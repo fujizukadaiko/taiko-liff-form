@@ -1,0 +1,128 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2575.7">
+  <style type="text/css">
+    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Hiragino Mincho ProN'; -webkit-text-stroke: #000000}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Hiragino Mincho ProN'; -webkit-text-stroke: #000000; min-height: 18.0px}
+    span.s1 {font-kerning: none}
+  </style>
+</head>
+<body>
+<p class="p1"><span class="s1">&lt;!doctype html&gt;</span></p>
+<p class="p1"><span class="s1">&lt;html lang="ja"&gt;</span></p>
+<p class="p1"><span class="s1">&lt;head&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;meta charset="utf-8" /&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;meta name="viewport" content="width=device-width,initial-scale=1" /&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;title&gt;出欠フォーム（LIFF）&lt;/title&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script src="https://static.line-scdn.net/liff/edge/2/sdk.js"&gt;&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;style&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>label { display:block; margin: 12px 0 6px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>select, input, textarea, button { width: 100%; padding: 10px; font-size: 16px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.hint { color:#666; font-size:12px; margin-top:6px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>.primary { background:#06c;color:#fff;border:none;border-radius:8px; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/style&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/head&gt;</span></p>
+<p class="p1"><span class="s1">&lt;body&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;h2&gt;公演 出欠登録&lt;/h2&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div id="userName" style="margin-bottom:8px;color:#444;"&gt;&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;label&gt;出欠&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;select id="attend" required&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;option value=""&gt;選択してください&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;option value="参加"&gt;参加&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;option value="不参加"&gt;不参加&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;option value="未定"&gt;未定&lt;/option&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/select&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div id="pendingWrap" style="display:none;"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;label&gt;未定の回答予定日（YYYY/MM/DD）&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;input id="pendingDate" type="text" placeholder="例）2025/09/10" /&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;div class="hint"&gt;未定を選んだ場合のみ&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;label&gt;車出し&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div class="row"&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;button type="button" id="carYes"&gt;はい&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>&lt;button type="button" id="carNo"&gt;いいえ&lt;/button&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/div&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;div id="carState" class="hint"&gt;未選択&lt;/div&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;label&gt;コメント（任意）&lt;/label&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;textarea id="comment" rows="3" placeholder="連絡事項があれば入力してください"&gt;&lt;/textarea&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;button id="submitBtn" class="primary" style="margin-top:16px;"&gt;送信&lt;/button&gt;</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;script&gt;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>// ★置換ポイント：LIFF ID と Apps Script WebアプリURL</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const LIFF_ID = "https://fujizukadaiko.github.io/taiko-liff-form/"; <span class="Apple-converted-space">                </span>// 例: 200xxx-xxxxxxxx</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzmZuvZwuZiatKR9L8oDeQFp5juY31L01guJEfL020uaAythliln-7AxP67zLdLL8m2/exec"; <span class="Apple-converted-space">    </span>// 例: https://script.google.com/macros/s/XXXX/exec</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>let car = ""; // "はい" | "いいえ" | ""</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>async function init() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>await liff.init({ liffId: LIFF_ID }); // liff.init は毎画面で必要</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!liff.isLoggedIn()) { liff.login(); return; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>// 表示用（scope=openid profile の場合）</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const tokenPayload = liff.getDecodedIDToken();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (tokenPayload &amp;&amp; tokenPayload.name) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById("userName").textContent = "対象：" + tokenPayload.name + " さん";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("attend").addEventListener("change", (e) =&gt; {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>document.getElementById("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>});</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("carYes").onclick = () =&gt; { car = "はい"; document.getElementById("carState").textContent = "はい"; };</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("carNo").onclick<span class="Apple-converted-space">  </span>= () =&gt; { car = "いいえ"; document.getElementById("carState").textContent = "いいえ"; };</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>document.getElementById("submitBtn").onclick = submitForm;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>async function submitForm() {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const attend = document.getElementById("attend").value;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const pendingDate = document.getElementById("pendingDate").value.trim();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const comment = document.getElementById("comment").value.trim();</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!attend) { alert("出欠を選んでください"); return; }</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (attend === "未定" &amp;&amp; pendingDate === "") {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (!confirm("未定の予定日が未入力です。このまま送信しますか？")) return;</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!car) { if (!confirm("車出しが未選択です。このまま送信しますか？")) return; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const idToken = liff.getIDToken(); // JWT（サーバーで検証）</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>if (!idToken) { alert("IDトークンが取得できません。LINEログイン後にお試しください。"); return; }</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>const payload = { idToken, form: { attend, pendingDate, car, comment } };</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>try {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const res = await fetch(API_ENDPOINT, {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>method: "POST",</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>headers: { "Content-Type": "application/json" },</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>body: JSON.stringify(payload),</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>});</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>const json = await res.json();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>if (json.status === "ok") {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>alert("送信しました。ありがとうございます！");</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>liff.closeWindow();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>} else {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">          </span>alert("送信に失敗しました: " + (json.message || "unknown"));</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>} catch (e) {</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">        </span>alert("通信に失敗しました: " + e);</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p2"><span class="s1"></span><br></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">    </span>init();</span></p>
+<p class="p1"><span class="s1"><span class="Apple-converted-space">  </span>&lt;/script&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/body&gt;</span></p>
+<p class="p1"><span class="s1">&lt;/html&gt;</span></p>
+</body>
+</html>
