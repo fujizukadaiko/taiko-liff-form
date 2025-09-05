@@ -14,9 +14,28 @@
     .ghost { background:#eee; border:1px solid #ddd; border-radius:8px; }
     .hint { color:#666; font-size:12px; }
     #msg { margin-top:8px; color:#444; }
+
+    /* ローディング（右上の小さなスピナー） */
+    #loading {
+      position: fixed; top: 12px; right: 12px;
+      display: none; align-items: center; gap: 8px;
+      background: rgba(0,0,0,0.65); color:#fff;
+      padding: 6px 10px; border-radius: 999px; font-size: 13px;
+    }
+    .spinner {
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: #fff; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 無効化時の見た目 */
+    .disabled { opacity: .6; pointer-events: none; }
   </style>
 </head>
 <body>
+  <div id="loading"><div class="spinner"></div><span id="loadingText">処理中…</span></div>
+
   <h2>出欠フォーム（初回登録テスト）</h2>
 
   <div class="card">
@@ -54,6 +73,32 @@
     const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxEEyy6bSNJLcsr9NcQy677-lVCNwK_-B0YTBM0V0i_f2yIMdlY2wiTF-_tmUDLUgxAPg/exec";
 
     let gLineId = "";
+    let busy = false;
+
+    // 共通：ボタンの非活性化＆文言切替
+    function setBusy(on, text = "処理中…") {
+      busy = on;
+      const loading = document.getElementById("loading");
+      const loadingText = document.getElementById("loadingText");
+      loadingText.textContent = text;
+      loading.style.display = on ? "flex" : "none";
+
+      // 触れる可能性のあるボタンをまとめて制御
+      const btns = [document.getElementById("beginBtn"), document.getElementById("regSubmit"), document.getElementById("pingBtn")];
+      btns.forEach(b=>{
+        if (!b) return;
+        if (on) {
+          if (!b.dataset.origText) b.dataset.origText = b.textContent;
+          b.textContent = (b.id === "beginBtn" ? "照会中…" : (b.id === "regSubmit" ? "送信中…" : "実行中…"));
+          b.classList.add("disabled");
+          b.disabled = true;
+        } else {
+          if (b.dataset.origText) b.textContent = b.dataset.origText;
+          b.classList.remove("disabled");
+          b.disabled = false;
+        }
+      });
+    }
 
     async function init() {
       await liff.init({ liffId: LIFF_ID });
@@ -63,29 +108,32 @@
 
     // 接続テスト
     document.getElementById("pingBtn").onclick = async ()=>{
+      if (busy) return;
+      setBusy(true, "接続テスト中…");
       try{
-        const t = await fetch(API_ENDPOINT + "?ping=1&ts="+Date.now()).then(r=>r.text());
+        const t = await fetch(API_ENDPOINT + "?ping=1&ts="+Date.now(), { cache:"no-store" }).then(r=>r.text());
         alert("接続テスト応答: " + t);
       }catch(e){ alert("接続失敗: " + e); }
+      finally { setBusy(false); }
     };
 
-    // 出欠入力をはじめる → whoami
+    // 出欠入力をはじめる → whoami（重複クリック防止）
     document.getElementById("beginBtn").onclick = async ()=>{
+      if (busy) return;
+      setBusy(true, "会員照会中…");
       try{
         const decoded = liff.getDecodedIDToken();
         if (!decoded || !decoded.sub) { alert("LINEログイン情報が取得できませんでした"); return; }
         gLineId = decoded.sub;
 
-        const res = await fetch(`${API_ENDPOINT}?whoami=1&id=${encodeURIComponent(gLineId)}&ts=${Date.now()}`);
+        const res = await fetch(`${API_ENDPOINT}?whoami=1&id=${encodeURIComponent(gLineId)}&ts=${Date.now()}`, { cache:"no-store" });
         const json = await res.json();
 
         if (json.status === "ok") {
-          // 既存登録あり → 出欠入力へ（今回はダミー表示）
           document.getElementById("regBox").style.display = "none";
           document.getElementById("attBox").style.display = "block";
           document.getElementById("msg").textContent = "登録済みとして判定しました。";
         } else if (json.status === "new") {
-          // 初回登録フォームを開く
           document.getElementById("regBox").style.display = "block";
           document.getElementById("attBox").style.display = "none";
           document.getElementById("msg").textContent = "初回登録が必要です。氏名を入力してください。";
@@ -94,11 +142,15 @@
         }
       }catch(e){
         alert("whoamiエラー: " + e);
+      } finally {
+        setBusy(false);
       }
     };
 
-    // 初回登録フォームの送信
+    // 初回登録フォームの送信（重複クリック防止）
     document.getElementById("regSubmit").onclick = async ()=>{
+      if (busy) return;
+      setBusy(true, "送信中…");
       try{
         const inputName = document.getElementById("inputName").value.trim();
         const performerName = document.getElementById("performerName").value.trim();
@@ -107,7 +159,7 @@
         if (!inputName || !performerName || !isPerformer) { alert("未入力があります"); return; }
 
         const url = `${API_ENDPOINT}?register=1&lineId=${encodeURIComponent(gLineId)}&inputName=${encodeURIComponent(inputName)}&performerName=${encodeURIComponent(performerName)}&isPerformer=${encodeURIComponent(isPerformer)}&ts=${Date.now()}`;
-        const json = await fetch(url, { method:"GET" }).then(r=>r.json());
+        const json = await fetch(url, { method:"GET", cache:"no-store" }).then(r=>r.json());
 
         if (json.status === "ok") {
           alert("登録しました。出欠入力へ進みます。");
@@ -119,6 +171,8 @@
         }
       }catch(e){
         alert("登録エラー: " + e);
+      } finally {
+        setBusy(false);
       }
     };
 
