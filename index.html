@@ -3,40 +3,44 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>出欠フォーム（LIFFテスト）</title>
+  <title>出欠フォーム（LIFF）</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }
-    #log { margin-top: 16px; padding: 12px; background:#f5f5f5; border-radius:8px; }
-    button { padding: 10px 16px; font-size: 16px; background:#06c; color:#fff; border:none; border-radius:6px; }
+    button { padding: 10px; font-size: 16px; margin-top: 20px; background:#06c; color:#fff; border:none; border-radius:8px; }
   </style>
 </head>
 <body>
-  <h2>LIFF テスト</h2>
-  <button id="startBtn">出欠入力を始める</button>
-  <div id="log">ログ出力エリア</div>
-
+  <h2>出欠テストフォーム</h2>
   <button id="startBtn">出欠入力を始める</button>
 
-<script>
-const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwrLSDi8eT5KWmH5zOj15eR0MuASdL4l2U5LebDy1Vl64nXS2enAcV_PNZctQVp_-l7MQ/exec";
+  <script>
+    const LIFF_ID = "2008020568-2jVl00Rn"; 
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwrLSDi8eT5KWmH5zOj15eR0MuASdL4l2U5LebDy1Vl64nXS2enAcV_PNZctQVp_-l7MQ/exec";
 
-async function init() {
-  await liff.init({ liffId: LIFF_ID });
-  if (!liff.isLoggedIn()) { liff.login(); return; }
+    async function init() {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login(); return; }
 
-  document.getElementById("startBtn").onclick = async () => {
-    const idToken = liff.getIDToken();
-    const decoded = liff.getDecodedIDToken();
-    const lineId = decoded.sub;   // ← LINE ID（固定のユーザーID）
+      document.getElementById("startBtn").onclick = async () => {
+        try {
+          const decoded = liff.getDecodedIDToken();
+          const lineId = decoded.sub;   // 固定のユーザーID
+          const displayName = decoded.name || "(no name)";
+          console.log("LINE ID:", lineId, "Name:", displayName);
 
-    // whoami判定を呼ぶ
-    const res = await fetch(`${API_ENDPOINT}?whoami=1&id=${lineId}`);
-    const json = await res.json();
-    alert("whoami応答: " + JSON.stringify(json));
-  };
-}
+          // whoami API 呼び出し
+          const res = await fetch(`${API_ENDPOINT}?whoami=1&id=${lineId}`);
+          const json = await res.json();
 
-init();
-</script>
+          alert("whoami応答: " + JSON.stringify(json));
+        } catch (err) {
+          alert("エラー: " + err);
+        }
+      };
+    }
+
+    init();
+  </script>
+</body>
+</html>
