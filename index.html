@@ -17,16 +17,23 @@
   .disabled { opacity:.6; pointer-events:none; }
   .hint { color:#666; font-size:12px; }
   #log { white-space:pre-wrap; font-size:12px; color:#555; margin-top:8px; }
+  #authWarn { display:none; background:#fff3cd; border:1px solid #ffeeba; color:#7a5; padding:10px; border-radius:8px; margin:8px 0; }
 </style>
 </head>
 <body>
   <h2>公演 出欠登録</h2>
 
   <div id="eventBox" class="card">読み込み中…</div>
+
   <div class="row" style="margin-bottom:8px;">
     <button id="reloadBtn" class="ghost">再読込</button>
     <button id="pingBtn" class="ghost">接続テスト</button>
   </div>
+
+  <div id="authWarn">
+    認証の更新が必要です。<button id="reauthBtn" class="primary" style="margin-left:8px;">再ログイン</button>
+  </div>
+
   <div id="userName" class="hint"></div>
 
   <!-- 未登録時：会員登録フォーム -->
@@ -102,7 +109,7 @@ function showTokenDebug(){
   $("debug").textContent = "aud:"+p.aud+" / exp:"+p.exp+" / 残り(秒):"+(p.exp-now);
 }
 
-// CORS回避のため FormData でPOST
+// ---- API（FormData） ----
 async function apiPostForm(payload){
   const fd = new FormData();
   Object.entries(payload).forEach(([k,v])=>{
@@ -115,51 +122,56 @@ async function apiPostForm(payload){
   try { return JSON.parse(txt); } catch { return { status:"error", raw:txt }; }
 }
 
-/* ===== 再認証ループ防止の仕掛け ===== */
-// 直近の再ログイン時刻（ms）を sessionStorage に保持し、60秒未満は再ログインしない
+/* ===== 再認証（手動トリガー） ===== */
+const RESUME_KEY = "resume_payload";
 const REAUTH_KEY = "reauth_at_ms";
-function shouldSkipReauthWithin(ms=60000){
-  const v = Number(sessionStorage.getItem(REAUTH_KEY) || "0");
-  return (Date.now() - v) < ms;
+
+function showAuthWarn(on=true){
+  $("authWarn").style.display = on ? "block" : "none";
 }
 function markReauthNow(){ sessionStorage.setItem(REAUTH_KEY, String(Date.now())); }
+function recentlyReauthed(ms=60000){
+  const v = Number(sessionStorage.getItem(REAUTH_KEY)||"0");
+  return (Date.now() - v) < ms;
+}
 
-// サーバが verify failed を返した時だけ 1回 re-login。復帰後に「保存済みペイロード」で自動再送
-const RESUME_KEY = "resume_payload";
-
-function requestReauthAndResume(payload){
-  if (shouldSkipReauthWithin(60000)) {
-    alert("認証を更新しました。画面を開き直してください。");
-    return;
-  }
-  sessionStorage.setItem(RESUME_KEY, JSON.stringify(payload));
+$("reauthBtn").onclick = ()=>{
+  if (recentlyReauthed()) { alert("直近で再ログイン済みです。少し待って再試行してください。"); return; }
+  const payload = $("reauthBtn").dataset.resume ? JSON.parse($("reauthBtn").dataset.resume) : null;
+  if (payload) sessionStorage.setItem(RESUME_KEY, JSON.stringify(payload));
   markReauthNow();
   const url = new URL(location.href);
   url.searchParams.set("resume","1");
   liff.login({ redirectUri: url.href });
+};
+
+function offerReauth(payload){
+  // ここでは自動で飛ばさず、ボタンを出すだけ
+  $("reauthBtn").dataset.resume = JSON.stringify(payload||{});
+  showAuthWarn(true);
 }
 
-function tryAutoResume(){
-  const url = new URL(location.href);
-  if (url.searchParams.get("resume") === "1") {
-    const saved = sessionStorage.getItem(RESUME_KEY);
-    sessionStorage.removeItem(RESUME_KEY);
-    if (saved) {
-      const payload = JSON.parse(saved);
-      // 送信再実行（whoami/登録/出欠 どれにも対応）
-      handleAction(payload);
-    }
-    // 二重再ログイン防止：URLの resume を消す
-    history.replaceState(null, "", location.pathname + location.search.replace(/([?&])resume=1(&|$)/, "$1").replace(/[?&]$/, ""));
+/* ===== アクション実行（自動再ログインはしない） ===== */
+async function handleAction(payload){
+  // idToken が必要なものは、あれば付ける。無ければそのまま投げてサーバ応答で判断
+  if (payload.action !== "activeEvent" && !payload.idToken) {
+    const tok = getIdToken();
+    if (tok) payload.idToken = tok;
   }
+  const resp = await apiPostForm(payload);
+  if (resp.status === "error" && resp.message === "verify failed") {
+    // 自動では飛ばさない。ボタンで明示的に再ログイン
+    offerReauth(payload);
+    return null;
+  }
+  return resp;
 }
 
-/* ===== イベント表示 ===== */
+/* ===== 画面構築 ===== */
 function formatEvent(ev){
   if (!ev) return "現在、配信中の公演はありません。";
   return `公演ID: ${ev.eventId}\n日時: ${ev.date} ${ev.time}\n場所: ${ev.place}`;
 }
-
 function buildPerformerSelect(members){
   const sel = $("selPerformer");
   sel.innerHTML = "";
@@ -173,23 +185,7 @@ function buildPerformerSelect(members){
   });
 }
 
-/* ===== 共通アクション実行（再送にも使う） ===== */
-async function handleAction(payload){
-  // payload は {action, idToken?, nonce?, form?}
-  if (payload.action !== "activeEvent" && !payload.idToken) {
-    const tok = getIdToken();
-    if (!tok) { requestReauthAndResume(payload); return; }
-    payload.idToken = tok;
-  }
-  const resp = await apiPostForm(payload);
-  if (resp.status === "error" && resp.message === "verify failed") {
-    requestReauthAndResume(payload);
-    return;
-  }
-  return resp;
-}
-
-/* ===== 初期化 ===== */
+/* ===== UIイベント ===== */
 $("attend").addEventListener("change", e=>{
   $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
 });
@@ -200,13 +196,14 @@ $("pingBtn").onclick = ()=>{
 };
 
 $("regBtn").onclick = async ()=>{
+  showAuthWarn(false);
   const inputName = $("inputName").value.trim();
   const performerName = $("performerName").value.trim();
   const isPerformer = $("isPerformer").value;
   if (!inputName || !performerName || !isPerformer) { alert("未入力があります"); return; }
   const payload = { action:"registerMember", form:{ inputName, performerName, isPerformer } };
   const resp = await handleAction(payload);
-  if (!resp) return; // 再認証へ遷移済み
+  if (!resp) { /* verify failed → ボタンで再ログインを案内 */ return; }
   if (resp.status === "ok") {
     alert("登録しました。出欠入力に進みます。");
     buildPerformerSelect(resp.members||[]);
@@ -219,6 +216,7 @@ $("regBtn").onclick = async ()=>{
 
 $("submitBtn").onclick = async ()=>{
   if (inFlight) return;
+  showAuthWarn(false);
   const eventId = window.__ACTIVE_EVENT_ID__ || "";
   if (!eventId) { alert("配信中の公演がありません"); return; }
   const performerName = $("selPerformer").value;
@@ -228,17 +226,16 @@ $("submitBtn").onclick = async ()=>{
   if (!performerName) { alert("演奏者を選択してください"); return; }
   if (!attend) { alert("出欠を選択してください"); return; }
 
-  const nonce = makeNonce();
-  setSubmitting(true);
   const payload = {
     action:"submitAttendance",
-    nonce,
+    nonce: makeNonce(),
     form:{ eventId, performerName, attend, pendingDate, comment }
   };
+  setSubmitting(true);
   const resp = await handleAction(payload);
   setSubmitting(false);
 
-  if (!resp) return; // 再認証へ遷移済み（復帰後に自動再送されます）
+  if (!resp) { /* verify failed → ボタンで再ログインを案内 */ return; }
   if (resp.status === "ok") {
     alert(resp.duplicate ? "（重複はスキップしました）送信済です。" : "送信しました。ありがとうございます！");
     try{ liff.closeWindow(); }catch(_){}
@@ -247,6 +244,7 @@ $("submitBtn").onclick = async ()=>{
   }
 };
 
+/* ===== 起動フロー ===== */
 window.addEventListener("error", ev=>{ alert("JSエラー: "+ev.message); });
 window.addEventListener("unhandledrejection", ev=>{ alert("通信エラー: "+(ev.reason && (ev.reason.message||ev.reason))); });
 
@@ -264,9 +262,10 @@ window.addEventListener("unhandledrejection", ev=>{ alert("通信エラー: "+(e
       $("eventBox").textContent = "現在、配信中の公演はありません。";
     }
 
-    // whoami（idToken必要：取れなければ handleAction 内で再認証→復帰後に自動再呼び出し）
+    // whoami（失敗時は認証ボタンを表示）
     const who = await handleAction({ action:"whoami" });
-    if (!who) return; // 再認証に遷移→復帰後に自動再実行
+    if (!who) { /* verify failed → 再ログインボタンが出ています */ return; }
+
     const idp = getDecoded(); if (idp && idp.name) $("userName").textContent = "対象：" + idp.name + " さん";
     showTokenDebug();
 
@@ -278,8 +277,29 @@ window.addEventListener("unhandledrejection", ev=>{ alert("通信エラー: "+(e
       $("attBox").style.display = "block";
     }
 
-    // ログイン復帰時の自動再送（登録/出欠）
-    tryAutoResume();
+    // もしログインから戻ってきたら、保管ペイロードがあれば再送
+    const url = new URL(location.href);
+    if (url.searchParams.get("resume") === "1") {
+      const saved = sessionStorage.getItem(RESUME_KEY);
+      sessionStorage.removeItem(RESUME_KEY);
+      if (saved) {
+        const payload = JSON.parse(saved);
+        showAuthWarn(false);
+        const res2 = await handleAction(payload);
+        if (res2 && res2.status === "ok" && payload.action === "registerMember") {
+          alert("登録しました。出欠入力に進みます。");
+          buildPerformerSelect(res2.members||[]);
+          $("regBox").style.display = "none";
+          $("attBox").style.display = "block";
+        } else if (res2 && res2.status === "ok" && payload.action === "submitAttendance") {
+          alert(res2.duplicate ? "（重複はスキップしました）送信済です。" : "送信しました。ありがとうございます！");
+          try{ liff.closeWindow(); }catch(_){}
+        }
+      }
+      // URLのresumeを消す
+      history.replaceState(null, "", location.pathname + location.search.replace(/([?&])resume=1(&|$)/, "$1").replace(/[?&]$/, ""));
+    }
+
   }catch(e){
     alert("初期化エラー: " + e);
   }
