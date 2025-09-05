@@ -48,10 +48,9 @@
   <div id="log"></div>
 
   <script>
-    // ★ここは実値のままで（差し替え済みのものをそのまま残してください）
+    // ★ここを必ず実値に差し替え
     const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";     
-    // 例: https://script.google.com/macros/s/XXXX/exec
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
 
     let car = ""; // "はい" | "いいえ" | ""
     const $ = (id) => document.getElementById(id);
@@ -66,11 +65,26 @@
     $("carNo").onclick  = () => { car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
     $("submitBtn").onclick = submitForm;
 
-    // --- グローバルエラーを可視化（静かに失敗するのを防ぐ）---
+    // --- グローバルエラーを可視化 ---
     window.addEventListener("error", (ev) => {
       alert("JSエラー: " + ev.message);
       log("JS error: " + ev.message);
     });
+
+    // --- 有効なIDトークンを保証するヘルパー ---
+    async function ensureFreshIdToken() {
+      const payload = liff.getDecodedIDToken(); // {exp,...} or null
+      const now = Date.now();
+      const expMs = payload?.exp ? payload.exp * 1000 : 0;
+      const almostExpired = expMs && (expMs - now < 30 * 1000); // 30秒未満は期限切れ扱い
+
+      if (!payload || almostExpired) {
+        log("ensureFreshIdToken: need refresh -> login()");
+        liff.login();
+        return null; // ログイン後に再読込される
+      }
+      return liff.getIDToken();
+    }
 
     // --- LIFF初期化 ---
     (async function init() {
@@ -81,12 +95,15 @@
         if (!liff.isLoggedIn()) {
           log("init: not logged in -> login()");
           liff.login();
-          return; // ← ログイン後に再ロードされます
+          return;
         }
-        const tokenPayload = liff.getDecodedIDToken();
-        if (tokenPayload && tokenPayload.name) {
-          $("userName").textContent = "対象：" + tokenPayload.name + " さん";
+        const payload = liff.getDecodedIDToken();
+        if (!payload || (payload.exp * 1000 - Date.now() < 30*1000)) {
+          log("init: token missing/expiring -> login()");
+          liff.login();
+          return;
         }
+        if (payload?.name) $("userName").textContent = "対象：" + payload.name + " さん";
         log("init: ready (logged in)");
       } catch (e) {
         alert("LIFF初期化でエラー: " + e);
@@ -108,13 +125,10 @@
         if (!confirm("車出しが未選択です。このまま送信しますか？")) return;
       }
 
-      const idToken = liff.getIDToken();
-      if (!idToken) {
-        alert("IDトークンが取得できません。LINEログイン後にお試しください。");
-        log("submit: no idToken");
-        return;
-      }
-      log("submit: have idToken");
+      // ★送信直前にトークンを必ずリフレッシュ確認
+      const idToken = await ensureFreshIdToken();
+      if (!idToken) { log("submit: token refresh via login (page reload)"); return; }
+      log("submit: have fresh idToken");
 
       const fd = new FormData();
       fd.append("idToken", idToken);
