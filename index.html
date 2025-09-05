@@ -97,10 +97,16 @@ function showTokenDebug(){
 }
 
 async function apiPost(payload){
-  const res = await fetch(API_ENDPOINT + "?ts=" + Date.now(), {
-    method:"POST", headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify(payload)
-  });
+  const fd = new FormData();
+  if (payload.action)  fd.append("action", payload.action);
+  if (payload.idToken) fd.append("idToken", payload.idToken);
+  if (payload.nonce)   fd.append("nonce", payload.nonce);
+  if (payload.form)    fd.append("form", JSON.stringify(payload.form));
+  // キャッシュバスター
+  const url = API_ENDPOINT + "?ts=" + Date.now();
+
+  // ★ Content-Type を手動で付けない（ブラウザに任せる）
+  const res = await fetch(url, { method:"POST", body: fd, cache:"no-store" });
   const txt = await res.text();
   try { return JSON.parse(txt); } catch { return { status:"error", raw:txt }; }
 }
