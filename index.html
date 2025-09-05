@@ -35,6 +35,7 @@
   <h2>出欠フォーム</h2>
 
   <div class="card">
+    <!-- ここに読みやすい公演情報を出す -->
     <div id="eventBox" class="hint">公演情報を読み込み中…</div>
     <div style="display:flex; gap:8px; margin-top:8px;">
       <button id="beginBtn" class="primary" style="flex:1;">出欠入力をはじめる</button>
@@ -62,6 +63,7 @@
   <!-- 出欠入力フォーム -->
   <div id="attBox" class="card" style="display:none;">
     <h3>出欠入力</h3>
+    <!-- ここにも同じ整形でサマリー表示 -->
     <div id="eventSummary" class="hint" style="margin-bottom:8px;"></div>
 
     <label>対象の演奏者</label>
@@ -118,6 +120,66 @@
       });
     }
 
+    // ===== 日時表示ユーティリティ =====
+    const WEEKS = ["日","月","火","水","木","金","土"];
+    const pad2 = n => String(n).padStart(2, "0");
+
+    // 文字列 or Dateらしき値から Date を作る（失敗時は null）
+    function parseToDate(val) {
+      if (!val) return null;
+      // 既にDateならそのまま
+      if (Object.prototype.toString.call(val) === "[object Date]" && !isNaN(val)) return val;
+      // 典型的な文字列をDate化
+      const d = new Date(val);
+      if (!isNaN(d)) return d;
+      // "2025/09/15" のような場合の安全パース
+      if (typeof val === "string") {
+        const m = val.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+        if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      }
+      return null;
+    }
+
+    // 時刻だけの扱い： "14:00" / Date(1899-12-30 14:00:00) 両対応
+    function parseToTime(val) {
+      if (!val) return null;
+      // Date文字列（1899年など）→ Dateにして時分を使う
+      const d = new Date(val);
+      if (!isNaN(d)) return d;
+      if (typeof val === "string") {
+        const m = val.match(/^(\d{1,2}):(\d{2})$/);
+        if (m) {
+          const t = new Date();
+          t.setHours(Number(m[1]), Number(m[2]), 0, 0);
+          return t;
+        }
+      }
+      return null;
+    }
+
+    function buildEventDisplay(ev) {
+      const d = parseToDate(ev.date);
+      const t = parseToTime(ev.time);
+      const datePart = d
+        ? `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}（${WEEKS[d.getDay()]}）`
+        : String(ev.date || "");
+      const timePart = t
+        ? `${pad2(t.getHours())}:${pad2(t.getMinutes())}`
+        : String(ev.time || "");
+      const line1 = `日時：${datePart}${timePart ? " " + timePart : ""}`;
+      const line2 = `場所：${ev.place || ""}`;
+      return { line1, line2 };
+    }
+
+    function applyEventDisplay(ev) {
+      const { line1, line2 } = buildEventDisplay(ev);
+      const eventBox = document.getElementById("eventBox");
+      const eventSummary = document.getElementById("eventSummary");
+      eventBox.textContent = `${line1}\n${line2}`;
+      if (eventSummary) eventSummary.textContent = `${line1}\n${line2}`;
+    }
+    // ===== /日時表示ユーティリティ =====
+
     function buildPerformerSelect(members){
       const sel = document.getElementById("selPerformer");
       sel.innerHTML = "";
@@ -138,9 +200,7 @@
         const j = await r.json();
         if (j.status==="ok" && j.event){
           activeEvent = j.event;
-          const txt = `公演ID: ${j.event.eventId} / 日時: ${j.event.date} ${j.event.time} / 場所: ${j.event.place}`;
-          document.getElementById("eventBox").textContent = txt;
-          document.getElementById("eventSummary").textContent = txt;
+          applyEventDisplay(j.event); // ★整形表示
         } else {
           document.getElementById("eventBox").textContent = "現在、配信中の公演はありません。";
           activeEvent = null;
@@ -184,6 +244,7 @@
           document.getElementById("regBox").style.display = "none";
           document.getElementById("attBox").style.display = "block";
           document.getElementById("msg").textContent = "登録済みとして判定しました。";
+          if (activeEvent) applyEventDisplay(activeEvent); // 出欠画面側にも表示
         } else if (json.status === "new") {
           document.getElementById("regBox").style.display = "block";
           document.getElementById("attBox").style.display = "none";
@@ -216,6 +277,7 @@
           document.getElementById("regBox").style.display = "none";
           document.getElementById("attBox").style.display = "block";
           document.getElementById("msg").textContent = "登録完了。出欠を入力してください。";
+          if (activeEvent) applyEventDisplay(activeEvent);
         } else {
           alert("登録失敗: " + (json.message || JSON.stringify(json)));
         }
@@ -243,7 +305,7 @@
 
         const qs = new URLSearchParams({
           submit:"1",
-          eventId: activeEvent.eventId,
+          eventId: activeEvent.eventId,  // 表示はしないが送信には使う
           lineId: gLineId,
           performerName, attend, pendingDate, comment,
           ts: String(Date.now())
