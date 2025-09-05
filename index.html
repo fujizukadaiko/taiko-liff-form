@@ -45,15 +45,15 @@
   <button id="submitBtn" class="primary" style="margin-top:16px;">送信</button>
 
   <script>
-    // ★置換ポイント：LIFF ID と Apps Script WebアプリURL
-    const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 200xxx-xxxxxxxx
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";
+    // ★ここを必ず実値に差し替え
+    const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";     
     // 例: https://script.google.com/macros/s/XXXX/exec
 
     let car = ""; // "はい" | "いいえ" | ""
 
     async function init() {
-      await liff.init({ liffId: LIFF_ID }); // liff.init は毎画面で必要
+      await liff.init({ liffId: LIFF_ID });
       if (!liff.isLoggedIn()) { liff.login(); return; }
 
       // 表示用（scope=openid profile の場合）
@@ -86,18 +86,16 @@
       const idToken = liff.getIDToken(); // JWT（サーバーで検証）
       if (!idToken) { alert("IDトークンが取得できません。LINEログイン後にお試しください。"); return; }
 
+      // FormData で送信（プリフライト回避）
       const fd = new FormData();
       fd.append("idToken", idToken);
       fd.append("form", JSON.stringify({ attend, pendingDate, car, comment }));
 
       try {
-        const res = await fetch(API_ENDPOINT, {
-          method: "POST",
-          body: fd,
-        });
-        // ← デバッグ用：サーバーの生テキストを表示
+        const res = await fetch(API_ENDPOINT, { method: "POST", body: fd });
+
+        // デバッグ用：サーバーの生テキストを表示（原因特定用）
         const raw = await res.text();
-        // 可能ならJSONとして解釈
         try {
           const json = JSON.parse(raw);
           if (json.status === "ok") {
@@ -109,10 +107,12 @@
             return;
           }
         } catch {
-          // JSONでなければそのまま表示
           alert("サーバー生応答：" + raw);
           return;
         }
+      } catch (e) {
+        alert("通信に失敗しました: " + e);
+      }
     }
 
     init();
