@@ -85,20 +85,29 @@
       const idToken = liff.getIDToken(); // JWT（サーバーで検証）
       if (!idToken) { alert("IDトークンが取得できません。LINEログイン後にお試しください。"); return; }
 
-      const payload = { idToken, form: { attend, pendingDate, car, comment } };
+      const fd = new FormData();
+      fd.append("idToken", idToken);
+      fd.append("form", JSON.stringify({ attend, pendingDate, car, comment }));
 
       try {
         const res = await fetch(API_ENDPOINT, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: fd,
         });
-        const json = await res.json();
-        if (json.status === "ok") {
+        let ok = false;
+        try {
+          const json = await res.json();
+          ok = json?.status === "ok";
+        } catch (_) {
+          // 読めない環境（no-cors相当）でも、ステータスが 200 なら成功扱いにする
+          ok = res.ok;
+        }
+
+        if (ok) {
           alert("送信しました。ありがとうございます！");
           liff.closeWindow();
         } else {
-          alert("送信に失敗しました: " + (json.message || "unknown"));
+          alert("送信に失敗しました（サーバー応答NG）。");
         }
       } catch (e) {
         alert("通信に失敗しました: " + e);
