@@ -95,24 +95,24 @@
           method: "POST",
           body: fd,
         });
-        let ok = false;
+        // ← デバッグ用：サーバーの生テキストを表示
+        const raw = await res.text();
+        // 可能ならJSONとして解釈
         try {
-          const json = await res.json();
-          ok = json?.status === "ok";
-        } catch (_) {
-          // 読めない環境（no-cors相当）でも、ステータスが 200 なら成功扱いにする
-          ok = res.ok;
+          const json = JSON.parse(raw);
+          if (json.status === "ok") {
+            alert("送信しました。ありがとうございます！");
+            liff.closeWindow();
+            return;
+          } else {
+            alert("サーバー応答：" + raw);
+            return;
+          }
+        } catch {
+          // JSONでなければそのまま表示
+          alert("サーバー生応答：" + raw);
+          return;
         }
-
-        if (ok) {
-          alert("送信しました。ありがとうございます！");
-          liff.closeWindow();
-        } else {
-          alert("送信に失敗しました（サーバー応答NG）。");
-        }
-      } catch (e) {
-        alert("通信に失敗しました: " + e);
-      }
     }
 
     init();
