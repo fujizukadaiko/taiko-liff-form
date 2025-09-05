@@ -13,6 +13,7 @@
     .hint { color:#666; font-size:12px; margin-top:6px; }
     .primary { background:#06c;color:#fff;border:none;border-radius:8px; }
     .ghost { background:#eee;color:#111;border:1px solid #ddd;border-radius:8px; }
+    .disabled { opacity: .6; pointer-events: none; }
     #log { margin-top:12px; font-size:12px; white-space:pre-wrap; color:#555; }
   </style>
 </head>
@@ -54,85 +55,85 @@
   <script>
     /* ===== 設定（ここを実値に差し替え） ===== */
     const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw9QUZnZ91EfrFyyCGo9LSh86Wsjxkb5s6KXjKpTa-RHYi3SkbkP7xb_YkPYkaxSE8/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzHMz0--fC8FiuaTlKqyDz7SQUMdCq7tHSIhhtjMp1_azDwFTTXqMXe7xh-WRwD-Wj8/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
     /* ======================================= */
 
-    // 簡易ログ
     function $(id){ return document.getElementById(id); }
     function log(m){ $("log").textContent += m + "\n"; }
 
-    // UIハンドラ
-    let car = ""; // "はい" | "いいえ" | ""
+    // 送信中ガード & ボタン制御
+    let inFlight = false;
+    function setSubmittingState(on){
+      const btn = $("submitBtn");
+      if(on){
+        btn.textContent = "送信中…";
+        btn.classList.add("disabled");
+        btn.disabled = true;
+        inFlight = true;
+      }else{
+        btn.textContent = "送信";
+        btn.classList.remove("disabled");
+        btn.disabled = false;
+        inFlight = false;
+      }
+    }
+
+    // UI
+    let car = "";
     $("attend").addEventListener("change", (e)=>{
       $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
-      log("attend change: " + e.target.value);
     });
-    $("carYes").onclick = ()=>{ car = "はい"; $("carState").textContent = "はい"; log("car = はい"); };
-    $("carNo").onclick  = ()=>{ car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
+    $("carYes").onclick = ()=>{ car = "はい"; $("carState").textContent = "はい"; };
+    $("carNo").onclick  = ()=>{ car = "いいえ"; $("carState").textContent = "いいえ"; };
     $("submitBtn").onclick = onSubmit;
     $("pingBtn").onclick   = ping;
 
-    // resume フラグ：リダイレクト復帰時に自動送信
-    const RESUME_KEY = "liff_resume_payload";
+    window.addEventListener("error", ev=>{
+      alert("JSエラー: " + ev.message);
+    });
+    window.addEventListener("unhandledrejection", ev=>{
+      alert("通信エラー: " + (ev.reason && (ev.reason.message||ev.reason)));
+    });
 
     function getDecodedSafely(){ try { return liff.getDecodedIDToken(); } catch(e){ return null; } }
     function getIdTokenSafely(){ try { return liff.getIDToken(); } catch(e){ return null; } }
-
     function showTokenDebug() {
       try {
         const p = getDecodedSafely();
         if (!p) { $("debug").textContent = "IDトークンなし"; return; }
         const now = Math.floor(Date.now()/1000);
-        const remain = p.exp - now;
-        $("debug").textContent =
-          "aud: " + p.aud + " / exp: " + p.exp + " / 残り(秒): " + remain;
+        $("debug").textContent = "aud: " + p.aud + " / exp: " + p.exp + " / 残り(秒): " + (p.exp - now);
       } catch (e) {
         $("debug").textContent = "decode失敗: " + e;
       }
     }
 
-    // LIFF初期化 → ログイン未済ならログイン → 復帰時は resume があれば自動送信
     (async function init(){
-      try {
-        await liff.init({ liffId: LIFF_ID });
-        if (!liff.isLoggedIn()) {
-          const url = new URL(location.href);
-          url.searchParams.set("resume","1");
-          sessionStorage.setItem(RESUME_KEY, "1");
-          liff.login({ redirectUri: url.href });
-          return;
-        }
-        const payload = getDecodedSafely();
-        if (payload && payload.name) $("userName").textContent = "対象：" + payload.name + " さん";
-        showTokenDebug();
-
-        // リダイレクト復帰時は自動送信を試みる
-        const url = new URL(location.href);
-        if (url.searchParams.get("resume") === "1" && sessionStorage.getItem(RESUME_KEY) === "1") {
-          sessionStorage.removeItem(RESUME_KEY);
-          log("resume: detected -> auto submit");
-          // 直前の入力は残っていないので、最低限送れるようダミー検知
-          // ここでは自動送信は控え、ユーザー操作で送ってもらう運用にします。
-          // 自動送信したい場合は、送信内容をURLやsessionStorageに保持する実装を足してください。
-        }
-      } catch(e){
-        alert("LIFF初期化エラー: " + e);
-        log("init error: " + e);
-      }
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+      const payload = getDecodedSafely();
+      if (payload && payload.name) $("userName").textContent = "対象：" + payload.name + " さん";
+      showTokenDebug();
     })();
 
-    // キャッシュバスター付き GET
     function ping(){
-      if(!API_ENDPOINT){ alert("API_ENDPOINTが未設定です"); return; }
       const url = API_ENDPOINT + "?ts=" + Date.now();
       fetch(url, { method:"GET", cache:"no-store" })
         .then(res => res.text())
-        .then(t => { alert("接続テスト応答: " + t); log("ping raw: "+t); })
-        .catch(e => { alert("接続テスト失敗: " + e); log("ping error: "+e); });
+        .then(t => alert("接続テスト応答: " + t))
+        .catch(e => alert("接続テスト失敗: " + e));
     }
 
-    // 送信ハンドラ（期限が近ければ自動ログイン→復帰後はボタンで再送）
-    function onSubmit(){
+    // 乱数ベースの冪等性トークン（nonce）
+    function makeNonce(){
+      const a = new Uint8Array(16);
+      crypto.getRandomValues(a);
+      return Array.from(a).map(x=>x.toString(16).padStart(2,"0")).join("");
+    }
+
+    async function onSubmit(){
+      if(inFlight) return; // 多重押下ガード
+
       const attend = $("attend").value;
       const pendingDate = $("pendingDate").value.trim();
       const comment = $("comment").value.trim();
@@ -147,51 +148,55 @@
 
       const p = getDecodedSafely();
       if(!p){
-        // 未ログイン → ログインして戻ってからもう一度押してもらう
-        const url = new URL(location.href);
-        url.searchParams.set("resume","1");
-        sessionStorage.setItem(RESUME_KEY, "1");
-        alert("認証を行います。OK後に画面へ戻ります。");
-        liff.login({ redirectUri: url.href });
+        alert("認証情報がありません。LINEトークから開き直してください。");
         return;
       }
-      const remain = p.exp*1000 - Date.now();
-      if (remain < 30000) {
-        // 30秒未満なら再ログイン
-        const url = new URL(location.href);
-        url.searchParams.set("resume","1");
-        sessionStorage.setItem(RESUME_KEY, "1");
-        alert("認証を更新します。OK後に画面へ戻ります。");
+      const remainMs = p.exp*1000 - Date.now();
+      if (remainMs < 30000) {
+        alert("認証を更新します。OK後に戻ります。");
+        const url = new URL(location.href); url.searchParams.set("resume","1");
         liff.login({ redirectUri: url.href });
         return;
       }
 
-      // ここまで来たら送信
       const idToken = getIdTokenSafely();
       if(!idToken){ alert("IDトークンを取得できません。LINEトークから開き直してください。"); return; }
 
+      // ここから送信確定：ボタン無効化
+      setSubmittingState(true);
+
+      const nonce = makeNonce();
       const fd = new FormData();
       fd.append("idToken", idToken);
+      fd.append("nonce", nonce); // ★ 冪等性トークン
       fd.append("form", JSON.stringify({ attend, pendingDate, car, comment }));
-      // デバッグ用：aud/exp を同梱
       fd.append("tokenAud", String(p.aud||""));
       fd.append("tokenExp", String(p.exp||""));
-      fd.append("ts", String(Date.now())); // キャッシュバスター
+      fd.append("ts", String(Date.now()));
 
-      fetch(API_ENDPOINT + "?ts=" + Date.now(), { method:"POST", body: fd, cache:"no-store" })
-        .then(res => res.text())
-        .then(raw => {
-          log("server raw: " + raw);
-          let json = null;
-          try{ json = JSON.parse(raw); }catch(_){}
-          if(json && json.status === "ok"){
-            alert("送信しました。ありがとうございます！");
-            try{ liff.closeWindow(); }catch(_){}
-            return;
-          }
-          if(raw){ alert("サーバー応答：" + raw); } else { alert("サーバー応答が空です"); }
-        })
-        .catch(e => { alert("通信に失敗しました: " + e); log("fetch error: " + e); });
+      try {
+        const res = await fetch(API_ENDPOINT + "?ts=" + Date.now(), { method:"POST", body: fd, cache:"no-store" });
+        const raw = await res.text();
+        let json = null; try{ json = JSON.parse(raw); }catch(_){}
+        // duplicate でもOKと同等に扱う
+        if(json && (json.status === "ok" || (json.status === "ok" && json.duplicate === true))){
+          alert(json && json.duplicate ? "送信済みデータを再送しませんでした（重複防止）。" : "送信しました。ありがとうございます！");
+          try{ liff.closeWindow(); }catch(_){}
+          return;
+        }
+        if(json && json.message === "verify failed"){
+          alert("認証の有効期限が切れました。OK後に戻ります。");
+          const url = new URL(location.href); url.searchParams.set("resume","1");
+          liff.login({ redirectUri: url.href });
+          return;
+        }
+        alert(raw ? ("サーバー応答："+raw) : "サーバー応答が空です");
+      } catch(e){
+        alert("通信に失敗しました: " + e);
+      } finally {
+        // 成否を問わず、ここではボタン復帰しておく（closeWindowできない環境を考慮）
+        setSubmittingState(false);
+      }
     }
   </script>
 </body>
