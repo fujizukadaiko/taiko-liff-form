@@ -3,19 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>出欠フォーム（初回登録テスト）</title>
+  <title>出欠フォーム</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; padding:16px; }
     .card { border:1px solid #ddd; border-radius:12px; padding:12px; margin:12px 0; }
     label { display:block; margin:10px 0 6px; }
-    input, select, button { width:100%; padding:10px; font-size:16px; }
+    input, select, textarea, button { width:100%; padding:10px; font-size:16px; }
     .primary { background:#06c; color:#fff; border:none; border-radius:8px; }
     .ghost { background:#eee; border:1px solid #ddd; border-radius:8px; }
     .hint { color:#666; font-size:12px; }
     #msg { margin-top:8px; color:#444; }
-
-    /* ローディング（右上の小さなスピナー） */
     #loading {
       position: fixed; top: 12px; right: 12px;
       display: none; align-items: center; gap: 8px;
@@ -28,20 +26,19 @@
       border-top-color: #fff; animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* 無効化時の見た目 */
     .disabled { opacity: .6; pointer-events: none; }
   </style>
 </head>
 <body>
   <div id="loading"><div class="spinner"></div><span id="loadingText">処理中…</span></div>
 
-  <h2>出欠フォーム（初回登録テスト）</h2>
+  <h2>出欠フォーム</h2>
 
   <div class="card">
-    <button id="beginBtn" class="primary">出欠入力をはじめる</button>
-    <div class="row" style="margin-top:8px;">
-      <button id="pingBtn" class="ghost">接続テスト</button>
+    <div id="eventBox" class="hint">公演情報を読み込み中…</div>
+    <div style="display:flex; gap:8px; margin-top:8px;">
+      <button id="beginBtn" class="primary" style="flex:1;">出欠入力をはじめる</button>
+      <button id="pingBtn" class="ghost" style="flex:1;">接続テスト</button>
     </div>
     <div id="msg" class="hint"></div>
   </div>
@@ -62,65 +59,117 @@
     <button id="regSubmit" class="primary" style="margin-top:12px;">登録する</button>
   </div>
 
-  <!-- 登録済みダミー表示（次フェーズで出欠入力UIに置換） -->
+  <!-- 出欠入力フォーム -->
   <div id="attBox" class="card" style="display:none;">
-    <h3>登録済みです</h3>
-    <div class="hint">この先は出欠入力UIを実装します（次フェーズ）。</div>
+    <h3>出欠入力</h3>
+    <div id="eventSummary" class="hint" style="margin-bottom:8px;"></div>
+
+    <label>対象の演奏者</label>
+    <select id="selPerformer"></select>
+
+    <label style="margin-top:10px;">出欠</label>
+    <select id="attend">
+      <option value="">選択してください</option>
+      <option value="参加">参加</option>
+      <option value="不参加">不参加</option>
+      <option value="未定">未定</option>
+    </select>
+
+    <div id="pendingWrap" style="display:none;">
+      <label>未定の回答予定日（YYYY/MM/DD）</label>
+      <input id="pendingDate" type="text" placeholder="例）2025/09/10" />
+    </div>
+
+    <label style="margin-top:10px;">コメント（任意）</label>
+    <textarea id="comment" rows="3" placeholder="連絡事項があれば入力してください"></textarea>
+
+    <button id="submitBtn" class="primary" style="margin-top:12px;">送信</button>
   </div>
 
   <script>
     const LIFF_ID = "2008020568-2jVl00Rn";
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxEEyy6bSNJLcsr9NcQy677-lVCNwK_-B0YTBM0V0i_f2yIMdlY2wiTF-_tmUDLUgxAPg/exec";
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwOy01jKo6Fz6SK7DyVZebDmrgWMkYH611CjyMkUPVsZT-ArHxadZR6X4SJmBoyfEf0NQ/exec";
 
     let gLineId = "";
     let busy = false;
+    let activeEvent = null;
+    let cachedMembers = [];
 
-    // 共通：ボタンの非活性化＆文言切替
-    function setBusy(on, text = "処理中…") {
+    function setBusy(on, text="処理中…") {
       busy = on;
       const loading = document.getElementById("loading");
-      const loadingText = document.getElementById("loadingText");
-      loadingText.textContent = text;
+      document.getElementById("loadingText").textContent = text;
       loading.style.display = on ? "flex" : "none";
-
-      // 触れる可能性のあるボタンをまとめて制御
-      const btns = [document.getElementById("beginBtn"), document.getElementById("regSubmit"), document.getElementById("pingBtn")];
+      const btns = ["beginBtn","regSubmit","pingBtn","submitBtn"]
+        .map(id=>document.getElementById(id))
+        .filter(Boolean);
       btns.forEach(b=>{
-        if (!b) return;
         if (on) {
           if (!b.dataset.origText) b.dataset.origText = b.textContent;
-          b.textContent = (b.id === "beginBtn" ? "照会中…" : (b.id === "regSubmit" ? "送信中…" : "実行中…"));
-          b.classList.add("disabled");
-          b.disabled = true;
+          if (b.id==="beginBtn") b.textContent="照会中…";
+          else if (b.id==="regSubmit") b.textContent="送信中…";
+          else if (b.id==="submitBtn") b.textContent="送信中…";
+          else b.textContent="実行中…";
+          b.classList.add("disabled"); b.disabled = true;
         } else {
           if (b.dataset.origText) b.textContent = b.dataset.origText;
-          b.classList.remove("disabled");
-          b.disabled = false;
+          b.classList.remove("disabled"); b.disabled = false;
         }
       });
+    }
+
+    function buildPerformerSelect(members){
+      const sel = document.getElementById("selPerformer");
+      sel.innerHTML = "";
+      // isPerformer=Y を優先。なければ全員
+      const perf = members.filter(m => (m.isPerformer||"").toUpperCase()==="Y");
+      const list = perf.length ? perf : members;
+      list.forEach(m=>{
+        const opt = document.createElement("option");
+        opt.value = m.performerName;
+        opt.textContent = m.performerName;
+        sel.appendChild(opt);
+      });
+    }
+
+    async function loadActiveEvent(){
+      try{
+        const r = await fetch(API_ENDPOINT + "?event=1&ts="+Date.now(), { cache:"no-store" });
+        const j = await r.json();
+        if (j.status==="ok" && j.event){
+          activeEvent = j.event;
+          const txt = `公演ID: ${j.event.eventId} / 日時: ${j.event.date} ${j.event.time} / 場所: ${j.event.place}`;
+          document.getElementById("eventBox").textContent = txt;
+          document.getElementById("eventSummary").textContent = txt;
+        } else {
+          document.getElementById("eventBox").textContent = "現在、配信中の公演はありません。";
+          activeEvent = null;
+        }
+      }catch(e){
+        document.getElementById("eventBox").textContent = "公演情報の取得に失敗しました。";
+      }
     }
 
     async function init() {
       await liff.init({ liffId: LIFF_ID });
       if (!liff.isLoggedIn()) { liff.login(); return; }
       document.getElementById("msg").textContent = "LIFF初期化完了。ボタンを押してください。";
+      loadActiveEvent(); // 起動時に公演だけ先読み
     }
 
     // 接続テスト
     document.getElementById("pingBtn").onclick = async ()=>{
-      if (busy) return;
-      setBusy(true, "接続テスト中…");
+      if (busy) return; setBusy(true,"接続テスト中…");
       try{
         const t = await fetch(API_ENDPOINT + "?ping=1&ts="+Date.now(), { cache:"no-store" }).then(r=>r.text());
         alert("接続テスト応答: " + t);
       }catch(e){ alert("接続失敗: " + e); }
-      finally { setBusy(false); }
+      finally{ setBusy(false); }
     };
 
-    // 出欠入力をはじめる → whoami（重複クリック防止）
+    // whoami
     document.getElementById("beginBtn").onclick = async ()=>{
-      if (busy) return;
-      setBusy(true, "会員照会中…");
+      if (busy) return; setBusy(true,"会員照会中…");
       try{
         const decoded = liff.getDecodedIDToken();
         if (!decoded || !decoded.sub) { alert("LINEログイン情報が取得できませんでした"); return; }
@@ -130,6 +179,8 @@
         const json = await res.json();
 
         if (json.status === "ok") {
+          cachedMembers = json.members || [];
+          buildPerformerSelect(cachedMembers);
           document.getElementById("regBox").style.display = "none";
           document.getElementById("attBox").style.display = "block";
           document.getElementById("msg").textContent = "登録済みとして判定しました。";
@@ -142,15 +193,12 @@
         }
       }catch(e){
         alert("whoamiエラー: " + e);
-      } finally {
-        setBusy(false);
-      }
+      } finally { setBusy(false); }
     };
 
-    // 初回登録フォームの送信（重複クリック防止）
+    // 初回登録
     document.getElementById("regSubmit").onclick = async ()=>{
-      if (busy) return;
-      setBusy(true, "送信中…");
+      if (busy) return; setBusy(true,"送信中…");
       try{
         const inputName = document.getElementById("inputName").value.trim();
         const performerName = document.getElementById("performerName").value.trim();
@@ -163,17 +211,53 @@
 
         if (json.status === "ok") {
           alert("登録しました。出欠入力へ進みます。");
+          cachedMembers = json.members || [];
+          buildPerformerSelect(cachedMembers);
           document.getElementById("regBox").style.display = "none";
           document.getElementById("attBox").style.display = "block";
-          document.getElementById("msg").textContent = "登録完了（次フェーズで出欠入力UIを実装）。";
+          document.getElementById("msg").textContent = "登録完了。出欠を入力してください。";
         } else {
           alert("登録失敗: " + (json.message || JSON.stringify(json)));
         }
-      }catch(e){
-        alert("登録エラー: " + e);
-      } finally {
-        setBusy(false);
-      }
+      }catch(e){ alert("登録エラー: " + e); }
+      finally { setBusy(false); }
+    };
+
+    // 出欠UIの動作
+    document.getElementById("attend").addEventListener("change", e=>{
+      document.getElementById("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
+    });
+
+    // 出欠送信
+    document.getElementById("submitBtn").onclick = async ()=>{
+      if (busy) return; setBusy(true,"送信中…");
+      try{
+        if (!activeEvent) { alert("配信中の公演がありません"); return; }
+        if (!gLineId) { alert("LINE IDが未取得です"); return; }
+        const performerName = document.getElementById("selPerformer").value;
+        const attend = document.getElementById("attend").value;
+        const pendingDate = document.getElementById("pendingDate").value.trim();
+        const comment = document.getElementById("comment").value.trim();
+        if (!performerName) { alert("演奏者を選択してください"); return; }
+        if (!attend) { alert("出欠を選択してください"); return; }
+
+        const qs = new URLSearchParams({
+          submit:"1",
+          eventId: activeEvent.eventId,
+          lineId: gLineId,
+          performerName, attend, pendingDate, comment,
+          ts: String(Date.now())
+        }).toString();
+
+        const json = await fetch(`${API_ENDPOINT}?${qs}`, { method:"GET", cache:"no-store" }).then(r=>r.json());
+        if (json.status === "ok") {
+          alert("送信しました。ありがとうございます！");
+          try { liff.closeWindow(); } catch(_){}
+        } else {
+          alert("送信失敗: " + (json.message || JSON.stringify(json)));
+        }
+      }catch(e){ alert("送信エラー: " + e); }
+      finally { setBusy(false); }
     };
 
     init();
