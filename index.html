@@ -19,7 +19,6 @@
 <body>
   <h2>公演 出欠登録</h2>
   <div id="userName" style="margin-bottom:8px;color:#444;"></div>
-  <div id="debug" class="hint" style="margin-top:8px;"></div>
 
   <button type="button" id="pingBtn" class="ghost" style="margin-bottom:12px;">接続テスト（GASへGET）</button>
 
@@ -49,128 +48,91 @@
 
   <button id="submitBtn" class="primary" style="margin-top:16px;">送信</button>
 
+  <div id="debug" class="hint" style="margin-top:8px;"></div>
   <div id="log"></div>
 
   <script>
     /* ===== 設定（ここを実値に差し替え） ===== */
     const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxeRa1hPzTdeM-9N-1iNf4mnsyf4eZ90YKaksChOu7BdA1IkV9N17ylp9l9JWsKYlCR/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw9QUZnZ91EfrFyyCGo9LSh86Wsjxkb5s6KXjKpTa-RHYi3SkbkP7xb_YkPYkaxSE8/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
     /* ======================================= */
 
     // 簡易ログ
     function $(id){ return document.getElementById(id); }
     function log(m){ $("log").textContent += m + "\n"; }
 
-    // UIハンドラは先に必ずバインド
+    // UIハンドラ
     let car = ""; // "はい" | "いいえ" | ""
-    $("attend").addEventListener("change", function(e){
+    $("attend").addEventListener("change", (e)=>{
       $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
       log("attend change: " + e.target.value);
     });
-    $("carYes").onclick = function(){ car = "はい"; $("carState").textContent = "はい"; log("car = はい"); };
-    $("carNo").onclick  = function(){ car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
-    $("submitBtn").onclick = submitForm;
-    $("pingBtn").onclick = ping;
+    $("carYes").onclick = ()=>{ car = "はい"; $("carState").textContent = "はい"; log("car = はい"); };
+    $("carNo").onclick  = ()=>{ car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
+    $("submitBtn").onclick = onSubmit;
+    $("pingBtn").onclick   = ping;
 
-    // エラー可視化
-    window.addEventListener("error", function(ev){
-      alert("JSエラー: " + ev.message + " @ " + (ev.filename||"") + ":" + (ev.lineno||""));
-      log("JS error: " + ev.message + " @ " + (ev.filename||"") + ":" + (ev.lineno||""));
-    });
-    window.addEventListener("unhandledrejection", function(ev){
-      alert("Promise未処理エラー: " + (ev.reason && (ev.reason.message||ev.reason)) );
-      log("unhandledrejection: " + (ev.reason && (ev.reason.message||ev.reason)));
-    });
-
-    // ===== 強制再ログイン用フラグ =====
-    const LOGIN_TRIED_KEY = "liff_relogin_once";
-    // ページ読み込みごとにフラグをリセット（常に新鮮な動作にする）
-    sessionStorage.removeItem(LOGIN_TRIED_KEY);
+    // resume フラグ：リダイレクト復帰時に自動送信
+    const RESUME_KEY = "liff_resume_payload";
 
     function getDecodedSafely(){ try { return liff.getDecodedIDToken(); } catch(e){ return null; } }
     function getIdTokenSafely(){ try { return liff.getIDToken(); } catch(e){ return null; } }
 
-    // 強制的に新しいIDトークンを取り直す（logout → login）
-    function forceRenewIdToken() {
-      if (!sessionStorage.getItem(LOGIN_TRIED_KEY)) {
-        sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
-        try { liff.logout(); } catch(_) {}
-        // 現在のURLに戻る
-        liff.login({ redirectUri: location.href });
-        return false; // この時点で遷移する
-      }
-      // 既に1回試しているのに取れない場合は案内
-      alert("認証の更新に失敗しました。LINEトークから開き直してください。");
-      return false;
-    }
-
-    // LIFF初期化
-    (function init(){
-      try {
-        log("init: start");
-        liff.init({ liffId: LIFF_ID }).then(function(){
-          log("init: liff initialized");
-          if(!liff.isLoggedIn()){
-            // 初回アクセスで未ログインなら、そのままログインへ
-            if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
-              sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
-              log("init: not logged in -> login()");
-              liff.login({ redirectUri: location.href });
-              return;
-            }else{
-              log("init: login already tried; skip");
-            }
-          }
-          const payload = getDecodedSafely();
-          if(payload && payload.name){ $("userName").textContent = "対象：" + payload.name + " さん"; }
-          log("init: ready");
-        }).catch(function(e){
-          alert("LIFF初期化でエラー: " + e);
-          log("init error: " + e);
-        });
-      } catch (e){
-        alert("LIFF初期化で例外: " + e);
-        log("init exception: " + e);
-      }
-    })();
-
-    // GASへのGETで疎通確認
-    function ping(){
-      if(!API_ENDPOINT){ alert("API_ENDPOINTが未設定です"); return; }
-      alert("GASへ接続テストを開始します");
-      fetch(API_ENDPOINT, { method:"GET" })
-        .then(function(res){ return res.text(); })
-        .then(function(t){ alert("接続テスト応答: " + t); log("ping raw: "+t); })
-        .catch(function(e){ alert("接続テスト失敗: " + e); log("ping error: "+e); });
-    }
     function showTokenDebug() {
       try {
-        const p = liff.getDecodedIDToken(); // { name, sub, aud, exp, ... }
+        const p = getDecodedSafely();
         if (!p) { $("debug").textContent = "IDトークンなし"; return; }
         const now = Math.floor(Date.now()/1000);
         const remain = p.exp - now;
         $("debug").textContent =
-          "aud(=LINE LoginのチャネルID): " + p.aud +
-          " / exp(秒): " + p.exp +
-          " / 残り(秒): " + remain;
+          "aud: " + p.aud + " / exp: " + p.exp + " / 残り(秒): " + remain;
       } catch (e) {
         $("debug").textContent = "decode失敗: " + e;
       }
     }
 
-    (function init(){
-      liff.init({ liffId: LIFF_ID }).then(function(){
-        if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
-        const payload = liff.getDecodedIDToken();
-        if (payload && payload.name) { $("userName").textContent = "対象：" + payload.name + " さん"; }
-        // ★ デバッグ表示
+    // LIFF初期化 → ログイン未済ならログイン → 復帰時は resume があれば自動送信
+    (async function init(){
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (!liff.isLoggedIn()) {
+          const url = new URL(location.href);
+          url.searchParams.set("resume","1");
+          sessionStorage.setItem(RESUME_KEY, "1");
+          liff.login({ redirectUri: url.href });
+          return;
+        }
+        const payload = getDecodedSafely();
+        if (payload && payload.name) $("userName").textContent = "対象：" + payload.name + " さん";
         showTokenDebug();
-      });
+
+        // リダイレクト復帰時は自動送信を試みる
+        const url = new URL(location.href);
+        if (url.searchParams.get("resume") === "1" && sessionStorage.getItem(RESUME_KEY) === "1") {
+          sessionStorage.removeItem(RESUME_KEY);
+          log("resume: detected -> auto submit");
+          // 直前の入力は残っていないので、最低限送れるようダミー検知
+          // ここでは自動送信は控え、ユーザー操作で送ってもらう運用にします。
+          // 自動送信したい場合は、送信内容をURLやsessionStorageに保持する実装を足してください。
+        }
+      } catch(e){
+        alert("LIFF初期化エラー: " + e);
+        log("init error: " + e);
+      }
     })();
 
-    // 送信：毎回送信直前にトークンを強制更新 → 戻ってきたら再度送信
-    function submitForm(){
-      log("submit: clicked");
+    // キャッシュバスター付き GET
+    function ping(){
+      if(!API_ENDPOINT){ alert("API_ENDPOINTが未設定です"); return; }
+      const url = API_ENDPOINT + "?ts=" + Date.now();
+      fetch(url, { method:"GET", cache:"no-store" })
+        .then(res => res.text())
+        .then(t => { alert("接続テスト応答: " + t); log("ping raw: "+t); })
+        .catch(e => { alert("接続テスト失敗: " + e); log("ping error: "+e); });
+    }
+
+    // 送信ハンドラ（期限が近ければ自動ログイン→復帰後はボタンで再送）
+    function onSubmit(){
       const attend = $("attend").value;
       const pendingDate = $("pendingDate").value.trim();
       const comment = $("comment").value.trim();
@@ -183,25 +145,42 @@
         if(!confirm("車出しが未選択です。このまま送信しますか？")) return;
       }
 
-      // ★ 送信直前に必ず新しいIDトークンを取得するため、強制的に再ログイン
-      if (!forceRenewIdToken()) return;
-
-      // ---- ここには通常到達しません（再ログインで遷移するため）----
-      // 戻ってきた後（2回目の送信）で、以下が実行されます。
-
-      let idToken = getIdTokenSafely();
-      if(!idToken){
-        alert("IDトークンを取得できません。LINEトークから開き直してください。");
+      const p = getDecodedSafely();
+      if(!p){
+        // 未ログイン → ログインして戻ってからもう一度押してもらう
+        const url = new URL(location.href);
+        url.searchParams.set("resume","1");
+        sessionStorage.setItem(RESUME_KEY, "1");
+        alert("認証を行います。OK後に画面へ戻ります。");
+        liff.login({ redirectUri: url.href });
         return;
       }
+      const remain = p.exp*1000 - Date.now();
+      if (remain < 30000) {
+        // 30秒未満なら再ログイン
+        const url = new URL(location.href);
+        url.searchParams.set("resume","1");
+        sessionStorage.setItem(RESUME_KEY, "1");
+        alert("認証を更新します。OK後に画面へ戻ります。");
+        liff.login({ redirectUri: url.href });
+        return;
+      }
+
+      // ここまで来たら送信
+      const idToken = getIdTokenSafely();
+      if(!idToken){ alert("IDトークンを取得できません。LINEトークから開き直してください。"); return; }
 
       const fd = new FormData();
       fd.append("idToken", idToken);
       fd.append("form", JSON.stringify({ attend, pendingDate, car, comment }));
+      // デバッグ用：aud/exp を同梱
+      fd.append("tokenAud", String(p.aud||""));
+      fd.append("tokenExp", String(p.exp||""));
+      fd.append("ts", String(Date.now())); // キャッシュバスター
 
-      fetch(API_ENDPOINT, { method:"POST", body: fd })
-        .then(function(res){ return res.text(); })
-        .then(function(raw){
+      fetch(API_ENDPOINT + "?ts=" + Date.now(), { method:"POST", body: fd, cache:"no-store" })
+        .then(res => res.text())
+        .then(raw => {
           log("server raw: " + raw);
           let json = null;
           try{ json = JSON.parse(raw); }catch(_){}
@@ -212,10 +191,7 @@
           }
           if(raw){ alert("サーバー応答：" + raw); } else { alert("サーバー応答が空です"); }
         })
-        .catch(function(e){
-          alert("通信に失敗しました: " + e);
-          log("fetch error: " + e);
-        });
+        .catch(e => { alert("通信に失敗しました: " + e); log("fetch error: " + e); });
     }
   </script>
 </body>
