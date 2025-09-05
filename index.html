@@ -21,7 +21,12 @@
 </head>
 <body>
   <h2>公演 出欠登録</h2>
+
   <div id="eventBox" class="card">読み込み中…</div>
+  <div class="row" style="margin-bottom:8px;">
+    <button id="reloadBtn" class="ghost">再読込</button>
+    <button id="pingBtn" class="ghost">接続テスト</button>
+  </div>
   <div id="userName" class="hint"></div>
 
   <!-- 未登録時：会員登録フォーム -->
@@ -63,18 +68,18 @@
     <button id="submitBtn" class="primary" style="margin-top:12px;">送信</button>
   </div>
 
-  <button id="pingBtn" class="ghost" style="margin-top:8px;">接続テスト</button>
   <div id="debug" class="hint" style="margin-top:8px;"></div>
   <div id="log"></div>
 
 <script>
-/* ===== 設定 ===== */
+/* ===== 設定（実値に差し替え） ===== */
 const LIFF_ID = "2008020568-2jVl00Rn";
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzbQbbDNajBj18rQ6B5AJdVkCvQOgOSGmv1sDHqYNRMaFj1jKqEEXrT4nNahGudkHsCrA/exec";
-/* =============== */
+/* ================================== */
 
 const $ = id => document.getElementById(id);
 const log = m => { $("log").textContent += m + "\n"; };
+
 let inFlight = false;
 const setSubmitting = on => {
   const b = $("submitBtn");
@@ -92,63 +97,62 @@ function getDecoded(){ try{ return liff.getDecodedIDToken(); }catch(_){ return n
 function getIdToken(){ try{ return liff.getIDToken(); }catch(_){ return null; } }
 function showTokenDebug(){
   const p = getDecoded(); if(!p){ $("debug").textContent="IDトークンなし"; return; }
-  const now = Math.floor(Date.now()/1000); $("debug").textContent =
-    "aud:"+p.aud+" / exp:"+p.exp+" / 残り(秒):"+(p.exp-now);
+  const now = Math.floor(Date.now()/1000);
+  $("debug").textContent = "aud:"+p.aud+" / exp:"+p.exp+" / 残り(秒):"+(p.exp-now);
 }
 
+// CORS回避のため FormData でPOST
 async function apiPost(payload){
   const fd = new FormData();
   if (payload.action)  fd.append("action", payload.action);
   if (payload.idToken) fd.append("idToken", payload.idToken);
   if (payload.nonce)   fd.append("nonce", payload.nonce);
   if (payload.form)    fd.append("form", JSON.stringify(payload.form));
-  // キャッシュバスター
-  const url = API_ENDPOINT + "?ts=" + Date.now();
-
-  // ★ Content-Type を手動で付けない（ブラウザに任せる）
-  const res = await fetch(url, { method:"POST", body: fd, cache:"no-store" });
+  const res = await fetch(API_ENDPOINT + "?ts=" + Date.now(), { method:"POST", body: fd, cache:"no-store" });
   const txt = await res.text();
   try { return JSON.parse(txt); } catch { return { status:"error", raw:txt }; }
 }
 
-async function init(){
-  await liff.init({ liffId: LIFF_ID });
-  // 1) イベント取得（トークン不要）
-  const ev = await apiPost({ action:"activeEvent" });
-  if (ev.status === "ok" && ev.event) {
-    $("eventBox").textContent = `公演ID:${ev.event.eventId} / ${ev.event.date} ${ev.event.time} @ ${ev.event.place}`;
-    window.__ACTIVE_EVENT_ID__ = ev.event.eventId;
-  } else {
-    $("eventBox").textContent = "現在、配信中の公演はありません。";
+// 1分未満のトークンは更新。未取得(null)でも更新。
+async function ensureFreshToken(minRemainMs = 60000){
+  const p = getDecoded();
+  if (!p) {
+    const url = new URL(location.href); url.searchParams.set("resume","1");
+    liff.login({ redirectUri: url.href });
+    return null; // ここで遷移
   }
-
-  // 2) 認証
-  if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
-  const idp = getDecoded(); if (idp && idp.name) $("userName").textContent = "対象：" + idp.name + " さん";
-  showTokenDebug();
-
-  // 3) 会員情報
-  const who = await apiPost({ action:"whoami", idToken: getIdToken() });
-  if (who.status !== "ok") { alert("認証エラー: 再度開き直してください"); return; }
-
-  const members = who.members || [];
-  if (members.length === 0) {
-    // 未登録 → 初回登録UI
-    $("regBox").style.display = "block";
-  } else {
-    // 登録済 → 出欠UI
-    buildPerformerSelect(members);
-    $("attBox").style.display = "block";
+  const remainMs = p.exp*1000 - Date.now();
+  if (remainMs < minRemainMs) {
+    const url = new URL(location.href); url.searchParams.set("resume","1");
+    liff.login({ redirectUri: url.href });
+    return null;
   }
+  // 念のため一度 getProfile を挟むと安定する端末がある
+  try { await liff.getProfile(); } catch(_) {}
+  const tok = getIdToken();
+  if (!tok) {
+    const url = new URL(location.href); url.searchParams.set("resume","1");
+    liff.login({ redirectUri: url.href });
+    return null;
+  }
+  return tok;
+}
+
+function formatEvent(ev){
+  if (!ev) return "現在、配信中の公演はありません。";
+  // 日付と時間を見やすく
+  const date = ev.date || "";
+  const time = ev.time || "";
+  const place = ev.place || "";
+  return `公演ID: ${ev.eventId}\n日時: ${date} ${time}\n場所: ${place}`;
 }
 
 function buildPerformerSelect(members){
   const sel = $("selPerformer");
   sel.innerHTML = "";
-  // isPerformer = Y のみ選択肢に（N=入力者本人が非演奏者）
-  const perfs = members.filter(m => (m.isPerformer||"").toUpperCase() === "Y");
-  const arr = perfs.length ? perfs : members; // 万一Yが無ければ全件候補
-  arr.forEach(m => {
+  const perfs = (members||[]).filter(m => (m.isPerformer||"").toUpperCase() === "Y");
+  const list = perfs.length ? perfs : (members||[]);
+  list.forEach(m=>{
     const opt = document.createElement("option");
     opt.value = m.performerName;
     opt.textContent = m.performerName;
@@ -161,15 +165,14 @@ $("attend").addEventListener("change", e=>{
 });
 
 $("regBtn").onclick = async ()=>{
+  const tok = await ensureFreshToken();
+  if (!tok) return; // ログインへ遷移
   const inputName = $("inputName").value.trim();
   const performerName = $("performerName").value.trim();
   const isPerformer = $("isPerformer").value;
   if (!inputName || !performerName || !isPerformer) { alert("未入力があります"); return; }
-  const resp = await apiPost({
-    action:"registerMember",
-    idToken:getIdToken(),
-    form:{ inputName, performerName, isPerformer }
-  });
+  const resp = await apiPost({ action:"registerMember", idToken: tok,
+    form:{ inputName, performerName, isPerformer }});
   if (resp.status === "ok") {
     alert("登録しました。出欠入力に進みます。");
     buildPerformerSelect(resp.members||[]);
@@ -190,19 +193,15 @@ $("submitBtn").onclick = async ()=>{
   const comment = $("comment").value.trim();
   if (!performerName) { alert("演奏者を選択してください"); return; }
   if (!attend) { alert("出欠を選択してください"); return; }
-  if (attend === "未定" && pendingDate === "") {
-    if (!confirm("未定の予定日が未入力です。このまま送信しますか？")) return;
-  }
-  // expが30秒未満なら更新
-  const p = getDecoded(); if (!p) { alert("認証が必要です。開き直してください。"); return; }
-  const remainMs = p.exp*1000 - Date.now();
-  if (remainMs < 30000) { alert("認証を更新します。OK後に戻ります。"); liff.login({ redirectUri: location.href }); return; }
+
+  const tok = await ensureFreshToken(60000);
+  if (!tok) return; // ログインへ遷移
 
   const nonce = makeNonce();
   setSubmitting(true);
   const resp = await apiPost({
     action:"submitAttendance",
-    idToken:getIdToken(),
+    idToken: tok,
     nonce,
     form:{ eventId, performerName, attend, pendingDate, comment }
   });
@@ -213,12 +212,14 @@ $("submitBtn").onclick = async ()=>{
     try{ liff.closeWindow(); }catch(_){}
   } else if (resp.message === "verify failed") {
     alert("認証の有効期限が切れました。OK後に戻ります。");
-    liff.login({ redirectUri: location.href });
+    const url = new URL(location.href); url.searchParams.set("resume","1");
+    liff.login({ redirectUri: url.href });
   } else {
     alert("送信エラー: " + (resp.raw || resp.message));
   }
 };
 
+$("reloadBtn").onclick = ()=>{ location.replace(location.href.split("#")[0]); };
 $("pingBtn").onclick = ()=>{
   fetch(API_ENDPOINT + "?ping=1&ts="+Date.now(), { method:"GET", cache:"no-store" })
     .then(r=>r.text()).then(t=>alert("接続: "+t)).catch(e=>alert("失敗: "+e));
@@ -227,7 +228,45 @@ $("pingBtn").onclick = ()=>{
 window.addEventListener("error", ev=>{ alert("JSエラー: "+ev.message); });
 window.addEventListener("unhandledrejection", ev=>{ alert("通信エラー: "+(ev.reason && (ev.reason.message||ev.reason))); });
 
-init();
+(async function init(){
+  try{
+    await liff.init({ liffId: LIFF_ID });
+
+    // 1) イベント取得（トークン不要）
+    const ev = await (async ()=>{
+      const fd = new FormData(); fd.append("action","activeEvent");
+      const r = await fetch(API_ENDPOINT + "?ts="+Date.now(), { method:"POST", body:fd, cache:"no-store" });
+      const t = await r.text(); try{ return JSON.parse(t); }catch{ return { status:"error", raw:t }; }
+    })();
+    if (ev.status === "ok" && ev.event) {
+      $("eventBox").textContent = formatEvent(ev.event);
+      window.__ACTIVE_EVENT_ID__ = ev.event.eventId;
+    } else {
+      $("eventBox").textContent = "現在、配信中の公演はありません。";
+    }
+
+    // 2) 認証 & whoami（ここで必ずトークンを新鮮に）
+    const tok = await ensureFreshToken(60000);
+    if (!tok) return; // ログインへ遷移
+    const idp = getDecoded(); if (idp && idp.name) $("userName").textContent = "対象：" + idp.name + " さん";
+    showTokenDebug();
+
+    const who = await apiPost({ action:"whoami", idToken: tok });
+    if (who.status !== "ok") {
+      alert("認証エラー：開き直してください");
+      return;
+    }
+    const members = who.members || [];
+    if (members.length === 0) {
+      $("regBox").style.display = "block";
+    } else {
+      buildPerformerSelect(members);
+      $("attBox").style.display = "block";
+    }
+  }catch(e){
+    alert("初期化エラー: " + e);
+  }
+})();
 </script>
 </body>
 </html>
