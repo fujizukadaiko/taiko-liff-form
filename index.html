@@ -19,6 +19,7 @@
 <body>
   <h2>公演 出欠登録</h2>
   <div id="userName" style="margin-bottom:8px;color:#444;"></div>
+  <div id="debug" class="hint" style="margin-top:8px;"></div>
 
   <button type="button" id="pingBtn" class="ghost" style="margin-bottom:12px;">接続テスト（GASへGET）</button>
 
@@ -142,6 +143,30 @@
         .then(function(t){ alert("接続テスト応答: " + t); log("ping raw: "+t); })
         .catch(function(e){ alert("接続テスト失敗: " + e); log("ping error: "+e); });
     }
+    function showTokenDebug() {
+      try {
+        const p = liff.getDecodedIDToken(); // { name, sub, aud, exp, ... }
+        if (!p) { $("debug").textContent = "IDトークンなし"; return; }
+        const now = Math.floor(Date.now()/1000);
+        const remain = p.exp - now;
+        $("debug").textContent =
+          "aud(=LINE LoginのチャネルID): " + p.aud +
+          " / exp(秒): " + p.exp +
+          " / 残り(秒): " + remain;
+      } catch (e) {
+        $("debug").textContent = "decode失敗: " + e;
+      }
+    }
+
+    (function init(){
+      liff.init({ liffId: LIFF_ID }).then(function(){
+        if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+        const payload = liff.getDecodedIDToken();
+        if (payload && payload.name) { $("userName").textContent = "対象：" + payload.name + " さん"; }
+        // ★ デバッグ表示
+        showTokenDebug();
+      });
+    })();
 
     // 送信：毎回送信直前にトークンを強制更新 → 戻ってきたら再度送信
     function submitForm(){
