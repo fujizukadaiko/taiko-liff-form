@@ -81,52 +81,40 @@
       log("unhandledrejection: " + (ev.reason && (ev.reason.message||ev.reason)));
     });
 
-    // login多重防止
-    const LOGIN_TRIED_KEY = "liff_login_tried_once";
+    // ===== 強制再ログイン用フラグ =====
+    const LOGIN_TRIED_KEY = "liff_relogin_once";
+    // ページ読み込みごとにフラグをリセット（常に新鮮な動作にする）
+    sessionStorage.removeItem(LOGIN_TRIED_KEY);
 
     function getDecodedSafely(){ try { return liff.getDecodedIDToken(); } catch(e){ return null; } }
     function getIdTokenSafely(){ try { return liff.getIDToken(); } catch(e){ return null; } }
 
-    // 送信直前の有効期限チェック（30秒未満なら1回だけ login）
-    function ensureTokenFreshOrLoginOnce(){
-      const payload = getDecodedSafely();
-      if(!payload || !payload.exp){
-        // payload 取れない＝未ログイン相当
-        if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
-          sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
-          alert("認証を行います。OK後に再読み込みされます。");
-          liff.login();
-        }else{
-          alert("認証情報が取得できません。LINEトークから開き直してください。");
-        }
-        return false;
+    // 強制的に新しいIDトークンを取り直す（logout → login）
+    function forceRenewIdToken() {
+      if (!sessionStorage.getItem(LOGIN_TRIED_KEY)) {
+        sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
+        try { liff.logout(); } catch(_) {}
+        // 現在のURLに戻る
+        liff.login({ redirectUri: location.href });
+        return false; // この時点で遷移する
       }
-      const now = Date.now();
-      const expMs = payload.exp * 1000;
-      if (expMs - now < 30000) { // 30秒未満で失効しそう
-        if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
-          sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
-          alert("認証を更新します。OK後に再読み込みされます。");
-          liff.login();
-        }else{
-          alert("トークン有効期限の更新に失敗しました。LINEトークから開き直してください。");
-        }
-        return false;
-      }
-      return true;
+      // 既に1回試しているのに取れない場合は案内
+      alert("認証の更新に失敗しました。LINEトークから開き直してください。");
+      return false;
     }
 
-    // LIFF初期化（loginは同一セッション1回まで）
+    // LIFF初期化
     (function init(){
       try {
         log("init: start");
         liff.init({ liffId: LIFF_ID }).then(function(){
           log("init: liff initialized");
           if(!liff.isLoggedIn()){
+            // 初回アクセスで未ログインなら、そのままログインへ
             if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
               sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
               log("init: not logged in -> login()");
-              liff.login();
+              liff.login({ redirectUri: location.href });
               return;
             }else{
               log("init: login already tried; skip");
@@ -155,7 +143,7 @@
         .catch(function(e){ alert("接続テスト失敗: " + e); log("ping error: "+e); });
     }
 
-    // 送信：期限チェック→POST→サーバ応答を見て必要時のみ再ログイン
+    // 送信：毎回送信直前にトークンを強制更新 → 戻ってきたら再度送信
     function submitForm(){
       log("submit: clicked");
       const attend = $("attend").value;
@@ -170,8 +158,11 @@
         if(!confirm("車出しが未選択です。このまま送信しますか？")) return;
       }
 
-      // 送信直前の期限チェック（必要時のみ1回 login）
-      if(!ensureTokenFreshOrLoginOnce()) return;
+      // ★ 送信直前に必ず新しいIDトークンを取得するため、強制的に再ログイン
+      if (!forceRenewIdToken()) return;
+
+      // ---- ここには通常到達しません（再ログインで遷移するため）----
+      // 戻ってきた後（2回目の送信）で、以下が実行されます。
 
       let idToken = getIdTokenSafely();
       if(!idToken){
@@ -194,19 +185,6 @@
             try{ liff.closeWindow(); }catch(_){}
             return;
           }
-          // 期限切れならこの時点で初めて再ログインを促す
-          if(json && json.message === "verify failed" && (json.raw||"").toLowerCase().indexOf("expired") >= 0){
-            if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
-              sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
-              alert("認証を更新します。OK後に再読み込みされます。");
-              liff.login();
-              return;
-            }else{
-              alert("再ログイン後も失敗しました。LINEトークから開き直してください。");
-              return;
-            }
-          }
-          // その他の応答はそのまま表示
           if(raw){ alert("サーバー応答：" + raw); } else { alert("サーバー応答が空です"); }
         })
         .catch(function(e){
