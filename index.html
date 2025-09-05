@@ -3,49 +3,42 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>出欠フォーム（複数人一括＋複数演奏者登録）</title>
+  <title>出欠フォーム</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; padding:16px; }
-    .card { border:1px solid #ddd; border-radius:12px; padding:12px; margin:12px 0; background:#fff; }
-    label { display:block; margin:10px 0 6px; }
+    body { font-family: system-ui, -apple-system, sans-serif; padding:16px; background:#f6f7f8; }
+    .card { border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin:12px 0; background:#fff; }
+    h2,h3,h4 { margin:6px 0 10px; }
+    label { display:block; margin:8px 0 6px; }
     input, select, textarea, button { width:100%; padding:10px; font-size:16px; box-sizing:border-box; }
-    .primary { background:#06c; color:#fff; border:none; border-radius:8px; }
-    .ghost { background:#f6f7f8; border:1px solid #ddd; border-radius:8px; }
-    .danger { background:#e11; color:#fff; border:none; border-radius:8px; }
-    .hint { color:#666; font-size:12px; }
-    #msg { margin-top:8px; color:#444; }
+    .primary { background:#0b66ff; color:#fff; border:none; border-radius:8px; }
+    .ghost { background:#f3f4f6; border:1px solid #e5e7eb; border-radius:8px; }
+    .hint { color:#6b7280; font-size:12px; }
+    #msg { margin-top:8px; color:#374151; }
     #loading {
       position: fixed; top: 12px; right: 12px;
       display: none; align-items: center; gap: 8px;
-      background: rgba(0,0,0,0.65); color:#fff;
+      background: rgba(17,17,17,0.75); color:#fff;
       padding: 6px 10px; border-radius: 999px; font-size: 13px;
+      z-index: 9999;
     }
-    .spinner {
-      width: 14px; height: 14px; border-radius: 50%;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #fff; animation: spin 0.8s linear infinite;
-    }
+    .spinner { width: 14px; height: 14px; border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff; animation: spin .8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .disabled { opacity: .6; pointer-events: none; }
 
     /* table */
     table { width:100%; border-collapse: collapse; table-layout: fixed; }
     th, td { border-bottom:1px solid #eee; padding:10px 6px; font-size:15px; vertical-align: middle; }
-    th { text-align:left; color:#333; background:#fafafa; }
+    th { text-align:left; color:#374151; background:#f9fafb; }
     .nameCell { width:40%; word-break: break-all; }
-    .attCell  { width:35%; }
-    .pdCell   { width:25%; }
-
-    .radio3 { display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
-    .radio3 label { display:flex; align-items:center; gap:6px; margin:0; }
-    .pendingDate { width:100%; min-width: 120px; }
-    .rowBtns { display:flex; gap:8px; }
+    .attCell  { width:30%; }
+    .pdCell   { width:30%; }
 
     /* 演奏者の追加行 */
-    .rowGrid { display:grid; grid-template-columns: 1fr 120px 90px; gap:10px; }
-    .rowGrid > * { min-width: 0; }
-    .toolbar { display:flex; gap:8px; }
+    .rowGrid { display:grid; grid-template-columns: 1fr 96px; gap:10px; margin-bottom:8px; }
+    .toolbar { display:flex; gap:8px; justify-content:flex-end; }
+    .delBtn { width:auto; }
   </style>
 </head>
 <body>
@@ -55,36 +48,34 @@
 
   <div class="card">
     <div id="eventBox" class="hint">公演情報を読み込み中…</div>
-    <div style="display:flex; gap:8px; margin-top:8px;">
+    <div style="display:flex; gap:8px; margin-top:10px;">
       <button id="beginBtn" class="primary" style="flex:1;">出欠入力をはじめる</button>
       <button id="pingBtn" class="ghost" style="flex:1;">接続テスト</button>
     </div>
     <div id="msg" class="hint"></div>
   </div>
 
-  <!-- 初回登録フォーム（複数演奏者対応） -->
+  <!-- 初回登録（複数演奏者） -->
   <div id="regBox" class="card" style="display:none;">
     <h3>初回登録</h3>
     <label>入力者氏名</label>
     <input id="inputName" type="text" placeholder="例）山田太郎" />
 
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px;">
       <h4 style="margin:0;">演奏者一覧</h4>
       <div class="toolbar">
         <button id="addPerfBtn" class="ghost" type="button">＋ 演奏者を追加</button>
       </div>
     </div>
-    <div id="perfList" class="hint" style="margin-top:8px;">
-      <!-- 動的に行を追加 -->
+    <div id="perfList" style="margin-top:8px;">
+      <!-- 演奏者行が動的に入る -->
     </div>
+    <div class="hint">入力者ご自身が演奏者の場合は、演奏者一覧にも同じお名前を追加してください。</div>
 
     <button id="regSubmitBulk" class="primary" style="margin-top:12px;">登録する</button>
-    <div class="hint" style="margin-top:6px;">
-      ※ 各行の「演奏者フラグ」は、その人が実際に出演するメンバーなら「はい(Y)」。保護者等は「いいえ(N)」にしてください。
-    </div>
   </div>
 
-  <!-- 出欠入力（複数人） -->
+  <!-- 出欠入力（複数人・プルダウン） -->
   <div id="attBox" class="card" style="display:none;">
     <h3>出欠入力</h3>
     <div id="eventSummary" class="hint" style="margin-bottom:8px;"></div>
@@ -99,7 +90,7 @@
 
   <script>
     const LIFF_ID = "2008020568-2jVl00Rn";
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxVsV3PR0sCxZwy9IGZ3-Kxsv89q2_-KFBYdnDXzdJ9kQ2naKCxFonDoLmRvbmgPJtk_g/exec";
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwsoLiXdkWIPazi4RAcww9YyfbuwfEEnwPXw-8tYGFGXuyRSvXVo0RD8-krZ6H0xJch1A/exec";
 
     let gLineId = "";
     let busy = false;
@@ -115,15 +106,12 @@
       document.getElementById("loadingText").textContent = text;
       loading.style.display = on ? "flex" : "none";
       const btns = ["beginBtn","regSubmitBulk","pingBtn","submitBulkBtn","addPerfBtn"]
-        .map(id=>document.getElementById(id))
-        .filter(Boolean);
+        .map(id=>document.getElementById(id)).filter(Boolean);
       btns.forEach(b=>{
         if (on) {
           if (!b.dataset.origText) b.dataset.origText = b.textContent;
-          if (b.id==="beginBtn") b.textContent="照会中…";
-          else if (b.id==="regSubmitBulk") b.textContent="送信中…";
-          else if (b.id==="submitBulkBtn") b.textContent="送信中…";
-          else b.textContent="実行中…";
+          b.textContent = (b.id==="submitBulkBtn" || b.id==="regSubmitBulk") ? "送信中…" :
+                          (b.id==="beginBtn") ? "照会中…" : "実行中…";
           b.classList.add("disabled"); b.disabled = true;
         } else {
           if (b.dataset.origText) b.textContent = b.dataset.origText;
@@ -179,32 +167,25 @@
     }
     // ===== /日時表示ユーティリティ =====
 
-    // === 初回登録（複数演奏者 UI） ===
-    function addPerformerRow(name="", flag="Y") {
+    // --- 初回登録：演奏者行の追加・削除 ---
+    function addPerformerRow(name="") {
       const host = document.getElementById("perfList");
       const row = document.createElement("div");
       row.className = "rowGrid";
       row.innerHTML = `
         <input type="text" class="perfNameInput" placeholder="演奏者氏名" value="${name}">
-        <select class="perfFlag">
-          <option value="Y"${flag==="Y"?" selected":""}>はい（演奏者）</option>
-          <option value="N"${flag==="N"?" selected":""}>いいえ（保護者など）</option>
-        </select>
-        <div class="rowBtns">
-          <button type="button" class="ghost btnDel">− 削除</button>
-        </div>
+        <button type="button" class="ghost delBtn">− 削除</button>
       `;
-      row.querySelector(".btnDel").onclick = ()=> {
+      row.querySelector(".delBtn").onclick = ()=> {
         host.removeChild(row);
-        if (host.children.length === 0) addPerformerRow(); // 行がなくならないように1行補充
+        if (host.children.length === 0) addPerformerRow(); // 最低1行は維持
       };
       host.appendChild(row);
     }
 
-    // === 出欠（複数行）UI ===
+    // --- 出欠（複数）UI（プルダウン） ---
     function renderMultiForm(members){
-      const perf = members.filter(m => (m.isPerformer||"").toUpperCase()==="Y");
-      const list = perf.length ? perf : members;
+      const list = members; // もうフラグは無い。登録されている演奏者全員を対象にする
 
       const wrap = document.getElementById("multiForm");
       wrap.innerHTML = "";
@@ -233,29 +214,33 @@
 
         const tdAttend = document.createElement("td");
         tdAttend.className = "attCell";
-        tdAttend.innerHTML = `
-          <div class="radio3">
-            <label><input type="radio" name="att_${idx}" value="参加">参加</label>
-            <label><input type="radio" name="att_${idx}" value="不参加">不参加</label>
-            <label><input type="radio" name="att_${idx}" value="未定">未定</label>
-          </div>`;
+        const sel = document.createElement("select");
+        sel.id = `att_${idx}`;
+        sel.innerHTML = `
+          <option value="">選択してください</option>
+          <option value="参加">参加</option>
+          <option value="不参加">不参加</option>
+          <option value="未定">未定</option>`;
+        tdAttend.appendChild(sel);
 
         const tdPending = document.createElement("td");
         tdPending.className = "pdCell";
-        tdPending.innerHTML = `
-          <input type="text" class="pendingDate" id="pd_${idx}" placeholder="YYYY/MM/DD" disabled>
-          <div class="hint">未定時のみ入力</div>`;
+        const pd = document.createElement("input");
+        pd.type = "text";
+        pd.placeholder = "YYYY/MM/DD";
+        pd.id = `pd_${idx}`;
+        pd.disabled = true;
+        pd.className = "pendingDate";
+        tdPending.appendChild(pd);
+        const hint = document.createElement("div");
+        hint.className = "hint";
+        hint.textContent = "未定時のみ入力";
+        tdPending.appendChild(hint);
 
-        // ラジオの変更で未定日入力を制御
-        setTimeout(()=>{
-          const radios = tdAttend.querySelectorAll(`input[name="att_${idx}"]`);
-          radios.forEach(r=>{
-            r.addEventListener("change", ()=>{
-              const input = tdPending.querySelector(`#pd_${idx}`);
-              input.disabled = (r.value !== "未定");
-              if (r.value !== "未定") input.value = "";
-            });
-          });
+        // 出欠選択に応じて予定日をON/OFF
+        sel.addEventListener("change", ()=>{
+          pd.disabled = (sel.value !== "未定");
+          if (sel.value !== "未定") pd.value = "";
         });
 
         tr.appendChild(tdName);
@@ -290,7 +275,7 @@
       document.getElementById("msg").textContent = "LIFF初期化完了。ボタンを押してください。";
 
       // 初回登録の演奏者リストを最低1行用意
-      addPerformerRow("","Y");
+      addPerformerRow("");
 
       loadActiveEvent();
     }
@@ -305,7 +290,7 @@
       finally{ setBusy(false); }
     };
 
-    // 出欠開始（whoami）
+    // whoami → 既存なら出欠へ／未登録なら初回登録
     document.getElementById("beginBtn").onclick = async ()=>{
       if (busy) return; setBusy(true,"会員照会中…");
       try{
@@ -335,10 +320,10 @@
       } finally { setBusy(false); }
     };
 
-    // 初回登録：演奏者行の追加
+    // 初回登録：演奏者追加
     document.getElementById("addPerfBtn").onclick = ()=>{
       if (busy) return;
-      addPerformerRow("","Y");
+      addPerformerRow("");
     };
 
     // 初回登録：まとめて送信
@@ -354,10 +339,7 @@
         const rows = host.querySelectorAll(".rowGrid");
         rows.forEach(row=>{
           const name = row.querySelector(".perfNameInput").value.trim();
-          const flag = row.querySelector(".perfFlag").value.trim();
-          if (name && (flag==="Y" || flag==="N")) {
-            list.push({ performerName: name, isPerformer: flag });
-          }
+          if (name) list.push(name);
         });
         if (list.length === 0) { alert("演奏者を1名以上入力してください"); return; }
 
@@ -379,7 +361,7 @@
       finally { setBusy(false); }
     };
 
-    // まとめて送信（Attendance）
+    // 出欠：まとめて送信
     document.getElementById("submitBulkBtn").onclick = async ()=>{
       if (busy) return; setBusy(true,"送信中…");
       try{
@@ -387,16 +369,13 @@
         if (!gLineId) { alert("LINE IDが未取得です"); return; }
         const commentAll = document.getElementById("commentAll").value.trim();
 
-        const perf = cachedMembers.filter(m => (m.isPerformer||"").toUpperCase()==="Y");
-        const list = perf.length ? perf : cachedMembers;
-
+        const list = cachedMembers;
         const bulk = [];
         list.forEach((m, idx)=>{
-          const radios = document.querySelectorAll(`input[name="att_${idx}"]`);
-          let val = "";
-          radios.forEach(r=>{ if (r.checked) val = r.value; });
-          if (!val) return; // 未選択は送らない（柔らかい仕様）
-          const pd = document.getElementById(`pd_${idx}`);
+          const sel = document.getElementById(`att_${idx}`);
+          const pd  = document.getElementById(`pd_${idx}`);
+          const val = sel ? sel.value : "";
+          if (!val) return; // 未選択は送らない
           bulk.push({
             performerName: m.performerName,
             attend: val,
