@@ -4,7 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>出欠フォーム（LIFF）</title>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <!-- 互換性配慮：crossorigin を付けてエラー情報を拾いやすくする -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" crossorigin="anonymous"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }
     label { display:block; margin: 12px 0 6px; }
@@ -48,258 +49,137 @@
   <div id="log"></div>
 
   <script>
-    // ★ここは実値に差し替え
+    // ★ここを実値に差し替え
     const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
     const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
 
-    let car = ""; // "はい" | "いいえ" | ""
-    const $ = (id) => document.getElementById(id);
-    const log = (m) => { const el = $("log"); el.textContent += (m + "\n"); };
+    var car = ""; // "はい" | "いいえ" | ""
+    function $(id){ return document.getElementById(id); }
+    function log(m){ var el=$("log"); el.textContent += (m + "\n"); }
 
-    // --- 先にハンドラを必ずバインド ---
-    $("attend").addEventListener("change", (e) => {
+    // 先にハンドラを必ずバインド（init結果に依存させない）
+    $("attend").addEventListener("change", function(e){
       $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
       log("attend change: " + e.target.value);
     });
-    $("carYes").onclick = () => { car = "はい"; $("carState").textContent = "はい"; log("car = はい"); };
-    $("carNo").onclick  = () => { car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
+    $("carYes").onclick = function(){ car = "はい"; $("carState").textContent = "はい"; log("car = はい"); };
+    $("carNo").onclick  = function(){ car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
     $("submitBtn").onclick = submitForm;
 
-    // --- グローバルエラー可視化 ---
-    window.addEventListener("error", (ev) => { alert("JSエラー: " + ev.message); log("JS error: " + ev.message); });
+    // エラー可視化（古いWebView向けに詳細も）
+    window.addEventListener("error", function(ev){
+      alert("JSエラー: " + ev.message + " @ " + (ev.filename||"") + ":" + (ev.lineno||""));
+      log("JS error: " + ev.message + " @ " + (ev.filename||"") + ":" + (ev.lineno||""));
+    });
+    window.addEventListener("unhandledrejection", function(ev){
+      alert("Promise未処理エラー: " + (ev.reason && (ev.reason.message||ev.reason)) );
+      log("unhandledrejection: " + (ev.reason && (ev.reason.message||ev.reason)));
+    });
 
-    // --- login() 連打を防ぐためのガード（同一セッション1回まで） ---
-    const LOGIN_TRIED_KEY = "liff_login_tried";
-    const REFRESH_TRIED_KEY = "liff_refresh_tried"; // トークン更新の再ログインも1回まで
+    // ループ抑止フラグ
+    var LOGIN_TRIED_KEY = "liff_login_tried";
+    var REFRESH_TRIED_KEY = "liff_refresh_tried";
 
-    // --- 有効なIDトークンを保証する（必要なら1回だけlogin） ---
-    async function ensureFreshIdToken() {
-      const payload = liff.getDecodedIDToken(); // {exp,...} or null
-      const now = Date.now();
-      const expMs = payload?.exp ? payload.exp * 1000 : 0;
-      const almostExpired = expMs && (expMs - now < 30 * 1000);
+    function getDecoded(){ 
+      try { return liff.getDecodedIDToken(); } catch(e){ return null; }
+    }
 
-      if (!payload || almostExpired) {
-        if (!sessionStorage.getItem(REFRESH_TRIED_KEY)) {
+    // モダン構文を使わずに期限チェック
+    function isTokenAlmostExpired(payload){
+      if(!payload || !payload.exp) return true;
+      var now = Date.now();
+      var expMs = payload.exp * 1000;
+      return (expMs - now) < 30000; // 30秒未満なら期限切れ扱い
+    }
+
+    // 有効なIDトークンを保証（必要なら1回だけlogin）
+    function ensureFreshIdToken(){
+      var payload = getDecoded();
+      if(!payload || isTokenAlmostExpired(payload)){
+        if(!sessionStorage.getItem(REFRESH_TRIED_KEY)){
           sessionStorage.setItem(REFRESH_TRIED_KEY, "1");
           log("ensureFreshIdToken: refreshing -> login()");
-          liff.login(); // ← ここで再読み込みされる
-        } else {
+          liff.login();
+        }else{
           log("ensureFreshIdToken: refresh already tried; give up");
           alert("再ログインが必要ですが、繰り返しを防ぐため中断しました。LINEトークから開き直してください。");
         }
         return null;
       }
-      return liff.getIDToken();
+      try { return liff.getIDToken(); } catch(e){ return null; }
     }
 
-    // --- LIFF初期化（loginは最多1回だけ） ---
-    (async function init() {
+    // LIFF初期化（loginは同一セッション1回まで）
+    (function init(){
       try {
         log("init: start");
-        await liff.init({ liffId: LIFF_ID });
-        log("init: liff initialized");
-
-        if (!liff.isLoggedIn()) {
-          if (!sessionStorage.getItem(LOGIN_TRIED_KEY)) {
-            sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
-            log("init: not logged in -> login() once");
-            liff.login();
-            return;
-          } else {
-            log("init: login already tried; skip");
+        liff.init({ liffId: LIFF_ID }).then(function(){
+          log("init: liff initialized");
+          if(!liff.isLoggedIn()){
+            if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
+              sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
+              log("init: not logged in -> login() once");
+              liff.login();
+              return;
+            }else{
+              log("init: login already tried; skip");
+            }
           }
-        }
-
-        const payload = liff.getDecodedIDToken();
-        if (payload?.name) $("userName").textContent = "対象：" + payload.name + " さん";
-        log("init: ready");
-      } catch (e) {
-        alert("LIFF初期化でエラー: " + e);
-        log("init error: " + e);
+          var payload = getDecoded();
+          if(payload && payload.name){ $("userName").textContent = "対象：" + payload.name + " さん"; }
+          log("init: ready");
+        }).catch(function(e){
+          alert("LIFF初期化でエラー: " + e);
+          log("init error: " + e);
+        });
+      } catch (e){
+        alert("LIFF初期化で例外: " + e);
+        log("init exception: " + e);
       }
     })();
 
-    async function submitForm() {
+    function submitForm(){
       log("submit: clicked");
-      const attend = $("attend").value;
-      const pendingDate = $("pendingDate").value.trim();
-      const comment = $("comment").value.trim();
+      var attend = $("attend").value;
+      var pendingDate = $("pendingDate").value.trim();
+      var comment = $("comment").value.trim();
 
-      if (!attend) { alert("出欠を選んでください"); return; }
-      if (attend === "未定" && pendingDate === "") {
-        if (!confirm("未定の予定日が未入力です。このまま送信しますか？")) return;
+      if(!attend){ alert("出欠を選んでください"); return; }
+      if(attend === "未定" && pendingDate === ""){
+        if(!confirm("未定の予定日が未入力です。このまま送信しますか？")) return;
       }
-      if (!car) {
-        if (!confirm("車出しが未選択です。このまま送信しますか？")) return;
+      if(!car){
+        if(!confirm("車出しが未選択です。このまま送信しますか？")) return;
       }
 
-      // ★送信直前に“新鮮な”トークンを保証（最多1回だけlogin）
-      const idToken = await ensureFreshIdToken();
-      if (!idToken) { log("submit: token refresh requested; page may reload"); return; }
+      var idToken = ensureFreshIdToken();
+      if(!idToken){ log("submit: token refresh requested; page may reload"); return; }
       log("submit: have fresh idToken");
 
-      const fd = new FormData();
+      var fd = new FormData();
       fd.append("idToken", idToken);
-      fd.append("form", JSON.stringify({ attend, pendingDate, car, comment }));
+      fd.append("form", JSON.stringify({ attend:attend, pendingDate:pendingDate, car:car, comment:comment }));
 
-      try {
-        const res = await fetch(API_ENDPOINT, { method: "POST", body: fd });
-        const raw = await res.text();
-        log("server raw: " + raw);
-        try {
-          const json = JSON.parse(raw);
-          if (json.status === "ok") {
-            alert("送信しました。ありがとうございます！");
-            liff.closeWindow();
-            return;
-          } else {
-            alert("サーバー応答：" + raw);
-            return;
+      fetch(API_ENDPOINT, { method:"POST", body:fd })
+        .then(function(res){ return res.text(); })
+        .then(function(raw){
+          log("server raw: " + raw);
+          try{
+            var json = JSON.parse(raw);
+            if(json.status === "ok"){
+              alert("送信しました。ありがとうございます！");
+              try{ liff.closeWindow(); }catch(_){}
+            }else{
+              alert("サーバー応答：" + raw);
+            }
+          }catch(_){
+            alert("サーバー生応答：" + raw);
           }
-        } catch {
-          alert("サーバー生応答：" + raw);
-          return;
-        }
-      } catch (e) {
-        alert("通信に失敗しました: " + e);
-        log("fetch error: " + e);
-      }
-    }
-  </script>
-</body>
-</html>
-  </select>
-
-  <div id="pendingWrap" style="display:none;">
-    <label>未定の回答予定日（YYYY/MM/DD）</label>
-    <input id="pendingDate" type="text" placeholder="例）2025/09/10" />
-    <div class="hint">未定を選んだ場合のみ</div>
-  </div>
-
-  <label>車出し</label>
-  <div class="row">
-    <button type="button" id="carYes">はい</button>
-    <button type="button" id="carNo">いいえ</button>
-  </div>
-  <div id="carState" class="hint">未選択</div>
-
-  <label>コメント（任意）</label>
-  <textarea id="comment" rows="3" placeholder="連絡事項があれば入力してください"></textarea>
-
-  <button id="submitBtn" class="primary" style="margin-top:16px;">送信</button>
-
-  <div id="log"></div>
-
-  <script>
-    // ★ここを必ず実値に差し替え
-    const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
-
-    let car = ""; // "はい" | "いいえ" | ""
-    const $ = (id) => document.getElementById(id);
-    const log = (m) => { const el = $("log"); el.textContent += (m + "\n"); };
-
-    // --- 先にハンドラを必ずバインド（initの成否に依存させない）---
-    $("attend").addEventListener("change", (e) => {
-      $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
-      log("attend change: " + e.target.value);
-    });
-    $("carYes").onclick = () => { car = "はい"; $("carState").textContent = "はい"; log("car = はい"); };
-    $("carNo").onclick  = () => { car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
-    $("submitBtn").onclick = submitForm;
-
-    // --- グローバルエラーを可視化 ---
-    window.addEventListener("error", (ev) => {
-      alert("JSエラー: " + ev.message);
-      log("JS error: " + ev.message);
-    });
-
-    // --- 有効なIDトークンを保証するヘルパー ---
-    async function ensureFreshIdToken() {
-      const payload = liff.getDecodedIDToken(); // {exp,...} or null
-      const now = Date.now();
-      const expMs = payload?.exp ? payload.exp * 1000 : 0;
-      const almostExpired = expMs && (expMs - now < 30 * 1000); // 30秒未満は期限切れ扱い
-
-      if (!payload || almostExpired) {
-        log("ensureFreshIdToken: need refresh -> login()");
-        liff.login();
-        return null; // ログイン後に再読込される
-      }
-      return liff.getIDToken();
-    }
-
-    // --- LIFF初期化 ---
-    (async function init() {
-      try {
-        log("init: start");
-        await liff.init({ liffId: LIFF_ID });
-        log("init: liff initialized");
-        if (!liff.isLoggedIn()) {
-          log("init: not logged in -> login()");
-          liff.login();
-          return;
-        }
-        const payload = liff.getDecodedIDToken();
-        if (!payload || (payload.exp * 1000 - Date.now() < 30*1000)) {
-          log("init: token missing/expiring -> login()");
-          liff.login();
-          return;
-        }
-        if (payload?.name) $("userName").textContent = "対象：" + payload.name + " さん";
-        log("init: ready (logged in)");
-      } catch (e) {
-        alert("LIFF初期化でエラー: " + e);
-        log("init error: " + e);
-      }
-    })();
-
-    async function submitForm() {
-      log("submit: clicked");
-      const attend = $("attend").value;
-      const pendingDate = $("pendingDate").value.trim();
-      const comment = $("comment").value.trim();
-
-      if (!attend) { alert("出欠を選んでください"); return; }
-      if (attend === "未定" && pendingDate === "") {
-        if (!confirm("未定の予定日が未入力です。このまま送信しますか？")) return;
-      }
-      if (!car) {
-        if (!confirm("車出しが未選択です。このまま送信しますか？")) return;
-      }
-
-      // ★送信直前にトークンを必ずリフレッシュ確認
-      const idToken = await ensureFreshIdToken();
-      if (!idToken) { log("submit: token refresh via login (page reload)"); return; }
-      log("submit: have fresh idToken");
-
-      const fd = new FormData();
-      fd.append("idToken", idToken);
-      fd.append("form", JSON.stringify({ attend, pendingDate, car, comment }));
-
-      try {
-        const res = await fetch(API_ENDPOINT, { method: "POST", body: fd });
-        const raw = await res.text();
-        log("server raw: " + raw);
-        try {
-          const json = JSON.parse(raw);
-          if (json.status === "ok") {
-            alert("送信しました。ありがとうございます！");
-            liff.closeWindow();
-            return;
-          } else {
-            alert("サーバー応答：" + raw);
-            return;
-          }
-        } catch {
-          alert("サーバー生応答：" + raw);
-          return;
-        }
-      } catch (e) {
-        alert("通信に失敗しました: " + e);
-        log("fetch error: " + e);
-      }
+        })
+        .catch(function(e){
+          alert("通信に失敗しました: " + e);
+          log("fetch error: " + e);
+        });
     }
   </script>
 </body>
