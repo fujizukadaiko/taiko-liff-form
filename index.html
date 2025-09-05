@@ -56,11 +56,12 @@
     const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz8XnLiPGr_M5c7LhGUO4SlziLLOuRTxhUlZkQUTWPeAB85875JIUr3nEh_s1wSz3tE/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
     /* ======================================= */
 
-    var car = ""; // "はい" | "いいえ" | ""
+    // 簡易ログ
     function $(id){ return document.getElementById(id); }
-    function log(m){ var el=$("log"); el.textContent += (m + "\n"); }
+    function log(m){ $("log").textContent += m + "\n"; }
 
-    // 先にハンドラを必ずバインド
+    // UIハンドラは先に必ずバインド
+    let car = ""; // "はい" | "いいえ" | ""
     $("attend").addEventListener("change", function(e){
       $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
       log("attend change: " + e.target.value);
@@ -80,12 +81,10 @@
       log("unhandledrejection: " + (ev.reason && (ev.reason.message||ev.reason)));
     });
 
-    // ループ抑止フラグ（同一セッションで多重loginを避ける）
-    var LOGIN_TRIED_KEY = "liff_login_tried";
+    // login多重防止
+    const LOGIN_TRIED_KEY = "liff_login_tried";
 
-    function getDecoded(){ 
-      try { return liff.getDecodedIDToken(); } catch(e){ return null; }
-    }
+    function getDecodedSafely(){ try { return liff.getDecodedIDToken(); } catch(e){ return null; } }
 
     // LIFF初期化（loginは同一セッション1回まで）
     (function init(){
@@ -103,7 +102,7 @@
               log("init: login already tried; skip");
             }
           }
-          var payload = getDecoded();
+          const payload = getDecodedSafely();
           if(payload && payload.name){ $("userName").textContent = "対象：" + payload.name + " さん"; }
           log("init: ready");
         }).catch(function(e){
@@ -116,7 +115,7 @@
       }
     })();
 
-    // GASへのGETで接続確認（/exec → doGet で "alive" が返るはず）
+    // GASへのGETで疎通確認
     function ping(){
       if(!API_ENDPOINT){ alert("API_ENDPOINTが未設定です"); return; }
       alert("GASへ接続テストを開始します");
@@ -126,12 +125,12 @@
         .catch(function(e){ alert("接続テスト失敗: " + e); log("ping error: "+e); });
     }
 
-    // 送信：まず必ずPOST。期限切れ等はサーバー応答で判断して1回だけlogin
+    // 送信：まず必ずPOST（投げっぱなし）。verifyエラーなどはサーバー側に委譲
     function submitForm(){
       log("submit: clicked");
-      var attend = $("attend").value;
-      var pendingDate = $("pendingDate").value.trim();
-      var comment = $("comment").value.trim();
+      const attend = $("attend").value;
+      const pendingDate = $("pendingDate").value.trim();
+      const comment = $("comment").value.trim();
 
       if(!attend){ alert("出欠を選んでください"); return; }
       if(attend === "未定" && pendingDate === ""){
@@ -141,8 +140,8 @@
         if(!confirm("車出しが未選択です。このまま送信しますか？")) return;
       }
 
-      // 1) まず“今ある”IDトークンを使う（無ければ1回だけlogin）
-      var idToken = null;
+      // 今あるIDトークンを使う（無ければ1回だけlogin）
+      let idToken = null;
       try { idToken = liff.getIDToken(); } catch(_){}
       if(!idToken){
         if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
@@ -159,50 +158,24 @@
       }
       log("submit: have idToken (len=" + idToken.length + ")");
 
-      // 2) 送信（必ずPOSTを試す）
-      var fd = new FormData();
+      const fd = new FormData();
       fd.append("idToken", idToken);
       fd.append("form", JSON.stringify({ attend:attend, pendingDate:pendingDate, car:car, comment:comment }));
 
-      alert("GASへ送信を開始します");
-      fetch(API_ENDPOINT, { method:"POST", body:fd })
-        .then(function(res){ return res.text(); })
-        .then(function(raw){
-          log("server raw: " + raw);
-
-          var json = null;
-          try{ json = JSON.parse(raw); }catch(_){}
-
-          // 3) 成功
-          if(json && json.status === "ok"){
-            alert("送信しました。ありがとうございます！");
-            try{ liff.closeWindow(); }catch(_){}
-            return;
-          }
-
-          // 4) 期限切れ等の verify 失敗時に“はじめて”1回だけ再ログイン
-          if(json && json.message === "verify failed" && (json.raw||"").toLowerCase().indexOf("expired") >= 0){
-            if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
-              sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
-              alert("認証を更新します。OK後に再読み込みされます。");
-              log("submit: verify failed expired -> login()");
-              liff.login();
-              return;
-            }else{
-              alert("再ログイン後も失敗しました。LINEトークから開き直してください。");
-              log("submit: verify failed even after login");
-              return;
-            }
-          }
-
-          // 5) その他の応答はそのまま表示（理由の可視化）
-          if(raw){ alert("サーバー応答：" + raw); }
-          else { alert("サーバー応答が空です"); }
-        })
-        .catch(function(e){
-          alert("通信に失敗しました: " + e);
-          log("fetch error: " + e);
-        });
+      // ★ 応答本文を読まず“投げっぱなし”でPOST（必要に応じて no-cors を有効化）
+      fetch(API_ENDPOINT, {
+        method:"POST",
+        body: fd
+        // , mode: "no-cors"   // ← もし端末依存でPOST応答が読めず止まる場合は有効化
+      })
+      .then(function(){
+        alert("送信リクエストを送出しました。数秒後にスプレッドシートをご確認ください。");
+        try{ liff.closeWindow(); }catch(_){}
+      })
+      .catch(function(e){
+        alert("通信に失敗しました: " + e);
+        log("fetch error: " + e);
+      });
     }
   </script>
 </body>
