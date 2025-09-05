@@ -16,39 +16,27 @@
   <button id="startBtn">出欠入力を始める</button>
   <div id="log">ログ出力エリア</div>
 
-  <script>
-    const LIFF_ID = "2008020568-2jVl00Rn"; // ←差し替え必須
+  <button id="startBtn">出欠入力を始める</button>
 
-    async function init() {
-      await liff.init({ liffId: LIFF_ID });
-      if (!liff.isLoggedIn()) {
-        liff.login();
-        return;
-      }
-      document.getElementById("log").textContent = "LIFF初期化完了。ボタンを押してください。";
-    }
+<script>
+const LIFF_ID = "2008020568-2jVl00Rn";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwrLSDi8eT5KWmH5zOj15eR0MuASdL4l2U5LebDy1Vl64nXS2enAcV_PNZctQVp_-l7MQ/exec";
 
-    document.getElementById("startBtn").addEventListener("click", async () => {
-      try {
-        const profile = await liff.getProfile();
-        const idToken = liff.getIDToken();
-        const payload = liff.getDecodedIDToken();
+async function init() {
+  await liff.init({ liffId: LIFF_ID });
+  if (!liff.isLoggedIn()) { liff.login(); return; }
 
-        console.log("getProfile:", profile);
-        console.log("idToken:", idToken);
-        console.log("decoded:", payload);
+  document.getElementById("startBtn").onclick = async () => {
+    const idToken = liff.getIDToken();
+    const decoded = liff.getDecodedIDToken();
+    const lineId = decoded.sub;   // ← LINE ID（固定のユーザーID）
 
-        document.getElementById("log").textContent =
-          "LINE ID: " + profile.userId + "\n" +
-          "表示名: " + profile.displayName + "\n" +
-          "ID Token: " + (idToken ? "取得OK" : "取得できず");
-      } catch (e) {
-        console.error("whoamiエラー:", e);
-        document.getElementById("log").textContent = "エラー: " + e.message;
-      }
-    });
+    // whoami判定を呼ぶ
+    const res = await fetch(`${API_ENDPOINT}?whoami=1&id=${lineId}`);
+    const json = await res.json();
+    alert("whoami応答: " + JSON.stringify(json));
+  };
+}
 
-    init();
-  </script>
-</body>
-</html>
+init();
+</script>
