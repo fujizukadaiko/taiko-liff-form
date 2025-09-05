@@ -23,7 +23,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .disabled { opacity:.6; pointer-events:none; }
 
-    /* table */
     table { width:100%; border-collapse: collapse; table-layout: fixed; }
     th, td { border-bottom:1px solid #eee; padding:10px 6px; font-size:15px; vertical-align: middle; }
     th { text-align:left; color:#374151; background:#f9fafb; }
@@ -40,10 +39,12 @@
 
   <h2>出欠フォーム</h2>
 
-  <div class="card">
+  <div class="card" id="topCard">
     <div class="muted" id="topInfo">公演情報を読み込み中…</div>
+    <div id="topSummary" class="summary" style="display:none; margin-top:8px;"></div>
     <div style="display:flex; gap:8px; margin-top:10px;">
       <button id="beginBtn" class="primary" style="flex:1;">出欠入力をはじめる</button>
+      <button id="editBtn" class="ghost" style="flex:1; display:none;">内容を修正する</button>
       <button id="pingBtn" class="ghost" style="flex:1;">接続テスト</button>
     </div>
     <div id="msg" class="hint"></div>
@@ -64,9 +65,7 @@
   </div>
 
   <!-- 複数公演：出欠入力領域 -->
-  <div id="eventsWrap" style="display:none;">
-    <!-- 公演ごとに card を生成 -->
-  </div>
+  <div id="eventsWrap" style="display:none;"></div>
 
   <div id="submitWrap" class="card" style="display:none;">
     <label>全体コメント（任意・全公演に同じコメント）</label>
@@ -76,7 +75,7 @@
 
   <script>
     const LIFF_ID = "2008020568-2jVl00Rn";
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzsr_Q1DAc-pe5EkZWRmxJX-1XermEp6cyHFEspqRdkhir8LpDPtiWp6usvsw56qQHD1g/exec";
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw2_O5HvWtANrJSvV3gMsa3KHHdXf2fTHB1lja_ZVv1CXOqVrHV5bkT0EP3GLYR97ERsg/exec";
 
     let gLineId = "";
     let busy = false;
@@ -92,13 +91,14 @@
       const loading = document.getElementById("loading");
       document.getElementById("loadingText").textContent = text;
       loading.style.display = on ? "flex" : "none";
-      const btns = ["beginBtn","pingBtn","addPerfBtn","regSubmitBulk","submitAllBtn"]
+      const btns = ["beginBtn","pingBtn","addPerfBtn","regSubmitBulk","submitAllBtn","editBtn"]
         .map(id=>document.getElementById(id)).filter(Boolean);
       btns.forEach(b=>{
+        if (!b) return;
         if (on) {
           if (!b.dataset.origText) b.dataset.origText = b.textContent;
           if (b.id==="submitAllBtn"||b.id==="regSubmitBulk") b.textContent="送信中…";
-          else if (b.id==="beginBtn") b.textContent="照会中…";
+          else if (b.id==="beginBtn"||b.id==="editBtn") b.textContent="照会中…";
           else b.textContent="実行中…";
           b.classList.add("disabled"); b.disabled = true;
         } else {
@@ -109,6 +109,7 @@
     }
 
     function parseToDate(val){
+      if (val instanceof Date && !isNaN(val)) return val;
       const d = new Date(val);
       if (!isNaN(d)) return d;
       const m = String(val||"").match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
@@ -116,11 +117,17 @@
       return null;
     }
     function parseToTime(val){
+      if (val instanceof Date && !isNaN(val)) return val;
       const d = new Date(val);
       if (!isNaN(d)) return d;
       const m = String(val||"").match(/^(\d{1,2}):(\d{2})$/);
       if (m) { const t=new Date(); t.setHours(+m[1],+m[2],0,0); return t; }
       return null;
+    }
+    function ymd(val){
+      const d = parseToDate(val);
+      if (!d) return String(val||"");
+      return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
     }
     function eventLines(ev){
       const d = parseToDate(ev.date);
@@ -253,7 +260,7 @@
       document.getElementById("submitWrap").style.display = "block";
     }
 
-    // ===== 既存回答のロード＆サマリ表示 =====
+    // ===== 既存回答のロード＆サマリ表示（公演別） =====
     async function loadExistingForAll(){
       perEventState = {};
       for (const ev of activeEvents){
@@ -262,11 +269,11 @@
         // 既存値を反映してセレクトを事前選択
         const ex = perEventState[ev.eventId].existing;
         if (Array.isArray(ex) && ex.length){
-          // サマリ表示
+          // サマリ表示（★ pendingDate を yyyy/mm/dd で）
           const sumDiv = document.getElementById(`sum_${ev.eventId}`);
           sumDiv.style.display = "block";
           sumDiv.innerHTML = `<div class="muted"><strong>現在の登録</strong><br>${
-            ex.map(r=>`${r.performerName}：${r.attend}${r.pendingDate?`（予定日:${r.pendingDate}）`:''}`).join("<br>")
+            ex.map(r=>`${r.performerName}：${r.attend}${r.pendingDate?`（予定日:${ymd(r.pendingDate)}）`:''}`).join("<br>")
           }<br><span class="hint">この内容は送信で上書きされます。</span></div>`;
 
           // テーブルに反映
@@ -286,6 +293,32 @@
       }
     }
 
+    // ===== トップ画面のサマリ描画（複数公演まとめ） =====
+    function renderTopSummary(){
+      const host = document.getElementById("topSummary");
+      host.innerHTML = "";
+      let lines = [];
+
+      for (const ev of activeEvents){
+        const ex = (perEventState[ev.eventId]?.existing) || [];
+        if (!ex.length) continue;
+        const [l1, l2] = eventLines(ev);
+        lines.push(`<div style="margin-bottom:6px;"><div class="muted" style="font-weight:600;">${l1}<br>${l2}</div>${
+          ex.map(r=>`${r.performerName}：${r.attend}${r.pendingDate?`（予定日:${ymd(r.pendingDate)}）`:''}`).join("<br>")
+        }</div>`);
+      }
+
+      if (lines.length){
+        host.style.display = "block";
+        host.innerHTML = `<div class="muted"><strong>現在の入力内容</strong><br>${lines.join("<hr style='border:none;border-top:1px dashed #e5e7eb;margin:8px 0;'/>")}</div>
+          <div class="hint" style="margin-top:6px;">修正する場合は「内容を修正する」を押してください。</div>`;
+        document.getElementById("editBtn").style.display = "inline-block";
+      } else {
+        host.style.display = "none";
+        document.getElementById("editBtn").style.display = "none";
+      }
+    }
+
     // ===== 接続テスト =====
     document.getElementById("pingBtn").onclick = async ()=>{
       if (busy) return; setBusy(true,"接続テスト中…");
@@ -297,7 +330,7 @@
     };
 
     // ===== 出欠開始（whoami → 初回登録 or 出欠UI） =====
-    document.getElementById("beginBtn").onclick = async ()=>{
+    async function beginFlow(){
       if (busy) return; setBusy(true,"会員照会中…");
       try{
         const decoded = liff.getDecodedIDToken();
@@ -324,11 +357,20 @@
         renderEvents();
         await loadExistingForAll();
         document.getElementById("regBox").style.display = "none";
-        document.getElementById("msg").textContent = "登録済みです。各公演の出欠を選んで「全部送信」を押してください。";
+        document.getElementById("eventsWrap").style.display = "block";
+        document.getElementById("submitWrap").style.display = "block";
+        document.getElementById("msg").textContent = "各公演の出欠を選んで「全部送信」を押してください。";
+        // 編集中はトップのサマリを隠す
+        document.getElementById("topSummary").style.display = "none";
+        document.getElementById("editBtn").style.display = "none";
+        window.scrollTo({top: document.getElementById("eventsWrap").offsetTop - 8, behavior:"smooth"});
       }catch(e){
         alert("whoamiエラー: " + e);
       } finally { setBusy(false); }
-    };
+    }
+
+    document.getElementById("beginBtn").onclick = beginFlow;
+    document.getElementById("editBtn").onclick  = beginFlow;
 
     // ===== 初回登録：行追加／送信 =====
     document.getElementById("addPerfBtn").onclick = ()=>{ if (!busy) addPerfRow(); };
@@ -353,7 +395,9 @@
           renderEvents();
           await loadExistingForAll();
           document.getElementById("regBox").style.display = "none";
-          document.getElementById("msg").textContent = "登録完了。各公演の出欠を選んで「全部送信」を押してください。";
+          document.getElementById("eventsWrap").style.display = "block";
+          document.getElementById("submitWrap").style.display = "block";
+          document.getElementById("msg").textContent = "各公演の出欠を選んで「全部送信」を押してください。";
         } else {
           alert("登録失敗: " + (j.message || JSON.stringify(j)));
         }
@@ -418,8 +462,22 @@
           }
         }
 
+        // ===== 送信完了：トップに戻してサマリ表示 =====
         alert("すべて送信しました。ありがとうございます！");
-        try{ liff.closeWindow(); }catch(_){}
+        // 最新状態を取り直し
+        await loadExistingForAll();
+        renderTopSummary();
+        // 編集UIを閉じる
+        document.getElementById("eventsWrap").style.display = "none";
+        document.getElementById("submitWrap").style.display = "none";
+        // トップに誘導
+        document.getElementById("msg").textContent = "送信内容をトップに表示しました。修正する場合は「内容を修正する」を押してください。";
+        document.getElementById("topSummary").style.display = "block";
+        document.getElementById("editBtn").style.display = "inline-block";
+        window.scrollTo({top: 0, behavior:"smooth"});
+
+        // 必要なら LIFF を閉じる代わりに上の処理で残す（closeWindowはしない）
+        // try { liff.closeWindow(); } catch(_) {}
       }catch(e){
         alert("送信エラー: " + e);
       } finally { setBusy(false); }
