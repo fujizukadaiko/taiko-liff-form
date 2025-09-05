@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>出欠フォーム（複数人一括）</title>
+  <title>出欠フォーム（複数人一括＋複数演奏者登録）</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; padding:16px; }
-    .card { border:1px solid #ddd; border-radius:12px; padding:12px; margin:12px 0; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:12px; margin:12px 0; background:#fff; }
     label { display:block; margin:10px 0 6px; }
-    input, select, textarea, button { width:100%; padding:10px; font-size:16px; }
+    input, select, textarea, button { width:100%; padding:10px; font-size:16px; box-sizing:border-box; }
     .primary { background:#06c; color:#fff; border:none; border-radius:8px; }
-    .ghost { background:#eee; border:1px solid #ddd; border-radius:8px; }
+    .ghost { background:#f6f7f8; border:1px solid #ddd; border-radius:8px; }
+    .danger { background:#e11; color:#fff; border:none; border-radius:8px; }
     .hint { color:#666; font-size:12px; }
     #msg { margin-top:8px; color:#444; }
     #loading {
@@ -28,20 +29,29 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .disabled { opacity: .6; pointer-events: none; }
 
-    table { width:100%; border-collapse: collapse; }
-    th, td { border-bottom:1px solid #eee; padding:8px 4px; font-size:15px; }
-    th { text-align:left; color:#444; }
-    .rowwrap { display:flex; gap:8px; align-items:center; }
-    .sm { font-size:12px; color:#666; }
-    .radio3 { display:flex; gap:8px; align-items:center; }
-    .radio3 label { display:flex; align-items:center; gap:4px; margin:0; }
-    .pendingDate { width:auto; min-width: 140px; }
+    /* table */
+    table { width:100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border-bottom:1px solid #eee; padding:10px 6px; font-size:15px; vertical-align: middle; }
+    th { text-align:left; color:#333; background:#fafafa; }
+    .nameCell { width:40%; word-break: break-all; }
+    .attCell  { width:35%; }
+    .pdCell   { width:25%; }
+
+    .radio3 { display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
+    .radio3 label { display:flex; align-items:center; gap:6px; margin:0; }
+    .pendingDate { width:100%; min-width: 120px; }
+    .rowBtns { display:flex; gap:8px; }
+
+    /* 演奏者の追加行 */
+    .rowGrid { display:grid; grid-template-columns: 1fr 120px 90px; gap:10px; }
+    .rowGrid > * { min-width: 0; }
+    .toolbar { display:flex; gap:8px; }
   </style>
 </head>
 <body>
   <div id="loading"><div class="spinner"></div><span id="loadingText">処理中…</span></div>
 
-  <h2>出欠フォーム（複数人まとめて送信）</h2>
+  <h2>出欠フォーム</h2>
 
   <div class="card">
     <div id="eventBox" class="hint">公演情報を読み込み中…</div>
@@ -52,20 +62,26 @@
     <div id="msg" class="hint"></div>
   </div>
 
-  <!-- 初回登録フォーム -->
+  <!-- 初回登録フォーム（複数演奏者対応） -->
   <div id="regBox" class="card" style="display:none;">
     <h3>初回登録</h3>
     <label>入力者氏名</label>
     <input id="inputName" type="text" placeholder="例）山田太郎" />
-    <label>演奏者氏名</label>
-    <input id="performerName" type="text" placeholder="例）山田花子" />
-    <label>入力者は演奏者ですか？</label>
-    <select id="isPerformer">
-      <option value="">選択してください</option>
-      <option value="Y">はい（演奏者）</option>
-      <option value="N">いいえ（保護者など）</option>
-    </select>
-    <button id="regSubmit" class="primary" style="margin-top:12px;">登録する</button>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+      <h4 style="margin:0;">演奏者一覧</h4>
+      <div class="toolbar">
+        <button id="addPerfBtn" class="ghost" type="button">＋ 演奏者を追加</button>
+      </div>
+    </div>
+    <div id="perfList" class="hint" style="margin-top:8px;">
+      <!-- 動的に行を追加 -->
+    </div>
+
+    <button id="regSubmitBulk" class="primary" style="margin-top:12px;">登録する</button>
+    <div class="hint" style="margin-top:6px;">
+      ※ 各行の「演奏者フラグ」は、その人が実際に出演するメンバーなら「はい(Y)」。保護者等は「いいえ(N)」にしてください。
+    </div>
   </div>
 
   <!-- 出欠入力（複数人） -->
@@ -83,7 +99,7 @@
 
   <script>
     const LIFF_ID = "2008020568-2jVl00Rn";
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyeUXW3hcrfCkdHzLN0oxQRCAVTWwl50TgdAg2DxW9d_DrPWRh0gG0Oj4YYgi471j_LEw/exec";
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxVsV3PR0sCxZwy9IGZ3-Kxsv89q2_-KFBYdnDXzdJ9kQ2naKCxFonDoLmRvbmgPJtk_g/exec";
 
     let gLineId = "";
     let busy = false;
@@ -98,14 +114,14 @@
       const loading = document.getElementById("loading");
       document.getElementById("loadingText").textContent = text;
       loading.style.display = on ? "flex" : "none";
-      const btns = ["beginBtn","regSubmit","pingBtn","submitBulkBtn"]
+      const btns = ["beginBtn","regSubmitBulk","pingBtn","submitBulkBtn","addPerfBtn"]
         .map(id=>document.getElementById(id))
         .filter(Boolean);
       btns.forEach(b=>{
         if (on) {
           if (!b.dataset.origText) b.dataset.origText = b.textContent;
           if (b.id==="beginBtn") b.textContent="照会中…";
-          else if (b.id==="regSubmit") b.textContent="送信中…";
+          else if (b.id==="regSubmitBulk") b.textContent="送信中…";
           else if (b.id==="submitBulkBtn") b.textContent="送信中…";
           else b.textContent="実行中…";
           b.classList.add("disabled"); b.disabled = true;
@@ -116,7 +132,7 @@
       });
     }
 
-    // 日時整形
+    // ===== 日時表示ユーティリティ =====
     function parseToDate(val) {
       if (!val) return null;
       if (Object.prototype.toString.call(val) === "[object Date]" && !isNaN(val)) return val;
@@ -161,11 +177,34 @@
       const es = document.getElementById("eventSummary");
       if (es) es.textContent = `${line1}\n${line2}`;
     }
+    // ===== /日時表示ユーティリティ =====
 
-    // 複数人フォームを構築
+    // === 初回登録（複数演奏者 UI） ===
+    function addPerformerRow(name="", flag="Y") {
+      const host = document.getElementById("perfList");
+      const row = document.createElement("div");
+      row.className = "rowGrid";
+      row.innerHTML = `
+        <input type="text" class="perfNameInput" placeholder="演奏者氏名" value="${name}">
+        <select class="perfFlag">
+          <option value="Y"${flag==="Y"?" selected":""}>はい（演奏者）</option>
+          <option value="N"${flag==="N"?" selected":""}>いいえ（保護者など）</option>
+        </select>
+        <div class="rowBtns">
+          <button type="button" class="ghost btnDel">− 削除</button>
+        </div>
+      `;
+      row.querySelector(".btnDel").onclick = ()=> {
+        host.removeChild(row);
+        if (host.children.length === 0) addPerformerRow(); // 行がなくならないように1行補充
+      };
+      host.appendChild(row);
+    }
+
+    // === 出欠（複数行）UI ===
     function renderMultiForm(members){
       const perf = members.filter(m => (m.isPerformer||"").toUpperCase()==="Y");
-      const list = perf.length ? perf : members; // 演奏者優先
+      const list = perf.length ? perf : members;
 
       const wrap = document.getElementById("multiForm");
       wrap.innerHTML = "";
@@ -178,9 +217,9 @@
       const thead = document.createElement("thead");
       thead.innerHTML = `
         <tr>
-          <th style="width:35%;">演奏者</th>
-          <th style="width:35%;">出欠</th>
-          <th style="width:30%;">未定予定日</th>
+          <th class="nameCell">演奏者</th>
+          <th class="attCell">出欠</th>
+          <th class="pdCell">未定の予定日</th>
         </tr>`;
       table.appendChild(thead);
 
@@ -189,9 +228,11 @@
         const tr = document.createElement("tr");
 
         const tdName = document.createElement("td");
+        tdName.className = "nameCell";
         tdName.textContent = m.performerName;
 
         const tdAttend = document.createElement("td");
+        tdAttend.className = "attCell";
         tdAttend.innerHTML = `
           <div class="radio3">
             <label><input type="radio" name="att_${idx}" value="参加">参加</label>
@@ -200,9 +241,10 @@
           </div>`;
 
         const tdPending = document.createElement("td");
+        tdPending.className = "pdCell";
         tdPending.innerHTML = `
           <input type="text" class="pendingDate" id="pd_${idx}" placeholder="YYYY/MM/DD" disabled>
-          <div class="sm">未定を選んだ場合のみ</div>`;
+          <div class="hint">未定時のみ入力</div>`;
 
         // ラジオの変更で未定日入力を制御
         setTimeout(()=>{
@@ -246,6 +288,10 @@
       await liff.init({ liffId: LIFF_ID });
       if (!liff.isLoggedIn()) { liff.login(); return; }
       document.getElementById("msg").textContent = "LIFF初期化完了。ボタンを押してください。";
+
+      // 初回登録の演奏者リストを最低1行用意
+      addPerformerRow("","Y");
+
       loadActiveEvent();
     }
 
@@ -259,7 +305,7 @@
       finally{ setBusy(false); }
     };
 
-    // whoami → 既存なら複数人フォームを表示
+    // 出欠開始（whoami）
     document.getElementById("beginBtn").onclick = async ()=>{
       if (busy) return; setBusy(true,"会員照会中…");
       try{
@@ -275,12 +321,12 @@
           renderMultiForm(cachedMembers);
           document.getElementById("regBox").style.display = "none";
           document.getElementById("attBox").style.display = "block";
-          document.getElementById("msg").textContent = "登録済みとして判定しました。家族分まとめて選択し、まとめて送信してください。";
+          document.getElementById("msg").textContent = "登録済みです。家族分まとめて選び、まとめて送信してください。";
           if (activeEvent) applyEventDisplay(activeEvent);
         } else if (json.status === "new") {
           document.getElementById("regBox").style.display = "block";
           document.getElementById("attBox").style.display = "none";
-          document.getElementById("msg").textContent = "初回登録が必要です。氏名を入力してください。";
+          document.getElementById("msg").textContent = "初回登録が必要です。入力者氏名と演奏者を追加してください。";
         } else {
           alert("応答エラー: " + JSON.stringify(json));
         }
@@ -289,26 +335,42 @@
       } finally { setBusy(false); }
     };
 
-    // 初回登録
-    document.getElementById("regSubmit").onclick = async ()=>{
+    // 初回登録：演奏者行の追加
+    document.getElementById("addPerfBtn").onclick = ()=>{
+      if (busy) return;
+      addPerformerRow("","Y");
+    };
+
+    // 初回登録：まとめて送信
+    document.getElementById("regSubmitBulk").onclick = async ()=>{
       if (busy) return; setBusy(true,"送信中…");
       try{
         const inputName = document.getElementById("inputName").value.trim();
-        const performerName = document.getElementById("performerName").value.trim();
-        const isPerformer = document.getElementById("isPerformer").value.trim();
         if (!gLineId) { alert("LINE IDが未取得です。上のボタンから開始してください。"); return; }
-        if (!inputName || !performerName || !isPerformer) { alert("未入力があります"); return; }
+        if (!inputName) { alert("入力者氏名を入力してください"); return; }
 
-        const url = `${API_ENDPOINT}?register=1&lineId=${encodeURIComponent(gLineId)}&inputName=${encodeURIComponent(inputName)}&performerName=${encodeURIComponent(performerName)}&isPerformer=${encodeURIComponent(isPerformer)}&ts=${Date.now()}`;
+        const list = [];
+        const host = document.getElementById("perfList");
+        const rows = host.querySelectorAll(".rowGrid");
+        rows.forEach(row=>{
+          const name = row.querySelector(".perfNameInput").value.trim();
+          const flag = row.querySelector(".perfFlag").value.trim();
+          if (name && (flag==="Y" || flag==="N")) {
+            list.push({ performerName: name, isPerformer: flag });
+          }
+        });
+        if (list.length === 0) { alert("演奏者を1名以上入力してください"); return; }
+
+        const url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(gLineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(list))}&ts=${Date.now()}`;
         const json = await fetch(url, { method:"GET", cache:"no-store" }).then(r=>r.json());
 
         if (json.status === "ok") {
-          alert("登録しました。出欠入力へ進みます。");
+          alert(`登録しました（${json.inserted ?? list.length}件）。出欠入力へ進みます。`);
           cachedMembers = json.members || [];
           renderMultiForm(cachedMembers);
           document.getElementById("regBox").style.display = "none";
           document.getElementById("attBox").style.display = "block";
-          document.getElementById("msg").textContent = "登録完了。家族分まとめて選択し、まとめて送信してください。";
+          document.getElementById("msg").textContent = "登録完了。家族分まとめて選び、まとめて送信してください。";
           if (activeEvent) applyEventDisplay(activeEvent);
         } else {
           alert("登録失敗: " + (json.message || JSON.stringify(json)));
@@ -317,7 +379,7 @@
       finally { setBusy(false); }
     };
 
-    // まとめて送信
+    // まとめて送信（Attendance）
     document.getElementById("submitBulkBtn").onclick = async ()=>{
       if (busy) return; setBusy(true,"送信中…");
       try{
@@ -325,7 +387,6 @@
         if (!gLineId) { alert("LINE IDが未取得です"); return; }
         const commentAll = document.getElementById("commentAll").value.trim();
 
-        // テーブルから収集
         const perf = cachedMembers.filter(m => (m.isPerformer||"").toUpperCase()==="Y");
         const list = perf.length ? perf : cachedMembers;
 
@@ -334,7 +395,7 @@
           const radios = document.querySelectorAll(`input[name="att_${idx}"]`);
           let val = "";
           radios.forEach(r=>{ if (r.checked) val = r.value; });
-          if (!val) return; // 未選択は送信しない（柔らかい仕様）
+          if (!val) return; // 未選択は送らない（柔らかい仕様）
           const pd = document.getElementById(`pd_${idx}`);
           bulk.push({
             performerName: m.performerName,
