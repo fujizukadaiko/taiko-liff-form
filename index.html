@@ -51,9 +51,10 @@
   <div id="log"></div>
 
   <script>
-    // ★ここは実値に差し替え
+    /* ===== 設定（ここを実値に差し替え） ===== */
     const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
     const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
+    /* ======================================= */
 
     var car = ""; // "はい" | "いいえ" | ""
     function $(id){ return document.getElementById(id); }
@@ -79,38 +80,11 @@
       log("unhandledrejection: " + (ev.reason && (ev.reason.message||ev.reason)));
     });
 
-    // ループ抑止フラグ
+    // ループ抑止フラグ（同一セッションで多重loginを避ける）
     var LOGIN_TRIED_KEY = "liff_login_tried";
-    var REFRESH_TRIED_KEY = "liff_refresh_tried";
 
     function getDecoded(){ 
       try { return liff.getDecodedIDToken(); } catch(e){ return null; }
-    }
-
-    // 期限チェック（猶予5秒に緩和）
-    function isTokenAlmostExpired(payload){
-      if(!payload || !payload.exp) return true;
-      var now = Date.now();
-      var expMs = payload.exp * 1000;
-      return (expMs - now) < 5000; // 5秒未満なら期限切れ扱い
-    }
-
-    // 有効なIDトークンを保証（必要なら1回だけlogin）
-    function ensureFreshIdToken(){
-      var payload = getDecoded();
-      if(!payload || isTokenAlmostExpired(payload)){
-        if(!sessionStorage.getItem(REFRESH_TRIED_KEY)){
-          sessionStorage.setItem(REFRESH_TRIED_KEY, "1");
-          log("ensureFreshIdToken: refreshing -> login()");
-          alert("認証を更新します。OK後に再読み込みされます。");
-          liff.login();
-        }else{
-          log("ensureFreshIdToken: refresh already tried; give up");
-          alert("再ログインが必要ですが、繰り返しを防ぐため中断しました。LINEトークから開き直してください。");
-        }
-        return null;
-      }
-      try { return liff.getIDToken(); } catch(e){ return null; }
     }
 
     // LIFF初期化（loginは同一セッション1回まで）
@@ -152,6 +126,7 @@
         .catch(function(e){ alert("接続テスト失敗: " + e); log("ping error: "+e); });
     }
 
+    // 送信：まず必ずPOST。期限切れ等はサーバー応答で判断して1回だけlogin
     function submitForm(){
       log("submit: clicked");
       var attend = $("attend").value;
@@ -166,10 +141,25 @@
         if(!confirm("車出しが未選択です。このまま送信しますか？")) return;
       }
 
-      var idToken = ensureFreshIdToken();
-      if(!idToken){ log("submit: token refresh requested; page may reload"); return; }
-      log("submit: have fresh idToken (length=" + idToken.length + ")");
+      // 1) まず“今ある”IDトークンを使う（無ければ1回だけlogin）
+      var idToken = null;
+      try { idToken = liff.getIDToken(); } catch(_){}
+      if(!idToken){
+        if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
+          sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
+          alert("認証を行います。OK後に再読み込みされます。");
+          log("submit: no idToken -> login()");
+          liff.login();
+          return;
+        }else{
+          alert("認証情報が取得できません。LINEトークから開き直してください。");
+          log("submit: no idToken and login already tried");
+          return;
+        }
+      }
+      log("submit: have idToken (len=" + idToken.length + ")");
 
+      // 2) 送信（必ずPOSTを試す）
       var fd = new FormData();
       fd.append("idToken", idToken);
       fd.append("form", JSON.stringify({ attend:attend, pendingDate:pendingDate, car:car, comment:comment }));
@@ -179,17 +169,35 @@
         .then(function(res){ return res.text(); })
         .then(function(raw){
           log("server raw: " + raw);
-          try{
-            var json = JSON.parse(raw);
-            if(json.status === "ok"){
-              alert("送信しました。ありがとうございます！");
-              try{ liff.closeWindow(); }catch(_){}
-            }else{
-              alert("サーバー応答：" + raw);
-            }
-          }catch(_){
-            alert("サーバー生応答：" + raw);
+
+          var json = null;
+          try{ json = JSON.parse(raw); }catch(_){}
+
+          // 3) 成功
+          if(json && json.status === "ok"){
+            alert("送信しました。ありがとうございます！");
+            try{ liff.closeWindow(); }catch(_){}
+            return;
           }
+
+          // 4) 期限切れ等の verify 失敗時に“はじめて”1回だけ再ログイン
+          if(json && json.message === "verify failed" && (json.raw||"").toLowerCase().indexOf("expired") >= 0){
+            if(!sessionStorage.getItem(LOGIN_TRIED_KEY)){
+              sessionStorage.setItem(LOGIN_TRIED_KEY, "1");
+              alert("認証を更新します。OK後に再読み込みされます。");
+              log("submit: verify failed expired -> login()");
+              liff.login();
+              return;
+            }else{
+              alert("再ログイン後も失敗しました。LINEトークから開き直してください。");
+              log("submit: verify failed even after login");
+              return;
+            }
+          }
+
+          // 5) その他の応答はそのまま表示（理由の可視化）
+          if(raw){ alert("サーバー応答：" + raw); }
+          else { alert("サーバー応答が空です"); }
         })
         .catch(function(e){
           alert("通信に失敗しました: " + e);
