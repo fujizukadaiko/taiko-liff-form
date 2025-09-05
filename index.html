@@ -1,203 +1,227 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>出欠フォーム（LIFF）</title>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" crossorigin="anonymous"></script>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }
-    label { display:block; margin: 12px 0 6px; }
-    select, input, textarea, button { width: 100%; padding: 10px; font-size: 16px; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .hint { color:#666; font-size:12px; margin-top:6px; }
-    .primary { background:#06c;color:#fff;border:none;border-radius:8px; }
-    .ghost { background:#eee;color:#111;border:1px solid #ddd;border-radius:8px; }
-    .disabled { opacity: .6; pointer-events: none; }
-    #log { margin-top:12px; font-size:12px; white-space:pre-wrap; color:#555; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>出欠フォーム（LIFF）</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js" crossorigin="anonymous"></script>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }
+  h2 { margin: 0 0 8px; }
+  .card { border:1px solid #ddd; border-radius:12px; padding:12px; margin:12px 0; }
+  label { display:block; margin: 10px 0 6px; }
+  select, input, textarea, button { width: 100%; padding: 10px; font-size: 16px; }
+  .row { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+  .primary { background:#06c; color:#fff; border:none; border-radius:8px; }
+  .ghost { background:#eee; color:#111; border:1px solid #ddd; border-radius:8px; }
+  .disabled { opacity:.6; pointer-events:none; }
+  .hint { color:#666; font-size:12px; }
+  #log { white-space:pre-wrap; font-size:12px; color:#555; margin-top:8px; }
+</style>
 </head>
 <body>
   <h2>公演 出欠登録</h2>
-  <div id="userName" style="margin-bottom:8px;color:#444;"></div>
+  <div id="eventBox" class="card">読み込み中…</div>
+  <div id="userName" class="hint"></div>
 
-  <button type="button" id="pingBtn" class="ghost" style="margin-bottom:12px;">接続テスト（GASへGET）</button>
-
-  <label>出欠</label>
-  <select id="attend" required>
-    <option value="">選択してください</option>
-    <option value="参加">参加</option>
-    <option value="不参加">不参加</option>
-    <option value="未定">未定</option>
-  </select>
-
-  <div id="pendingWrap" style="display:none;">
-    <label>未定の回答予定日（YYYY/MM/DD）</label>
-    <input id="pendingDate" type="text" placeholder="例）2025/09/10" />
-    <div class="hint">未定を選んだ場合のみ</div>
+  <!-- 未登録時：会員登録フォーム -->
+  <div id="regBox" class="card" style="display:none;">
+    <h3>初回登録</h3>
+    <label>入力者氏名</label>
+    <input id="inputName" type="text" placeholder="例）山田太郎" />
+    <label>演奏者氏名</label>
+    <input id="performerName" type="text" placeholder="例）山田花子" />
+    <label>入力者は演奏者ですか？</label>
+    <select id="isPerformer">
+      <option value="">選択してください</option>
+      <option value="Y">はい（演奏者）</option>
+      <option value="N">いいえ（保護者など）</option>
+    </select>
+    <button id="regBtn" class="primary" style="margin-top:12px;">登録する</button>
   </div>
 
-  <label>車出し</label>
-  <div class="row">
-    <button type="button" id="carYes">はい</button>
-    <button type="button" id="carNo">いいえ</button>
+  <!-- 登録済み：出欠フォーム -->
+  <div id="attBox" class="card" style="display:none;">
+    <h3>出欠入力</h3>
+    <div id="perfWrap">
+      <label>対象の演奏者</label>
+      <select id="selPerformer"></select>
+    </div>
+    <label>出欠</label>
+    <select id="attend">
+      <option value="">選択してください</option>
+      <option value="参加">参加</option>
+      <option value="不参加">不参加</option>
+      <option value="未定">未定</option>
+    </select>
+    <div id="pendingWrap" style="display:none;">
+      <label>未定の回答予定日（YYYY/MM/DD）</label>
+      <input id="pendingDate" type="text" placeholder="例）2025/09/10" />
+    </div>
+    <label>コメント（任意）</label>
+    <textarea id="comment" rows="3"></textarea>
+    <button id="submitBtn" class="primary" style="margin-top:12px;">送信</button>
   </div>
-  <div id="carState" class="hint">未選択</div>
 
-  <label>コメント（任意）</label>
-  <textarea id="comment" rows="3" placeholder="連絡事項があれば入力してください"></textarea>
-
-  <button id="submitBtn" class="primary" style="margin-top:16px;">送信</button>
-
+  <button id="pingBtn" class="ghost" style="margin-top:8px;">接続テスト</button>
   <div id="debug" class="hint" style="margin-top:8px;"></div>
   <div id="log"></div>
 
-  <script>
-    /* ===== 設定（ここを実値に差し替え） ===== */
-    const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzHMz0--fC8FiuaTlKqyDz7SQUMdCq7tHSIhhtjMp1_azDwFTTXqMXe7xh-WRwD-Wj8/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
-    /* ======================================= */
+<script>
+/* ===== 設定 ===== */
+const LIFF_ID = "2008020568-2jVl00Rn";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzbQbbDNajBj18rQ6B5AJdVkCvQOgOSGmv1sDHqYNRMaFj1jKqEEXrT4nNahGudkHsCrA/exec";
+/* =============== */
 
-    function $(id){ return document.getElementById(id); }
-    function log(m){ $("log").textContent += m + "\n"; }
+const $ = id => document.getElementById(id);
+const log = m => { $("log").textContent += m + "\n"; };
+let inFlight = false;
+const setSubmitting = on => {
+  const b = $("submitBtn");
+  if (!b) return;
+  if (on) { b.textContent = "送信中…"; b.classList.add("disabled"); b.disabled = true; inFlight = true; }
+  else { b.textContent = "送信"; b.classList.remove("disabled"); b.disabled = false; inFlight = false; }
+};
 
-    // 送信中ガード & ボタン制御
-    let inFlight = false;
-    function setSubmittingState(on){
-      const btn = $("submitBtn");
-      if(on){
-        btn.textContent = "送信中…";
-        btn.classList.add("disabled");
-        btn.disabled = true;
-        inFlight = true;
-      }else{
-        btn.textContent = "送信";
-        btn.classList.remove("disabled");
-        btn.disabled = false;
-        inFlight = false;
-      }
-    }
+function makeNonce(){
+  const a = new Uint8Array(16); crypto.getRandomValues(a);
+  return Array.from(a).map(x=>x.toString(16).padStart(2,"0")).join("");
+}
 
-    // UI
-    let car = "";
-    $("attend").addEventListener("change", (e)=>{
-      $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
-    });
-    $("carYes").onclick = ()=>{ car = "はい"; $("carState").textContent = "はい"; };
-    $("carNo").onclick  = ()=>{ car = "いいえ"; $("carState").textContent = "いいえ"; };
-    $("submitBtn").onclick = onSubmit;
-    $("pingBtn").onclick   = ping;
+function getDecoded(){ try{ return liff.getDecodedIDToken(); }catch(_){ return null; } }
+function getIdToken(){ try{ return liff.getIDToken(); }catch(_){ return null; } }
+function showTokenDebug(){
+  const p = getDecoded(); if(!p){ $("debug").textContent="IDトークンなし"; return; }
+  const now = Math.floor(Date.now()/1000); $("debug").textContent =
+    "aud:"+p.aud+" / exp:"+p.exp+" / 残り(秒):"+(p.exp-now);
+}
 
-    window.addEventListener("error", ev=>{
-      alert("JSエラー: " + ev.message);
-    });
-    window.addEventListener("unhandledrejection", ev=>{
-      alert("通信エラー: " + (ev.reason && (ev.reason.message||ev.reason)));
-    });
+async function apiPost(payload){
+  const res = await fetch(API_ENDPOINT + "?ts=" + Date.now(), {
+    method:"POST", headers:{ "Content-Type":"application/json" },
+    body: JSON.stringify(payload)
+  });
+  const txt = await res.text();
+  try { return JSON.parse(txt); } catch { return { status:"error", raw:txt }; }
+}
 
-    function getDecodedSafely(){ try { return liff.getDecodedIDToken(); } catch(e){ return null; } }
-    function getIdTokenSafely(){ try { return liff.getIDToken(); } catch(e){ return null; } }
-    function showTokenDebug() {
-      try {
-        const p = getDecodedSafely();
-        if (!p) { $("debug").textContent = "IDトークンなし"; return; }
-        const now = Math.floor(Date.now()/1000);
-        $("debug").textContent = "aud: " + p.aud + " / exp: " + p.exp + " / 残り(秒): " + (p.exp - now);
-      } catch (e) {
-        $("debug").textContent = "decode失敗: " + e;
-      }
-    }
+async function init(){
+  await liff.init({ liffId: LIFF_ID });
+  // 1) イベント取得（トークン不要）
+  const ev = await apiPost({ action:"activeEvent" });
+  if (ev.status === "ok" && ev.event) {
+    $("eventBox").textContent = `公演ID:${ev.event.eventId} / ${ev.event.date} ${ev.event.time} @ ${ev.event.place}`;
+    window.__ACTIVE_EVENT_ID__ = ev.event.eventId;
+  } else {
+    $("eventBox").textContent = "現在、配信中の公演はありません。";
+  }
 
-    (async function init(){
-      await liff.init({ liffId: LIFF_ID });
-      if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
-      const payload = getDecodedSafely();
-      if (payload && payload.name) $("userName").textContent = "対象：" + payload.name + " さん";
-      showTokenDebug();
-    })();
+  // 2) 認証
+  if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return; }
+  const idp = getDecoded(); if (idp && idp.name) $("userName").textContent = "対象：" + idp.name + " さん";
+  showTokenDebug();
 
-    function ping(){
-      const url = API_ENDPOINT + "?ts=" + Date.now();
-      fetch(url, { method:"GET", cache:"no-store" })
-        .then(res => res.text())
-        .then(t => alert("接続テスト応答: " + t))
-        .catch(e => alert("接続テスト失敗: " + e));
-    }
+  // 3) 会員情報
+  const who = await apiPost({ action:"whoami", idToken: getIdToken() });
+  if (who.status !== "ok") { alert("認証エラー: 再度開き直してください"); return; }
 
-    // 乱数ベースの冪等性トークン（nonce）
-    function makeNonce(){
-      const a = new Uint8Array(16);
-      crypto.getRandomValues(a);
-      return Array.from(a).map(x=>x.toString(16).padStart(2,"0")).join("");
-    }
+  const members = who.members || [];
+  if (members.length === 0) {
+    // 未登録 → 初回登録UI
+    $("regBox").style.display = "block";
+  } else {
+    // 登録済 → 出欠UI
+    buildPerformerSelect(members);
+    $("attBox").style.display = "block";
+  }
+}
 
-    async function onSubmit(){
-      if(inFlight) return; // 多重押下ガード
+function buildPerformerSelect(members){
+  const sel = $("selPerformer");
+  sel.innerHTML = "";
+  // isPerformer = Y のみ選択肢に（N=入力者本人が非演奏者）
+  const perfs = members.filter(m => (m.isPerformer||"").toUpperCase() === "Y");
+  const arr = perfs.length ? perfs : members; // 万一Yが無ければ全件候補
+  arr.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.performerName;
+    opt.textContent = m.performerName;
+    sel.appendChild(opt);
+  });
+}
 
-      const attend = $("attend").value;
-      const pendingDate = $("pendingDate").value.trim();
-      const comment = $("comment").value.trim();
+$("attend").addEventListener("change", e=>{
+  $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
+});
 
-      if(!attend){ alert("出欠を選んでください"); return; }
-      if(attend === "未定" && pendingDate === ""){
-        if(!confirm("未定の予定日が未入力です。このまま送信しますか？")) return;
-      }
-      if(!car){
-        if(!confirm("車出しが未選択です。このまま送信しますか？")) return;
-      }
+$("regBtn").onclick = async ()=>{
+  const inputName = $("inputName").value.trim();
+  const performerName = $("performerName").value.trim();
+  const isPerformer = $("isPerformer").value;
+  if (!inputName || !performerName || !isPerformer) { alert("未入力があります"); return; }
+  const resp = await apiPost({
+    action:"registerMember",
+    idToken:getIdToken(),
+    form:{ inputName, performerName, isPerformer }
+  });
+  if (resp.status === "ok") {
+    alert("登録しました。出欠入力に進みます。");
+    buildPerformerSelect(resp.members||[]);
+    $("regBox").style.display = "none";
+    $("attBox").style.display = "block";
+  } else {
+    alert("登録に失敗しました: " + (resp.raw||resp.message));
+  }
+};
 
-      const p = getDecodedSafely();
-      if(!p){
-        alert("認証情報がありません。LINEトークから開き直してください。");
-        return;
-      }
-      const remainMs = p.exp*1000 - Date.now();
-      if (remainMs < 30000) {
-        alert("認証を更新します。OK後に戻ります。");
-        const url = new URL(location.href); url.searchParams.set("resume","1");
-        liff.login({ redirectUri: url.href });
-        return;
-      }
+$("submitBtn").onclick = async ()=>{
+  if (inFlight) return;
+  const eventId = window.__ACTIVE_EVENT_ID__ || "";
+  if (!eventId) { alert("配信中の公演がありません"); return; }
+  const performerName = $("selPerformer").value;
+  const attend = $("attend").value;
+  const pendingDate = $("pendingDate").value.trim();
+  const comment = $("comment").value.trim();
+  if (!performerName) { alert("演奏者を選択してください"); return; }
+  if (!attend) { alert("出欠を選択してください"); return; }
+  if (attend === "未定" && pendingDate === "") {
+    if (!confirm("未定の予定日が未入力です。このまま送信しますか？")) return;
+  }
+  // expが30秒未満なら更新
+  const p = getDecoded(); if (!p) { alert("認証が必要です。開き直してください。"); return; }
+  const remainMs = p.exp*1000 - Date.now();
+  if (remainMs < 30000) { alert("認証を更新します。OK後に戻ります。"); liff.login({ redirectUri: location.href }); return; }
 
-      const idToken = getIdTokenSafely();
-      if(!idToken){ alert("IDトークンを取得できません。LINEトークから開き直してください。"); return; }
+  const nonce = makeNonce();
+  setSubmitting(true);
+  const resp = await apiPost({
+    action:"submitAttendance",
+    idToken:getIdToken(),
+    nonce,
+    form:{ eventId, performerName, attend, pendingDate, comment }
+  });
+  setSubmitting(false);
 
-      // ここから送信確定：ボタン無効化
-      setSubmittingState(true);
+  if (resp.status === "ok") {
+    alert(resp.duplicate ? "（重複はスキップしました）送信済です。" : "送信しました。ありがとうございます！");
+    try{ liff.closeWindow(); }catch(_){}
+  } else if (resp.message === "verify failed") {
+    alert("認証の有効期限が切れました。OK後に戻ります。");
+    liff.login({ redirectUri: location.href });
+  } else {
+    alert("送信エラー: " + (resp.raw || resp.message));
+  }
+};
 
-      const nonce = makeNonce();
-      const fd = new FormData();
-      fd.append("idToken", idToken);
-      fd.append("nonce", nonce); // ★ 冪等性トークン
-      fd.append("form", JSON.stringify({ attend, pendingDate, car, comment }));
-      fd.append("tokenAud", String(p.aud||""));
-      fd.append("tokenExp", String(p.exp||""));
-      fd.append("ts", String(Date.now()));
+$("pingBtn").onclick = ()=>{
+  fetch(API_ENDPOINT + "?ping=1&ts="+Date.now(), { method:"GET", cache:"no-store" })
+    .then(r=>r.text()).then(t=>alert("接続: "+t)).catch(e=>alert("失敗: "+e));
+};
 
-      try {
-        const res = await fetch(API_ENDPOINT + "?ts=" + Date.now(), { method:"POST", body: fd, cache:"no-store" });
-        const raw = await res.text();
-        let json = null; try{ json = JSON.parse(raw); }catch(_){}
-        // duplicate でもOKと同等に扱う
-        if(json && (json.status === "ok" || (json.status === "ok" && json.duplicate === true))){
-          alert(json && json.duplicate ? "送信済みデータを再送しませんでした（重複防止）。" : "送信しました。ありがとうございます！");
-          try{ liff.closeWindow(); }catch(_){}
-          return;
-        }
-        if(json && json.message === "verify failed"){
-          alert("認証の有効期限が切れました。OK後に戻ります。");
-          const url = new URL(location.href); url.searchParams.set("resume","1");
-          liff.login({ redirectUri: url.href });
-          return;
-        }
-        alert(raw ? ("サーバー応答："+raw) : "サーバー応答が空です");
-      } catch(e){
-        alert("通信に失敗しました: " + e);
-      } finally {
-        // 成否を問わず、ここではボタン復帰しておく（closeWindowできない環境を考慮）
-        setSubmittingState(false);
-      }
-    }
-  </script>
+window.addEventListener("error", ev=>{ alert("JSエラー: "+ev.message); });
+window.addEventListener("unhandledrejection", ev=>{ alert("通信エラー: "+(ev.reason && (ev.reason.message||ev.reason))); });
+
+init();
+</script>
 </body>
 </html>
