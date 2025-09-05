@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>出欠フォーム（LIFF）</title>
-  <!-- 互換性配慮：crossorigin を付けてエラー情報を拾いやすくする -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" crossorigin="anonymous"></script>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }
@@ -13,12 +12,15 @@
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .hint { color:#666; font-size:12px; margin-top:6px; }
     .primary { background:#06c;color:#fff;border:none;border-radius:8px; }
+    .ghost { background:#eee;color:#111;border:1px solid #ddd;border-radius:8px; }
     #log { margin-top:12px; font-size:12px; white-space:pre-wrap; color:#555; }
   </style>
 </head>
 <body>
   <h2>公演 出欠登録</h2>
   <div id="userName" style="margin-bottom:8px;color:#444;"></div>
+
+  <button type="button" id="pingBtn" class="ghost" style="margin-bottom:12px;">接続テスト（GASへGET）</button>
 
   <label>出欠</label>
   <select id="attend" required>
@@ -49,7 +51,7 @@
   <div id="log"></div>
 
   <script>
-    // ★ここを実値に差し替え
+    // ★ここは実値に差し替え
     const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
     const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";     // 例: https://script.google.com/macros/s/XXXX/exec
 
@@ -57,7 +59,7 @@
     function $(id){ return document.getElementById(id); }
     function log(m){ var el=$("log"); el.textContent += (m + "\n"); }
 
-    // 先にハンドラを必ずバインド（init結果に依存させない）
+    // 先にハンドラを必ずバインド
     $("attend").addEventListener("change", function(e){
       $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
       log("attend change: " + e.target.value);
@@ -65,8 +67,9 @@
     $("carYes").onclick = function(){ car = "はい"; $("carState").textContent = "はい"; log("car = はい"); };
     $("carNo").onclick  = function(){ car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
     $("submitBtn").onclick = submitForm;
+    $("pingBtn").onclick = ping;
 
-    // エラー可視化（古いWebView向けに詳細も）
+    // エラー可視化
     window.addEventListener("error", function(ev){
       alert("JSエラー: " + ev.message + " @ " + (ev.filename||"") + ":" + (ev.lineno||""));
       log("JS error: " + ev.message + " @ " + (ev.filename||"") + ":" + (ev.lineno||""));
@@ -84,12 +87,12 @@
       try { return liff.getDecodedIDToken(); } catch(e){ return null; }
     }
 
-    // モダン構文を使わずに期限チェック
+    // 期限チェック（猶予5秒に緩和）
     function isTokenAlmostExpired(payload){
       if(!payload || !payload.exp) return true;
       var now = Date.now();
       var expMs = payload.exp * 1000;
-      return (expMs - now) < 30000; // 30秒未満なら期限切れ扱い
+      return (expMs - now) < 5000; // 5秒未満なら期限切れ扱い
     }
 
     // 有効なIDトークンを保証（必要なら1回だけlogin）
@@ -99,6 +102,7 @@
         if(!sessionStorage.getItem(REFRESH_TRIED_KEY)){
           sessionStorage.setItem(REFRESH_TRIED_KEY, "1");
           log("ensureFreshIdToken: refreshing -> login()");
+          alert("認証を更新します。OK後に再読み込みされます。");
           liff.login();
         }else{
           log("ensureFreshIdToken: refresh already tried; give up");
@@ -138,6 +142,16 @@
       }
     })();
 
+    // GASへのGETで接続確認（/exec → doGet で "alive" が返るはず）
+    function ping(){
+      if(!API_ENDPOINT){ alert("API_ENDPOINTが未設定です"); return; }
+      alert("GASへ接続テストを開始します");
+      fetch(API_ENDPOINT, { method:"GET" })
+        .then(function(res){ return res.text(); })
+        .then(function(t){ alert("接続テスト応答: " + t); log("ping raw: "+t); })
+        .catch(function(e){ alert("接続テスト失敗: " + e); log("ping error: "+e); });
+    }
+
     function submitForm(){
       log("submit: clicked");
       var attend = $("attend").value;
@@ -154,12 +168,13 @@
 
       var idToken = ensureFreshIdToken();
       if(!idToken){ log("submit: token refresh requested; page may reload"); return; }
-      log("submit: have fresh idToken");
+      log("submit: have fresh idToken (length=" + idToken.length + ")");
 
       var fd = new FormData();
       fd.append("idToken", idToken);
       fd.append("form", JSON.stringify({ attend:attend, pendingDate:pendingDate, car:car, comment:comment }));
 
+      alert("GASへ送信を開始します");
       fetch(API_ENDPOINT, { method:"POST", body:fd })
         .then(function(res){ return res.text(); })
         .then(function(raw){
