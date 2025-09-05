@@ -3,42 +3,124 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>出欠フォーム（LIFF）</title>
+  <title>出欠フォーム（初回登録テスト）</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }
-    button { padding: 10px; font-size: 16px; margin-top: 20px; background:#06c; color:#fff; border:none; border-radius:8px; }
+    body { font-family: system-ui, -apple-system, sans-serif; padding:16px; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:12px; margin:12px 0; }
+    label { display:block; margin:10px 0 6px; }
+    input, select, button { width:100%; padding:10px; font-size:16px; }
+    .primary { background:#06c; color:#fff; border:none; border-radius:8px; }
+    .ghost { background:#eee; border:1px solid #ddd; border-radius:8px; }
+    .hint { color:#666; font-size:12px; }
+    #msg { margin-top:8px; color:#444; }
   </style>
 </head>
 <body>
-  <h2>出欠テストフォーム</h2>
-  <button id="startBtn">出欠入力を始める</button>
+  <h2>出欠フォーム（初回登録テスト）</h2>
+
+  <div class="card">
+    <button id="beginBtn" class="primary">出欠入力をはじめる</button>
+    <div class="row" style="margin-top:8px;">
+      <button id="pingBtn" class="ghost">接続テスト</button>
+    </div>
+    <div id="msg" class="hint"></div>
+  </div>
+
+  <!-- 初回登録フォーム -->
+  <div id="regBox" class="card" style="display:none;">
+    <h3>初回登録</h3>
+    <label>入力者氏名</label>
+    <input id="inputName" type="text" placeholder="例）山田太郎" />
+    <label>演奏者氏名</label>
+    <input id="performerName" type="text" placeholder="例）山田花子" />
+    <label>入力者は演奏者ですか？</label>
+    <select id="isPerformer">
+      <option value="">選択してください</option>
+      <option value="Y">はい（演奏者）</option>
+      <option value="N">いいえ（保護者など）</option>
+    </select>
+    <button id="regSubmit" class="primary" style="margin-top:12px;">登録する</button>
+  </div>
+
+  <!-- 登録済みダミー表示（次フェーズで出欠入力UIに置換） -->
+  <div id="attBox" class="card" style="display:none;">
+    <h3>登録済みです</h3>
+    <div class="hint">この先は出欠入力UIを実装します（次フェーズ）。</div>
+  </div>
 
   <script>
-    const LIFF_ID = "2008020568-2jVl00Rn"; 
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyOYgVPZRPOGX99yyKAImuc50--9cUhQf8lS7na7LZjU1Luwi5O5zE22oMVPBaQJq-QKQ/exec";
+    const LIFF_ID = "2008020568-2jVl00Rn";
+    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxEEyy6bSNJLcsr9NcQy677-lVCNwK_-B0YTBM0V0i_f2yIMdlY2wiTF-_tmUDLUgxAPg/exec";
+
+    let gLineId = "";
 
     async function init() {
       await liff.init({ liffId: LIFF_ID });
       if (!liff.isLoggedIn()) { liff.login(); return; }
-
-      document.getElementById("startBtn").onclick = async () => {
-        try {
-          const decoded = liff.getDecodedIDToken();
-          const lineId = decoded.sub;   // 固定のユーザーID
-          const displayName = decoded.name || "(no name)";
-          console.log("LINE ID:", lineId, "Name:", displayName);
-
-          // whoami API 呼び出し
-          const res = await fetch(`${API_ENDPOINT}?whoami=1&id=${lineId}`);
-          const json = await res.json();
-
-          alert("whoami応答: " + JSON.stringify(json));
-        } catch (err) {
-          alert("エラー: " + err);
-        }
-      };
+      document.getElementById("msg").textContent = "LIFF初期化完了。ボタンを押してください。";
     }
+
+    // 接続テスト
+    document.getElementById("pingBtn").onclick = async ()=>{
+      try{
+        const t = await fetch(API_ENDPOINT + "?ping=1&ts="+Date.now()).then(r=>r.text());
+        alert("接続テスト応答: " + t);
+      }catch(e){ alert("接続失敗: " + e); }
+    };
+
+    // 出欠入力をはじめる → whoami
+    document.getElementById("beginBtn").onclick = async ()=>{
+      try{
+        const decoded = liff.getDecodedIDToken();
+        if (!decoded || !decoded.sub) { alert("LINEログイン情報が取得できませんでした"); return; }
+        gLineId = decoded.sub;
+
+        const res = await fetch(`${API_ENDPOINT}?whoami=1&id=${encodeURIComponent(gLineId)}&ts=${Date.now()}`);
+        const json = await res.json();
+
+        if (json.status === "ok") {
+          // 既存登録あり → 出欠入力へ（今回はダミー表示）
+          document.getElementById("regBox").style.display = "none";
+          document.getElementById("attBox").style.display = "block";
+          document.getElementById("msg").textContent = "登録済みとして判定しました。";
+        } else if (json.status === "new") {
+          // 初回登録フォームを開く
+          document.getElementById("regBox").style.display = "block";
+          document.getElementById("attBox").style.display = "none";
+          document.getElementById("msg").textContent = "初回登録が必要です。氏名を入力してください。";
+        } else {
+          alert("応答エラー: " + JSON.stringify(json));
+        }
+      }catch(e){
+        alert("whoamiエラー: " + e);
+      }
+    };
+
+    // 初回登録フォームの送信
+    document.getElementById("regSubmit").onclick = async ()=>{
+      try{
+        const inputName = document.getElementById("inputName").value.trim();
+        const performerName = document.getElementById("performerName").value.trim();
+        const isPerformer = document.getElementById("isPerformer").value.trim();
+        if (!gLineId) { alert("LINE IDが未取得です。上のボタンから開始してください。"); return; }
+        if (!inputName || !performerName || !isPerformer) { alert("未入力があります"); return; }
+
+        const url = `${API_ENDPOINT}?register=1&lineId=${encodeURIComponent(gLineId)}&inputName=${encodeURIComponent(inputName)}&performerName=${encodeURIComponent(performerName)}&isPerformer=${encodeURIComponent(isPerformer)}&ts=${Date.now()}`;
+        const json = await fetch(url, { method:"GET" }).then(r=>r.json());
+
+        if (json.status === "ok") {
+          alert("登録しました。出欠入力へ進みます。");
+          document.getElementById("regBox").style.display = "none";
+          document.getElementById("attBox").style.display = "block";
+          document.getElementById("msg").textContent = "登録完了（次フェーズで出欠入力UIを実装）。";
+        } else {
+          alert("登録失敗: " + (json.message || JSON.stringify(json)));
+        }
+      }catch(e){
+        alert("登録エラー: " + e);
+      }
+    };
 
     init();
   </script>
