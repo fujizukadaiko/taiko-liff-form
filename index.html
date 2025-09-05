@@ -12,6 +12,7 @@
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .hint { color:#666; font-size:12px; margin-top:6px; }
     .primary { background:#06c;color:#fff;border:none;border-radius:8px; }
+    #log { margin-top:12px; font-size:12px; white-space:pre-wrap; color:#555; }
   </style>
 </head>
 <body>
@@ -44,58 +45,85 @@
 
   <button id="submitBtn" class="primary" style="margin-top:16px;">送信</button>
 
+  <div id="log"></div>
+
   <script>
-    // ★ここを必ず実値に差し替え
+    // ★ここは実値のままで（差し替え済みのものをそのまま残してください）
     const LIFF_ID = "2008020568-2jVl00Rn";                 // 例: 165xxxxxx-xxxxxxxx
     const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDuwi0f1Xf1ZpUFtQzujarmNE3b7UeAbmY0lwpdPLKu5mRDQ-lgDm8XAVh6ag_FvMV/exec";     
     // 例: https://script.google.com/macros/s/XXXX/exec
 
     let car = ""; // "はい" | "いいえ" | ""
+    const $ = (id) => document.getElementById(id);
+    const log = (m) => { const el = $("log"); el.textContent += (m + "\n"); };
 
-    async function init() {
-      await liff.init({ liffId: LIFF_ID });
-      if (!liff.isLoggedIn()) { liff.login(); return; }
+    // --- 先にハンドラを必ずバインド（initの成否に依存させない）---
+    $("attend").addEventListener("change", (e) => {
+      $("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
+      log("attend change: " + e.target.value);
+    });
+    $("carYes").onclick = () => { car = "はい"; $("carState").textContent = "はい"; log("car = はい"); };
+    $("carNo").onclick  = () => { car = "いいえ"; $("carState").textContent = "いいえ"; log("car = いいえ"); };
+    $("submitBtn").onclick = submitForm;
 
-      // 表示用（scope=openid profile の場合）
-      const tokenPayload = liff.getDecodedIDToken();
-      if (tokenPayload && tokenPayload.name) {
-        document.getElementById("userName").textContent = "対象：" + tokenPayload.name + " さん";
+    // --- グローバルエラーを可視化（静かに失敗するのを防ぐ）---
+    window.addEventListener("error", (ev) => {
+      alert("JSエラー: " + ev.message);
+      log("JS error: " + ev.message);
+    });
+
+    // --- LIFF初期化 ---
+    (async function init() {
+      try {
+        log("init: start");
+        await liff.init({ liffId: LIFF_ID });
+        log("init: liff initialized");
+        if (!liff.isLoggedIn()) {
+          log("init: not logged in -> login()");
+          liff.login();
+          return; // ← ログイン後に再ロードされます
+        }
+        const tokenPayload = liff.getDecodedIDToken();
+        if (tokenPayload && tokenPayload.name) {
+          $("userName").textContent = "対象：" + tokenPayload.name + " さん";
+        }
+        log("init: ready (logged in)");
+      } catch (e) {
+        alert("LIFF初期化でエラー: " + e);
+        log("init error: " + e);
       }
-
-      document.getElementById("attend").addEventListener("change", (e) => {
-        document.getElementById("pendingWrap").style.display = (e.target.value === "未定") ? "block" : "none";
-      });
-
-      document.getElementById("carYes").onclick = () => { car = "はい"; document.getElementById("carState").textContent = "はい"; };
-      document.getElementById("carNo").onclick  = () => { car = "いいえ"; document.getElementById("carState").textContent = "いいえ"; };
-
-      document.getElementById("submitBtn").onclick = submitForm;
-    }
+    })();
 
     async function submitForm() {
-      const attend = document.getElementById("attend").value;
-      const pendingDate = document.getElementById("pendingDate").value.trim();
-      const comment = document.getElementById("comment").value.trim();
+      log("submit: clicked");
+      const attend = $("attend").value;
+      const pendingDate = $("pendingDate").value.trim();
+      const comment = $("comment").value.trim();
 
       if (!attend) { alert("出欠を選んでください"); return; }
       if (attend === "未定" && pendingDate === "") {
         if (!confirm("未定の予定日が未入力です。このまま送信しますか？")) return;
       }
-      if (!car) { if (!confirm("車出しが未選択です。このまま送信しますか？")) return; }
+      if (!car) {
+        if (!confirm("車出しが未選択です。このまま送信しますか？")) return;
+      }
 
-      const idToken = liff.getIDToken(); // JWT（サーバーで検証）
-      if (!idToken) { alert("IDトークンが取得できません。LINEログイン後にお試しください。"); return; }
+      const idToken = liff.getIDToken();
+      if (!idToken) {
+        alert("IDトークンが取得できません。LINEログイン後にお試しください。");
+        log("submit: no idToken");
+        return;
+      }
+      log("submit: have idToken");
 
-      // FormData で送信（プリフライト回避）
       const fd = new FormData();
       fd.append("idToken", idToken);
       fd.append("form", JSON.stringify({ attend, pendingDate, car, comment }));
 
       try {
         const res = await fetch(API_ENDPOINT, { method: "POST", body: fd });
-
-        // デバッグ用：サーバーの生テキストを表示（原因特定用）
         const raw = await res.text();
+        log("server raw: " + raw);
         try {
           const json = JSON.parse(raw);
           if (json.status === "ok") {
@@ -112,10 +140,9 @@
         }
       } catch (e) {
         alert("通信に失敗しました: " + e);
+        log("fetch error: " + e);
       }
     }
-
-    init();
   </script>
 </body>
 </html>
