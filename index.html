@@ -10,11 +10,13 @@
     h2 { margin: 0 0 12px; }
     .card { border:1px solid #ddd; border-radius:12px; padding:12px; margin:8px 0; }
     .muted { color:#666; font-size:13px; }
-    button { padding:10px 14px; border-radius:10px; border:none; background:#06c; color:#fff; font-size:16px; }
+    button { padding:10px 14px; border-radius:10px; border:none; background:#06c; color:#fff; font-size:16px; cursor:pointer; }
+    button:disabled { opacity:0.6; cursor:not-allowed; }
     .ghost { background:#f5f5f5; color:#333; }
     .row { display:flex; gap:8px; flex-wrap:wrap; }
     .ok { color:#0a7; }
     .err { color:#c33; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   </style>
 </head>
 <body>
@@ -27,59 +29,108 @@
   </div>
 
   <div class="row" style="margin-top:8px;">
-    <button id="btnStart">出欠入力を始める</button>
+    <button id="btnStart" disabled>出欠入力を始める</button>
     <button id="btnPing" class="ghost">接続テスト</button>
   </div>
 
-  <div id="log" class="muted" style="margin-top:10px;"></div>
+  <div id="debug" class="muted" style="margin-top:12px;"></div>
+  <div id="log" class="muted" style="margin-top:8px;"></div>
 
 <script>
-  // ===== 設定（置換） =====
-  const LIFF_ID = "＜あなたのLIFF ID＞";        // 例: 200xxx-xxxxxx
-  const API_ENDPOINT = "＜GASの/exec URL＞";     // 例: https://script.google.com/macros/s/XXXX/exec
+  // ===== 設定（置換してください） =====
+  const LIFF_ID = "2008020568-2jVl00Rn";            // 例: 200xxx-xxxxxx
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw8yD16abH2IBz5-WbbwxoIehEozkUUCpN7HbjYm75pEdQemIdzR2QQPapk7m6xEVGxUg/exec";         // 例: https://script.google.com/macros/s/XXXX/exec
 
   // ===== 表示整形ユーティリティ =====
   function formatYmdDow(dateStr){
-    const d = new Date(dateStr);
-    if (isNaN(d)) return String(dateStr||"");
-    const dow = "日月火水木金土"[d.getDay()];
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,"0");
-    const dd = String(d.getDate()).padStart(2,"0");
-    return `${y}/${m}/${dd}（${dow}）`;
+    // "yyyy/MM/dd" も Date 文字列も対応
+    const s = String(dateStr||"");
+    const tryDate = new Date(s);
+    if (!isNaN(tryDate)) {
+      const d = tryDate;
+      const dow = "日月火水木金土"[d.getDay()];
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      return `${y}/${m}/${dd}（${dow}）`;
+    }
+    // すでに "yyyy/MM/dd" ならそのまま
+    return s;
   }
   function formatHm(timeStr){
-    const t = new Date(timeStr);
-    if (isNaN(t)) return String(timeStr||"");
-    const hh = String(t.getHours()).padStart(2,"0");
-    const mm = String(t.getMinutes()).padStart(2,"0");
-    return `${hh}:${mm}`;
+    const s = String(timeStr||"");
+    const m = s.match(/^(\d{1,2}:\d{2})/);
+    if (m) return m[1];                   // "14:00" のような場合
+    const d = new Date(s);
+    if (!isNaN(d)) {
+      const hh = String(d.getHours()).padStart(2,"0");
+      const mm = String(d.getMinutes()).padStart(2,"0");
+      return `${hh}:${mm}`;
+    }
+    return s;
   }
 
+  // ===== グローバル状態 =====
+  let myProfile = null;     // liff.getProfile() 結果
+  let myLineUserId = null;  // Messaging API の userId（"U..."）
+  let myLoginSub = null;    // Login の sub（id_token）※pushには使えない
+
   // ===== 初期化 =====
-  let myProfile = null;
+  init().catch(err => logErr(err));
 
   async function init(){
     await liff.init({ liffId: LIFF_ID });
+
     if (!liff.isLoggedIn()) { liff.login(); return; }
 
-    // 表示用（profile スコープがONなら name が取れる）
-    const payload = liff.getDecodedIDToken();
-    const name = payload && payload.name ? payload.name : "";
-    document.getElementById("me").textContent = name ? `こんにちは、${name} さん` : "";
+    // Login の id_token（名前など）
+    const idt = liff.getDecodedIDToken();
+    myLoginSub = idt && idt.sub ? idt.sub : null;
+
+    // Messagingの userId を取得（基本は LINE アプリ内でのみ保証）
+    try {
+      myProfile = await liff.getProfile();          // { userId, displayName, ... }
+      myLineUserId = myProfile && myProfile.userId ? myProfile.userId : null;
+    } catch (e) {
+      // 外部ブラウザ等だと取れない場合がある
+      myProfile = null;
+      myLineUserId = null;
+    }
+
+    // 画面表示
+    const meEl = document.getElementById("me");
+    const debugEl = document.getElementById("debug");
+
+    const dispName = (myProfile && myProfile.displayName) ? myProfile.displayName : (idt?.name || "");
+    meEl.textContent = dispName ? `こんにちは、${dispName} さん` : "こんにちは";
+
+    let hints = [];
+    if (myLineUserId) {
+      hints.push(`Messaging userId: <span class="mono">${escapeHtml(myLineUserId)}</span>`);
+    } else {
+      if (!liff.isInClient()) {
+        hints.push(`<span class="err">LINEアプリ外で開いているため userId が取得できません。必ず「LINEアプリ内」で開いてください。</span>`);
+      } else {
+        hints.push(`<span class="err">userId が取得できませんでした。LIFFのスコープに "profile" を含めているか確認してください。</span>`);
+      }
+    }
+    if (myLoginSub) {
+      hints.push(`Login sub: <span class="mono">${escapeHtml(myLoginSub)}</span>（※pushには使えません）`);
+    }
+    debugEl.innerHTML = hints.join("<br>");
 
     // 公演取得＆表示
     await loadEvents();
 
     // ボタン
     document.getElementById("btnPing").onclick = onPing;
-    document.getElementById("btnStart").onclick = () => {
-      // ここで既存の whoami → 初回登録 or 出欠入力 へ遷移する処理を呼んでください
-      // 既存のロジックが別関数ならそこを呼ぶ形でOK
-      log("ボタン反応OK（この先は既存の出欠フローに接続してください）");
-    };
+    document.getElementById("btnStart").onclick = onStart;
+
+    // userId が取れていれば開始ボタンを有効化
+    document.getElementById("btnStart").disabled = !myLineUserId;
   }
 
+  // ===== 公演一覧ロード =====
   async function loadEvents(){
     const el = document.getElementById("events");
     el.textContent = "読み込み中...";
@@ -103,11 +154,40 @@
       }).join("");
     } catch(err){
       el.innerHTML = `<span class="err">公演情報の取得に失敗しました。</span>`;
-      log(err.message || String(err));
+      logErr(err);
     }
   }
 
-  // 接続テスト
+  // ===== 出欠開始（whoami → 初回登録or出欠へ） =====
+  async function onStart(){
+    if (!myLineUserId) {
+      log("userId が取得できないため開始できません。LINEアプリ内で開いてください。");
+      return;
+    }
+    try{
+      disableStart(true);
+      // whoami: Members に登録があるか確認（Messaging userId を送る）
+      const url = `${API_ENDPOINT}?whoami=1&id=${encodeURIComponent(myLineUserId)}`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.status === "ok") {
+        log("登録済みのため、出欠入力に進みます。"); 
+        // TODO: ここで既存の「出欠入力画面へ遷移」ロジックを呼んでください
+      } else if (json.status === "new") {
+        log("未登録のため、初回登録に進みます。"); 
+        // TODO: ここで既存の「初回登録フォーム表示」ロジックを呼んでください
+      } else {
+        log("ステータス不明: " + JSON.stringify(json));
+      }
+    } catch(e){
+      logErr(e);
+    } finally {
+      disableStart(false);
+    }
+  }
+
+  // ===== 接続テスト =====
   async function onPing(){
     try{
       const r = await fetch(API_ENDPOINT + "?ping=1");
@@ -118,12 +198,26 @@
     }
   }
 
-  function log(t){
-    const el = document.getElementById("log");
-    el.textContent = t;
+  // ===== ユーティリティ =====
+  function disableStart(b){
+    document.getElementById("btnStart").disabled = b;
   }
-
-  init();
+  function log(t){
+    document.getElementById("log").innerHTML = escapeHtml(String(t));
+  }
+  function logErr(err){
+    console.error(err);
+    const msg = (err && err.message) ? err.message : String(err);
+    document.getElementById("log").innerHTML = `<span class="err">${escapeHtml(msg)}</span>`;
+  }
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#39;");
+  }
 </script>
 </body>
 </html>
