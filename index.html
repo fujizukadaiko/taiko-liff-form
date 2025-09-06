@@ -3,488 +3,127 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>出欠フォーム（複数公演対応）</title>
+  <title>公演 出欠フォーム</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; padding:16px; background:#f6f7f8; }
-    .card { border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin:12px 0; background:#fff; }
-    h2,h3,h4 { margin:6px 0 10px; }
-    label { display:block; margin:8px 0 6px; }
-    input, select, textarea, button { width:100%; padding:10px; font-size:16px; box-sizing:border-box; }
-    .primary { background:#0b66ff; color:#fff; border:none; border-radius:8px; }
-    .ghost { background:#f3f4f6; border:1px solid #e5e7eb; border-radius:8px; }
-    .hint { color:#6b7280; font-size:12px; }
-    .muted { color:#374151; font-size:14px; }
-
-    #loading { position: fixed; top:12px; right:12px; display:none; align-items:center; gap:8px;
-      background:rgba(17,17,17,0.75); color:#fff; padding:6px 10px; border-radius:999px; font-size:13px; z-index:9999; }
-    .spinner { width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,0.35);
-      border-top-color:#fff; animation: spin .8s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .disabled { opacity:.6; pointer-events:none; }
-
-    table { width:100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border-bottom:1px solid #eee; padding:10px 6px; font-size:15px; vertical-align: middle; }
-    th { text-align:left; color:#374151; background:#f9fafb; }
-    .nameCell { width:40%; word-break: break-all; }
-    .attCell  { width:30%; }
-    .pdCell   { width:30%; }
-
-    .eventHeader { display:flex; justify-content:space-between; align-items:center; gap:10px; }
-    .summary { background:#fafafa; border:1px dashed #ddd; border-radius:8px; padding:8px; margin-top:8px; }
+    body { font-family: system-ui, -apple-system, sans-serif; padding: 16px; }
+    h2 { margin: 0 0 12px; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:12px; margin:8px 0; }
+    .muted { color:#666; font-size:13px; }
+    button { padding:10px 14px; border-radius:10px; border:none; background:#06c; color:#fff; font-size:16px; }
+    .ghost { background:#f5f5f5; color:#333; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; }
+    .ok { color:#0a7; }
+    .err { color:#c33; }
   </style>
 </head>
 <body>
-  <div id="loading"><div class="spinner"></div><span id="loadingText">処理中…</span></div>
+  <h2>出欠入力</h2>
+  <div id="me" class="muted"></div>
 
-  <h2>出欠フォーム</h2>
-
-  <div class="card" id="topCard">
-    <div class="muted" id="topInfo">公演情報を読み込み中…</div>
-    <div id="topSummary" class="summary" style="display:none; margin-top:8px;"></div>
-    <div style="display:flex; gap:8px; margin-top:10px;">
-      <button id="beginBtn" class="primary" style="flex:1;">出欠入力をはじめる</button>
-      <button id="editBtn" class="ghost" style="flex:1; display:none;">内容を修正する</button>
-      <button id="pingBtn" class="ghost" style="flex:1;">接続テスト</button>
-    </div>
-    <div id="msg" class="hint"></div>
+  <div class="card">
+    <div class="muted">現在配信中の公演</div>
+    <div id="events">読み込み中...</div>
   </div>
 
-  <!-- 初回登録（複数演奏者） -->
-  <div id="regBox" class="card" style="display:none;">
-    <h3>初回登録</h3>
-    <label>入力者氏名</label>
-    <input id="inputName" type="text" placeholder="例）山田太郎" />
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px;">
-      <h4 style="margin:0;">演奏者一覧</h4>
-      <button id="addPerfBtn" class="ghost" type="button">＋ 演奏者を追加</button>
-    </div>
-    <div id="perfList" style="margin-top:8px;"></div>
-    <div class="hint">※ ご自身も演奏する場合は、ご自身の名前も演奏者に追加してください。</div>
-    <button id="regSubmitBulk" class="primary" style="margin-top:12px;">登録する</button>
+  <div class="row" style="margin-top:8px;">
+    <button id="btnStart">出欠入力を始める</button>
+    <button id="btnPing" class="ghost">接続テスト</button>
   </div>
 
-  <!-- 複数公演：出欠入力領域 -->
-  <div id="eventsWrap" style="display:none;"></div>
+  <div id="log" class="muted" style="margin-top:10px;"></div>
 
-  <div id="submitWrap" class="card" style="display:none;">
-    <label>全体コメント（任意・全公演に同じコメント）</label>
-    <textarea id="commentAll" rows="3" placeholder="連絡事項があれば入力してください"></textarea>
-    <button id="submitAllBtn" class="primary" style="margin-top:12px;">全部送信</button>
-  </div>
+<script>
+  // ===== 設定（置換） =====
+  const LIFF_ID = "＜あなたのLIFF ID＞";        // 例: 200xxx-xxxxxx
+  const API_ENDPOINT = "＜GASの/exec URL＞";     // 例: https://script.google.com/macros/s/XXXX/exec
 
-  <script>
-    const LIFF_ID = "2008020568-2jVl00Rn";
-    const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw24_nWrSMqIoe1PTkRkjilgz4PMsyeInwcEKGiIbR7se_hc3SyxHqVbgVKLEnYDmOy/exec";
+  // ===== 表示整形ユーティリティ =====
+  function formatYmdDow(dateStr){
+    const d = new Date(dateStr);
+    if (isNaN(d)) return String(dateStr||"");
+    const dow = "日月火水木金土"[d.getDay()];
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return `${y}/${m}/${dd}（${dow}）`;
+  }
+  function formatHm(timeStr){
+    const t = new Date(timeStr);
+    if (isNaN(t)) return String(timeStr||"");
+    const hh = String(t.getHours()).padStart(2,"0");
+    const mm = String(t.getMinutes()).padStart(2,"0");
+    return `${hh}:${mm}`;
+  }
 
-    let gLineId = "";
-    let busy = false;
-    let activeEvents = []; // [{eventId,date,time,place}]
-    let members = [];      // [{performerName, inputName, lineId}]
-    let perEventState = {}; // { eventId: { rows:[{name,att,pd}], existing:[...]} }
+  // ===== 初期化 =====
+  let myProfile = null;
 
-    const WEEKS = ["日","月","火","水","木","金","土"];
-    const pad2 = n => String(n).padStart(2,"0");
+  async function init(){
+    await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
 
-    function setBusy(on, text="処理中…") {
-      busy = on;
-      const loading = document.getElementById("loading");
-      document.getElementById("loadingText").textContent = text;
-      loading.style.display = on ? "flex" : "none";
-      const btns = ["beginBtn","pingBtn","addPerfBtn","regSubmitBulk","submitAllBtn","editBtn"]
-        .map(id=>document.getElementById(id)).filter(Boolean);
-      btns.forEach(b=>{
-        if (!b) return;
-        if (on) {
-          if (!b.dataset.origText) b.dataset.origText = b.textContent;
-          if (b.id==="submitAllBtn"||b.id==="regSubmitBulk") b.textContent="送信中…";
-          else if (b.id==="beginBtn"||b.id==="editBtn") b.textContent="照会中…";
-          else b.textContent="実行中…";
-          b.classList.add("disabled"); b.disabled = true;
-        } else {
-          if (b.dataset.origText) b.textContent = b.dataset.origText;
-          b.classList.remove("disabled"); b.disabled = false;
-        }
-      });
-    }
+    // 表示用（profile スコープがONなら name が取れる）
+    const payload = liff.getDecodedIDToken();
+    const name = payload && payload.name ? payload.name : "";
+    document.getElementById("me").textContent = name ? `こんにちは、${name} さん` : "";
 
-    function parseToDate(val){
-      if (val instanceof Date && !isNaN(val)) return val;
-      const d = new Date(val);
-      if (!isNaN(d)) return d;
-      const m = String(val||"").match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-      if (m) return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
-      return null;
-    }
-    function parseToTime(val){
-      if (val instanceof Date && !isNaN(val)) return val;
-      const d = new Date(val);
-      if (!isNaN(d)) return d;
-      const m = String(val||"").match(/^(\d{1,2}):(\d{2})$/);
-      if (m) { const t=new Date(); t.setHours(+m[1],+m[2],0,0); return t; }
-      return null;
-    }
-    function ymd(val){
-      const d = parseToDate(val);
-      if (!d) return String(val||"");
-      return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-    }
-    function eventLines(ev){
-      const d = parseToDate(ev.date);
-      const t = parseToTime(ev.time);
-      const datePart = d ? `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}（${WEEKS[d.getDay()]}）` : (ev.date||"");
-      const timePart = t ? `${pad2(t.getHours())}:${pad2(t.getMinutes())}` : (ev.time||"");
-      return [`日時：${datePart}${timePart?" "+timePart:""}`, `場所：${ev.place||""}`];
-    }
+    // 公演取得＆表示
+    await loadEvents();
 
-    async function init(){
-      await liff.init({ liffId: LIFF_ID });
-      if (!liff.isLoggedIn()) { liff.login(); return; }
-      document.getElementById("msg").textContent = "LIFF初期化完了。ボタンを押してください。";
-      addPerfRow(); // 初回登録フォームの行を1つ用意
-      // イベント一覧
-      try{
-        const j = await fetch(API_ENDPOINT + "?events=1&ts="+Date.now(), {cache:"no-store"}).then(r=>r.json());
-        if (j.status==="ok") {
-          activeEvents = j.events || [];
-          if (activeEvents.length===0) {
-            document.getElementById("topInfo").textContent = "現在、配信中の公演はありません。";
-          } else {
-            document.getElementById("topInfo").textContent =
-              `配信中の公演：${activeEvents.length}件（この画面で一括回答できます）`;
-          }
-        } else {
-          document.getElementById("topInfo").textContent = "公演情報の取得に失敗しました。";
-        }
-      }catch{
-        document.getElementById("topInfo").textContent = "公演情報の取得に失敗しました。";
-      }
-    }
-
-    // ===== 初回登録UI =====
-    function addPerfRow(name=""){
-      const host = document.getElementById("perfList");
-      const row = document.createElement("div");
-      row.style.display = "grid";
-      row.style.gridTemplateColumns = "1fr 96px";
-      row.style.gap = "10px";
-      row.style.marginBottom = "8px";
-      row.innerHTML = `
-        <input type="text" class="perfName" placeholder="演奏者氏名" value="${name}">
-        <button type="button" class="ghost delBtn">− 削除</button>
-      `;
-      row.querySelector(".delBtn").onclick = ()=>{
-        host.removeChild(row);
-        if (host.children.length===0) addPerfRow();
-      };
-      host.appendChild(row);
-    }
-
-    // ===== 出欠UI（公演ごとセクション生成） =====
-    function renderEvents(){
-      const wrap = document.getElementById("eventsWrap");
-      wrap.innerHTML = "";
-      if (activeEvents.length===0) return;
-
-      activeEvents.forEach(ev=>{
-        const card = document.createElement("div");
-        card.className = "card";
-        const [line1, line2] = eventLines(ev);
-        card.innerHTML = `
-          <div class="eventHeader">
-            <h3 style="margin:0;">出欠入力</h3>
-            <div class="muted">${line1}<br>${line2}</div>
-          </div>
-          <div class="summary" id="sum_${ev.eventId}" style="display:none;"></div>
-          <div style="overflow:auto; margin-top:8px;">
-            <table>
-              <thead>
-                <tr>
-                  <th class="nameCell">演奏者</th>
-                  <th class="attCell">出欠</th>
-                  <th class="pdCell">未定の予定日</th>
-                </tr>
-              </thead>
-              <tbody id="tb_${ev.eventId}">
-              </tbody>
-            </table>
-          </div>
-        `;
-        wrap.appendChild(card);
-
-        // テーブル行（membersで展開）
-        const tbody = card.querySelector(`#tb_${ev.eventId}`);
-        members.forEach((m, idx)=>{
-          const tr = document.createElement("tr");
-          const nameTd = document.createElement("td");
-          nameTd.className = "nameCell";
-          nameTd.textContent = m.performerName;
-
-          const attTd  = document.createElement("td");
-          attTd.className = "attCell";
-          const sel = document.createElement("select");
-          sel.id = `att_${ev.eventId}_${idx}`;
-          sel.innerHTML = `
-            <option value="">選択してください</option>
-            <option value="参加">参加</option>
-            <option value="不参加">不参加</option>
-            <option value="未定">未定</option>`;
-          attTd.appendChild(sel);
-
-          const pdTd = document.createElement("td");
-          pdTd.className = "pdCell";
-          const pd = document.createElement("input");
-          pd.type = "text";
-          pd.placeholder = "YYYY/MM/DD";
-          pd.id = `pd_${ev.eventId}_${idx}`;
-          pd.disabled = true;
-          pdTd.appendChild(pd);
-          const hint = document.createElement("div");
-          hint.className = "hint";
-          hint.textContent = "未定時のみ入力";
-          pdTd.appendChild(hint);
-
-          sel.addEventListener("change", ()=>{
-            pd.disabled = (sel.value!=="未定");
-            if (sel.value!=="未定") pd.value = "";
-          });
-
-          tr.appendChild(nameTd);
-          tr.appendChild(attTd);
-          tr.appendChild(pdTd);
-          tbody.appendChild(tr);
-        });
-      });
-
-      document.getElementById("eventsWrap").style.display = "block";
-      document.getElementById("submitWrap").style.display = "block";
-    }
-
-    // ===== 既存回答のロード＆サマリ表示（公演別） =====
-    async function loadExistingForAll(){
-      perEventState = {};
-      for (const ev of activeEvents){
-        const j = await fetch(`${API_ENDPOINT}?getAttendance=1&eventId=${encodeURIComponent(ev.eventId)}&lineId=${encodeURIComponent(gLineId)}&ts=${Date.now()}`, {cache:"no-store"}).then(r=>r.json());
-        perEventState[ev.eventId] = { rows:[], existing:j.status==="ok" ? (j.rows||[]) : [] };
-        // 既存値を反映してセレクトを事前選択
-        const ex = perEventState[ev.eventId].existing;
-        if (Array.isArray(ex) && ex.length){
-          // サマリ表示（★ pendingDate を yyyy/mm/dd で）
-          const sumDiv = document.getElementById(`sum_${ev.eventId}`);
-          sumDiv.style.display = "block";
-          sumDiv.innerHTML = `<div class="muted"><strong>現在の登録</strong><br>${
-            ex.map(r=>`${r.performerName}：${r.attend}${r.pendingDate?`（予定日:${ymd(r.pendingDate)}）`:''}`).join("<br>")
-          }<br><span class="hint">この内容は送信で上書きされます。</span></div>`;
-
-          // テーブルに反映
-          members.forEach((m, idx)=>{
-            const found = ex.find(r => r.performerName === m.performerName);
-            if (found){
-              const sel = document.getElementById(`att_${ev.eventId}_${idx}`);
-              const pd  = document.getElementById(`pd_${ev.eventId}_${idx}`);
-              if (sel){ sel.value = found.attend || ""; }
-              if (pd){
-                if (found.attend==="未定") { pd.disabled=false; pd.value=found.pendingDate||""; }
-                else { pd.disabled=true; pd.value=""; }
-              }
-            }
-          });
-        }
-      }
-    }
-
-    // ===== トップ画面のサマリ描画（複数公演まとめ） =====
-    function renderTopSummary(){
-      const host = document.getElementById("topSummary");
-      host.innerHTML = "";
-      let lines = [];
-
-      for (const ev of activeEvents){
-        const ex = (perEventState[ev.eventId]?.existing) || [];
-        if (!ex.length) continue;
-        const [l1, l2] = eventLines(ev);
-        lines.push(`<div style="margin-bottom:6px;"><div class="muted" style="font-weight:600;">${l1}<br>${l2}</div>${
-          ex.map(r=>`${r.performerName}：${r.attend}${r.pendingDate?`（予定日:${ymd(r.pendingDate)}）`:''}`).join("<br>")
-        }</div>`);
-      }
-
-      if (lines.length){
-        host.style.display = "block";
-        host.innerHTML = `<div class="muted"><strong>現在の入力内容</strong><br>${lines.join("<hr style='border:none;border-top:1px dashed #e5e7eb;margin:8px 0;'/>")}</div>
-          <div class="hint" style="margin-top:6px;">修正する場合は「内容を修正する」を押してください。</div>`;
-        document.getElementById("editBtn").style.display = "inline-block";
-      } else {
-        host.style.display = "none";
-        document.getElementById("editBtn").style.display = "none";
-      }
-    }
-
-    // ===== 接続テスト =====
-    document.getElementById("pingBtn").onclick = async ()=>{
-      if (busy) return; setBusy(true,"接続テスト中…");
-      try{
-        const t = await fetch(API_ENDPOINT + "?ping=1&ts="+Date.now(), {cache:"no-store"}).then(r=>r.text());
-        alert("接続テスト応答: " + t);
-      }catch(e){ alert("接続失敗: " + e); }
-      finally{ setBusy(false); }
+    // ボタン
+    document.getElementById("btnPing").onclick = onPing;
+    document.getElementById("btnStart").onclick = () => {
+      // ここで既存の whoami → 初回登録 or 出欠入力 へ遷移する処理を呼んでください
+      // 既存のロジックが別関数ならそこを呼ぶ形でOK
+      log("ボタン反応OK（この先は既存の出欠フローに接続してください）");
     };
+  }
 
-    // ===== 出欠開始（whoami → 初回登録 or 出欠UI） =====
-    async function beginFlow(){
-      if (busy) return; setBusy(true,"会員照会中…");
-      try{
-        const decoded = liff.getDecodedIDToken();
-        if (!decoded || !decoded.sub){ alert("LINEログイン情報が取得できませんでした"); return; }
-        gLineId = decoded.sub;
+  async function loadEvents(){
+    const el = document.getElementById("events");
+    el.textContent = "読み込み中...";
+    try{
+      const res = await fetch(API_ENDPOINT + "?events=1");
+      const json = await res.json();
+      if (json.status !== "ok") { el.innerHTML = `<span class="err">取得失敗</span>`; return; }
+      const list = json.events || [];
+      if (list.length === 0) { el.innerHTML = `<span>現在配信中の公演はありません</span>`; return; }
 
-        // 会員チェック
-        const j = await fetch(`${API_ENDPOINT}?whoami=1&id=${encodeURIComponent(gLineId)}&ts=${Date.now()}`, {cache:"no-store"}).then(r=>r.json());
-        if (j.status==="new"){
-          document.getElementById("regBox").style.display = "block";
-          document.getElementById("eventsWrap").style.display = "none";
-          document.getElementById("submitWrap").style.display = "none";
-          document.getElementById("msg").textContent = "初回登録が必要です。入力者氏名と演奏者を追加してください。";
-          return;
-        }
-        members = j.members || [];
-        if (members.length===0){
-          document.getElementById("msg").textContent = "演奏者が登録されていません。初回登録をお願いします。";
-          document.getElementById("regBox").style.display = "block";
-          return;
-        }
-
-        // 出欠UIを公演ごとに描画
-        renderEvents();
-        await loadExistingForAll();
-        document.getElementById("regBox").style.display = "none";
-        document.getElementById("eventsWrap").style.display = "block";
-        document.getElementById("submitWrap").style.display = "block";
-        document.getElementById("msg").textContent = "各公演の出欠を選んで「全部送信」を押してください。";
-        // 編集中はトップのサマリを隠す
-        document.getElementById("topSummary").style.display = "none";
-        document.getElementById("editBtn").style.display = "none";
-        window.scrollTo({top: document.getElementById("eventsWrap").offsetTop - 8, behavior:"smooth"});
-      }catch(e){
-        alert("whoamiエラー: " + e);
-      } finally { setBusy(false); }
+      el.innerHTML = list.map(ev => {
+        const date = formatYmdDow(ev.date);
+        const time = formatHm(ev.time);
+        const line1 = `日時：${date} ${time}`;
+        const line2 = `場所：${ev.place || ""}`;
+        return `
+          <div class="card" style="margin:8px 0;">
+            <div>${line1}</div>
+            <div>${line2}</div>
+          </div>`;
+      }).join("");
+    } catch(err){
+      el.innerHTML = `<span class="err">公演情報の取得に失敗しました。</span>`;
+      log(err.message || String(err));
     }
+  }
 
-    document.getElementById("beginBtn").onclick = beginFlow;
-    document.getElementById("editBtn").onclick  = beginFlow;
+  // 接続テスト
+  async function onPing(){
+    try{
+      const r = await fetch(API_ENDPOINT + "?ping=1");
+      const j = await r.json();
+      log(`接続テスト応答: ${j.status}`);
+    } catch(e){
+      log("接続テスト失敗: " + (e.message || e));
+    }
+  }
 
-    // ===== 初回登録：行追加／送信 =====
-    document.getElementById("addPerfBtn").onclick = ()=>{ if (!busy) addPerfRow(); };
+  function log(t){
+    const el = document.getElementById("log");
+    el.textContent = t;
+  }
 
-    document.getElementById("regSubmitBulk").onclick = async ()=>{
-      if (busy) return; setBusy(true,"送信中…");
-      try{
-        const inputName = document.getElementById("inputName").value.trim();
-        if (!gLineId){ alert("LINE IDが未取得です。上のボタンから開始してください。"); return; }
-        if (!inputName){ alert("入力者氏名を入力してください"); return; }
-        const list = [];
-        document.querySelectorAll("#perfList .perfName").forEach(el=>{
-          const v = el.value.trim(); if (v) list.push(v);
-        });
-        if (list.length===0){ alert("演奏者を1名以上入力してください"); return; }
-
-        const url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(gLineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(list))}&ts=${Date.now()}`;
-        const j = await fetch(url, {cache:"no-store"}).then(r=>r.json());
-        if (j.status==="ok"){
-          alert(`登録しました（${j.inserted}件）。出欠入力へ進みます。`);
-          members = j.members || [];
-          renderEvents();
-          await loadExistingForAll();
-          document.getElementById("regBox").style.display = "none";
-          document.getElementById("eventsWrap").style.display = "block";
-          document.getElementById("submitWrap").style.display = "block";
-          document.getElementById("msg").textContent = "各公演の出欠を選んで「全部送信」を押してください。";
-        } else {
-          alert("登録失敗: " + (j.message || JSON.stringify(j)));
-        }
-      }catch(e){ alert("登録エラー: " + e); }
-      finally{ setBusy(false); }
-    };
-
-    // ===== 全部送信（公演ごとに submitBulk を順次実行） =====
-    document.getElementById("submitAllBtn").onclick = async ()=>{
-      if (busy) return; setBusy(true,"送信中…");
-      try{
-        if (!gLineId){ alert("LINE IDが未取得です"); return; }
-        if (activeEvents.length===0){ alert("配信中の公演がありません"); return; }
-
-        const commentAll = document.getElementById("commentAll").value.trim();
-
-        // 公演ごとに入力を収集
-        const tasks = [];
-        let overwriteCountMsg = "";
-        for (const ev of activeEvents){
-          const bulk = [];
-          members.forEach((m, idx)=>{
-            const sel = document.getElementById(`att_${ev.eventId}_${idx}`);
-            const pd  = document.getElementById(`pd_${ev.eventId}_${idx}`);
-            if (!sel) return;
-            const val = sel.value;
-            if (!val) return; // 未選択は送らない
-            bulk.push({
-              performerName: m.performerName,
-              attend: val,
-              pendingDate: (val==="未定") ? (pd.value.trim()||"") : "",
-              comment: commentAll
-            });
-          });
-          // 既存の件数
-          const ex = perEventState[ev.eventId]?.existing || [];
-          if (ex.length>0) {
-            overwriteCountMsg += `・公演 ${ev.eventId}：既存 ${ex.length} 件を上書き\n`;
-          }
-          tasks.push({ ev, bulk });
-        }
-
-        if (tasks.every(t => t.bulk.length===0)){
-          alert("いずれの公演にも出欠が選択されていません。");
-          return;
-        }
-
-        // 上書き確認（既存がある公演が1つでもあれば提示）
-        if (overwriteCountMsg){
-          const ok = confirm(`以下の既存回答は上書きされます。続行しますか？\n\n${overwriteCountMsg}`);
-          if (!ok) { return; }
-        }
-
-        // 送信（順次）
-        for (const t of tasks){
-          if (t.bulk.length===0) continue; // スキップ可
-          const url = `${API_ENDPOINT}?submitBulk=1&eventId=${encodeURIComponent(t.ev.eventId)}&lineId=${encodeURIComponent(gLineId)}&bulk=${encodeURIComponent(JSON.stringify(t.bulk))}&ts=${Date.now()}`;
-          const j = await fetch(url, {cache:"no-store"}).then(r=>r.json());
-          if (!(j.status==="ok")){
-            alert(`送信失敗（公演 ${t.ev.eventId}）：` + (j.message || JSON.stringify(j)));
-            return;
-          }
-        }
-
-        // ===== 送信完了：トップに戻してサマリ表示 =====
-        alert("すべて送信しました。ありがとうございます！");
-        // 最新状態を取り直し
-        await loadExistingForAll();
-        renderTopSummary();
-        // 編集UIを閉じる
-        document.getElementById("eventsWrap").style.display = "none";
-        document.getElementById("submitWrap").style.display = "none";
-        // トップに誘導
-        document.getElementById("msg").textContent = "送信内容をトップに表示しました。修正する場合は「内容を修正する」を押してください。";
-        document.getElementById("topSummary").style.display = "block";
-        document.getElementById("editBtn").style.display = "inline-block";
-        window.scrollTo({top: 0, behavior:"smooth"});
-
-        // 必要なら LIFF を閉じる代わりに上の処理で残す（closeWindowはしない）
-        // try { liff.closeWindow(); } catch(_) {}
-      }catch(e){
-        alert("送信エラー: " + e);
-      } finally { setBusy(false); }
-    };
-
-    // 初期化
-    init();
-  </script>
+  init();
+</script>
 </body>
 </html>
