@@ -28,22 +28,15 @@
       padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-size:14px;
     }
     input::placeholder { color:#aaa; }
+    /* 初期は非表示。JSで display を明示的に 'inline-block' に変えて表示させる */
     .pending-wrap { display:none; }
     .del { background:#fee; border:1px solid #fbb; color:#a11; }
     .add { background:#eef9ff; border:1px solid #bfe6ff; color:#035; }
     .toolbar { display:flex; gap:8px; flex-wrap:wrap; }
     .warn { color:#a11; font-weight:600; }
     .ok { color:#0a7; font-weight:600; }
-    /* loading overlay */
-    .overlay {
-      position:fixed; inset:0; background:rgba(255,255,255,.8);
-      display:none; align-items:center; justify-content:center; z-index:999;
-      backdrop-filter: blur(2px);
-    }
-    .spinner {
-      width:28px; height:28px; border:3px solid #ddd; border-top-color: var(--pri);
-      border-radius:50%; animation:spin 1s linear infinite;
-    }
+    .overlay { position:fixed; inset:0; background:rgba(255,255,255,.8); display:none; align-items:center; justify-content:center; z-index:999; backdrop-filter: blur(2px); }
+    .spinner { width:28px; height:28px; border:3px solid #ddd; border-top-color: var(--pri); border-radius:50%; animation:spin 1s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
     .nav { margin:12px 0; }
   </style>
@@ -115,12 +108,12 @@ const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbydMPG_HVgX5dRh7uV
 
 /* ====== 状態 ====== */
 let state = {
-  lineId: "",        // liff.getDecodedIDToken().sub
-  displayName: "",   // 取得できる場合のみ（profileスコープ）
+  lineId: "",
+  displayName: "",
   who: "new",        // "ok" or "new"
   members: [],       // [{lineId,inputName,performerName}]
   events: [],        // [{eventId,date,time,place}]
-  attendCache: {}    // eventId -> rows [{ performerName, attend, pendingDate, comment, answeredAt }]
+  attendCache: {}    // eventId -> rows
 };
 
 /* ====== 共通UI ====== */
@@ -150,11 +143,7 @@ async function apiPing(){ return fetchJson("?ping=1"); }
 async function apiEvents(){ return fetchJson("?events=1"); }
 async function apiWhoAmI(lineId){ return fetchJson(`?whoami=1&id=${encodeURIComponent(lineId)}`); }
 async function apiRegisterBulk(lineId, inputName, list){
-  const qs = new URLSearchParams({
-    registerBulk:"1",
-    lineId, inputName,
-    list: JSON.stringify(list)
-  });
+  const qs = new URLSearchParams({ registerBulk:"1", lineId, inputName, list: JSON.stringify(list) });
   return fetchJson("?"+qs.toString());
 }
 async function apiGetAttendance(eventId, lineId){
@@ -247,19 +236,16 @@ function goTop(){
 /* ====== 初回登録 ====== */
 function onStart(){
   if (state.who === "new") {
-    // 初回登録へ
     $("#initMsg").textContent = "";
     $("#inputName").value = "";
     $("#perfList").innerHTML = "";
     addPerfRow(""); // 最低1行
     hide("#viewTop"); show("#viewInit");
   } else {
-    // 出欠入力へ
     openAttend();
   }
 }
 function onManageNames(){
-  // 既登録でも氏名編集させる（同一画面を再利用）
   $("#initMsg").textContent = "";
   $("#inputName").value = (state.members[0]?.inputName || "");
   $("#perfList").innerHTML = "";
@@ -292,7 +278,6 @@ async function onSubmitInit(){
   try{
     const res = await apiRegisterBulk(state.lineId, inputName, perfs);
     if (res.status !== "ok") throw new Error(res.message || "登録失敗");
-    // 状態更新
     state.who = "ok";
     state.members = res.members || [];
     alert("登録しました");
@@ -311,7 +296,6 @@ async function openAttend(){
   hide("#viewTop"); show("#viewAttend");
   overlay(true);
   try{
-    // 既存回答をイベント毎に読み込み
     state.attendCache = {};
     for (const ev of state.events) {
       const r = await apiGetAttendance(ev.eventId, state.lineId);
@@ -336,7 +320,7 @@ function renderAttendForm(){
   }
   const html = state.events.map(ev=>{
     const ymd = fmtYmdDow(ev.date); const hm = fmtHm(ev.time);
-    const prev = state.attendCache[ev.eventId] || []; // [{ performerName, attend, pendingDate, ... }]
+    const prev = state.attendCache[ev.eventId] || [];
     const map = {}; for (const r of prev) map[r.performerName] = r;
 
     const rows = perfs.map(name=>{
@@ -373,9 +357,7 @@ function renderAttendForm(){
   }).join("");
 
   $("#attendArea").innerHTML = html;
-
-  // --- ここで各selectに直接ハンドラをバインド（change/input両方）＆初期表示反映 ---
-  bindAttendSelectHandlers();
+  bindAttendSelectHandlers(); // ← ここでバインド＆初期反映
 }
 
 function bindAttendSelectHandlers(){
@@ -387,13 +369,14 @@ function bindAttendSelectHandlers(){
 
     const toggle = ()=> {
       const v = (sel.value || "").trim();
-      wrap.style.display = (v === '未定') ? '' : 'none';
+      // 重要：CSSの display:none を上書きするため、明示的に設定する
+      wrap.style.display = (v === '未定') ? 'inline-block' : 'none';
     };
 
     // 初期表示
     toggle();
 
-    // 変更時（ブラウザ差対策で change と input を両方）
+    // 変更時（ブラウザ差吸収のため change と input 両方）
     sel.addEventListener('change', toggle);
     sel.addEventListener('input',  toggle);
   });
@@ -418,7 +401,6 @@ function validateBeforeSubmit(){
   return true;
 }
 
-// イベント単位で集約
 function collectBulkForEvent(eventId){
   const rows = document.querySelectorAll(`.att-row[data-event="${CSS.escape(eventId)}"]`);
   const items = [];
@@ -431,7 +413,7 @@ function collectBulkForEvent(eventId){
     const attend = (sel?.value || "").trim();
     let pendingDate = '';
     if (attend === '未定' && date && date.value) {
-      pendingDate = date.value.replace(/-/g, '/'); // yyyy/MM/dd に揃える
+      pendingDate = date.value.replace(/-/g, '/');
     }
     const comment = com?.value?.trim() || '';
 
@@ -447,7 +429,7 @@ async function onSubmitAll(){
   try{
     for (const ev of state.events) {
       const items = collectBulkForEvent(ev.eventId);
-      if (items.length === 0) continue; // 未入力イベントはスキップ
+      if (items.length === 0) continue;
       const res = await apiSubmitBulk(ev.eventId, state.lineId, items);
       if (res.status !== "ok") throw new Error(res.message || "送信失敗");
     }
