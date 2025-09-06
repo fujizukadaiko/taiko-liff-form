@@ -136,10 +136,8 @@ function fmtYmdDow(s){
   return `${y}/${m}/${dd}（${fmtDow(d)}）`;
 }
 function fmtHm(s){
-  // GASは Date or "Sat Dec 30 1899 14:00:00 ..." なので、Dateとして読めるなら読む
   const d = new Date(s);
   if (isNaN(d)) {
-    // "HH:mm:ss" 文字列の場合
     const m = String(s||"").match(/^(\d{1,2}):(\d{2})/);
     if (m) return `${m[1].padStart(2,"0")}:${m[2]}`;
     return String(s||"");
@@ -261,7 +259,7 @@ function onStart(){
   }
 }
 function onManageNames(){
-  // 既登録でも氏名編集させる（同じ画面を再利用）
+  // 既登録でも氏名編集させる（同一画面を再利用）
   $("#initMsg").textContent = "";
   $("#inputName").value = (state.members[0]?.inputName || "");
   $("#perfList").innerHTML = "";
@@ -339,7 +337,6 @@ function renderAttendForm(){
   const html = state.events.map(ev=>{
     const ymd = fmtYmdDow(ev.date); const hm = fmtHm(ev.time);
     const prev = state.attendCache[ev.eventId] || []; // [{ performerName, attend, pendingDate, ... }]
-    // performerName -> row
     const map = {}; for (const r of prev) map[r.performerName] = r;
 
     const rows = perfs.map(name=>{
@@ -377,37 +374,39 @@ function renderAttendForm(){
 
   $("#attendArea").innerHTML = html;
 
-  // --- 「未定」のときだけ予定日を表示（初期反映＆変更時反映） ---
-  initPendingVisibility();
+  // --- ここで各selectに直接ハンドラをバインド（change/input両方）＆初期表示反映 ---
+  bindAttendSelectHandlers();
 }
 
-// （A）変更時の切り替え
-document.addEventListener('change', (e) => {
-  if (!e.target.classList.contains('attend-select')) return;
-  const row = e.target.closest('.att-row');
-  if (!row) return;
-  const wrap = row.querySelector('.pending-wrap');
-  if (!wrap) return;
-  wrap.style.display = (e.target.value === '未定') ? '' : 'none';
-});
-// （B）初期表示
-function initPendingVisibility(){
-  document.querySelectorAll('.att-row').forEach(row=>{
+function bindAttendSelectHandlers(){
+  const rows = document.querySelectorAll('.att-row');
+  rows.forEach(row=>{
     const sel = row.querySelector('.attend-select');
     const wrap = row.querySelector('.pending-wrap');
     if (!sel || !wrap) return;
-    wrap.style.display = (sel.value === '未定') ? '' : 'none';
+
+    const toggle = ()=> {
+      const v = (sel.value || "").trim();
+      wrap.style.display = (v === '未定') ? '' : 'none';
+    };
+
+    // 初期表示
+    toggle();
+
+    // 変更時（ブラウザ差対策で change と input を両方）
+    sel.addEventListener('change', toggle);
+    sel.addEventListener('input',  toggle);
   });
 }
 
-// （C）送信前バリデーション：未定なら予定日必須
+// 送信前バリデーション：未定なら予定日必須
 function validateBeforeSubmit(){
   for (const row of document.querySelectorAll('.att-row')) {
     const name = row.dataset.name || row.querySelector('.name')?.textContent?.trim() || '';
     const sel  = row.querySelector('.attend-select');
     const date = row.querySelector('.pending-date');
     if (!sel) continue;
-    if (sel.value === '未定') {
+    if ((sel.value || "").trim() === '未定') {
       if (!date || !date.value) {
         alert(`${name} さんは「未定」のため予定日を入力してください。`);
         date?.focus();
@@ -419,7 +418,7 @@ function validateBeforeSubmit(){
   return true;
 }
 
-// （D）イベント単位で集約
+// イベント単位で集約
 function collectBulkForEvent(eventId){
   const rows = document.querySelectorAll(`.att-row[data-event="${CSS.escape(eventId)}"]`);
   const items = [];
@@ -429,7 +428,7 @@ function collectBulkForEvent(eventId){
     const date = row.querySelector('.pending-date');
     const com  = row.querySelector('.comment-input');
 
-    const attend = sel?.value || '';
+    const attend = (sel?.value || "").trim();
     let pendingDate = '';
     if (attend === '未定' && date && date.value) {
       pendingDate = date.value.replace(/-/g, '/'); // yyyy/MM/dd に揃える
