@@ -24,7 +24,6 @@
     .sectionTitle{ font-weight:700; margin:8px 0; }
     .line{ height:1px; background:var(--c-border); margin:10px 0; }
     .warn{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
-
     .pill{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
     .right{ text-align:right; }
 
@@ -39,13 +38,13 @@
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
     .small{ font-size:12px; color:var(--c-muted); }
+    .pendingWrap{ display:none; }
   </style>
 </head>
 <body>
 <header>公演 出欠フォーム</header>
 <main>
 
-  <!-- 友だち未追加アラート（任意） -->
   <div id="friendAlert" class="card warn" style="display:none;">
     このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
   </div>
@@ -66,12 +65,13 @@
 
     <div class="row" style="margin-top:6px;">
       <button id="btnPrimary">読み込み中...</button>
+      <button id="btnEditMembers" class="ghost">氏名（Members）編集</button>
       <button id="btnReload" class="ghost">再読み込み</button>
     </div>
     <div id="homeLog" class="muted" style="margin-top:8px;"></div>
   </section>
 
-  <!-- ===== フォーム（出欠） ===== -->
+  <!-- ===== 出欠フォーム ===== -->
   <section id="view-form" data-view>
     <div class="row" style="justify-content:space-between;">
       <div class="sectionTitle">出欠入力フォーム</div>
@@ -83,7 +83,7 @@
 
     <div class="line"></div>
     <div class="row right">
-      <button id="btnSubmit">送信する</button>
+      <button id="btnSubmitAll">まとめて送信</button>
     </div>
     <div id="formLog" class="muted" style="margin-top:8px;"></div>
   </section>
@@ -97,7 +97,7 @@
 
     <div class="card">
       <label for="regInputName">入力者氏名（あなたの名前）</label>
-      <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
+      <input type="text" id="regInputName" placeholder="例：藤塚 太郎"/>
 
       <div class="line"></div>
       <div class="row" style="justify-content:space-between; align-items:center;">
@@ -112,6 +112,32 @@
       <button id="btnRegister">登録する</button>
     </div>
     <div id="regLog" class="muted" style="margin-top:8px;"></div>
+  </section>
+
+  <!-- ===== Members編集（追加/削除） ===== -->
+  <section id="view-members" data-view>
+    <div class="row" style="justify-content:space-between;">
+      <div class="sectionTitle">氏名（Members）編集</div>
+      <button id="btnBackFromMembers" class="ghost">トップに戻る</button>
+    </div>
+
+    <div class="card">
+      <label for="memInputName">入力者氏名（あなたの名前）</label>
+      <input type="text" id="memInputName" placeholder="例：藤塚 太郎"/>
+
+      <div class="line"></div>
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <div class="sectionTitle" style="margin:0;">演奏者（家族も可）</div>
+        <button id="btnAddPerfEdit" class="ghost" type="button">＋ 演奏者を追加</button>
+      </div>
+      <div id="memPerfList"></div>
+      <div class="small muted">行を削除すると、その演奏者は登録から外れます。</div>
+    </div>
+
+    <div class="row right">
+      <button id="btnSaveMembers">保存する</button>
+    </div>
+    <div id="memLog" class="muted" style="margin-top:8px;"></div>
   </section>
 
 </main>
@@ -137,6 +163,7 @@ function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classLi
 function logHome(t){ $("#homeLog").textContent = t||""; }
 function logForm(t){ $("#formLog").textContent = t||""; }
 function logReg(t){ $("#regLog").textContent = t||""; }
+function logMem(t){ $("#memLog").textContent = t||""; }
 
 function formatYmdDow(s){
   const d = new Date(s); if (isNaN(d)) return String(s||"");
@@ -146,8 +173,7 @@ function formatYmdDow(s){
 function formatHm(s){
   const d = new Date(s);
   if (!isNaN(d)) return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-  const m = String(s||"").match(/^(\d{1,2}:\d{2})/);
-  return m ? m[1] : String(s||"");
+  const m = String(s||"").match(/^(\d{1,2}:\d{2})/); return m ? m[1] : String(s||"");
 }
 function toYmdForInput(ymd){ const m=String(ymd||"").match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/); return m?`${m[1]}-${String(m[2]).padStart(2,"0")}-${String(m[3]).padStart(2,"0")}`:""; }
 function fromInputToYmd(v){ const m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?`${m[1]}/${m[2]}/${m[3]}`:""; }
@@ -197,15 +223,17 @@ async function init(){
     $("#btnPrimary").onclick = onPrimary;
     $("#btnBackFromForm").onclick = ()=> show("#view-home");
     $("#btnBackFromReg").onclick  = ()=> show("#view-home");
-    $("#btnSubmit").onclick = onSubmit;
-
-    // 初回登録UIのボタン
-    $("#btnAddPerf").onclick = addPerformerField;
+    $("#btnSubmitAll").onclick = ()=> onSubmit(null); // まとめて送信
     $("#btnRegister").onclick = onRegister;
 
-    // 演奏者1行目を用意
-    resetRegisterForm();
+    $("#btnEditMembers").onclick = onOpenMembers;
+    $("#btnBackFromMembers").onclick = ()=> show("#view-home");
+    $("#btnSaveMembers").onclick = onSaveMembers;
+    // addボタンはラッパーで PointerEvent を渡さない
+    $("#btnAddPerf").onclick = () => addPerformerField("");
+    $("#btnAddPerfEdit").onclick = () => addMemberPerformerField("");
 
+    resetRegisterForm();
     await refreshData();
 
   }catch(err){
@@ -230,6 +258,7 @@ function renderHome(){
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
+  $("#btnEditMembers").style.display = hasMembers ? "" : "none";
 
   if (!hasMembers){
     $("#answersBox").innerHTML = `
@@ -261,11 +290,9 @@ function renderHome(){
 /* ===== メインボタンの動作 ===== */
 function onPrimary(){
   if (state.members.length === 0){
-    // 初回登録へ
     resetRegisterForm();
     show("#view-register");
   } else {
-    // 出欠フォームへ
     buildFormView();
     show("#view-form");
   }
@@ -290,7 +317,6 @@ function buildFormView(){
   for (const e of state.events){
     const current = state.answers[e.eventId] || [];
     const map = {}; current.forEach(r => map[r.performerName] = r);
-
     const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
 
     const card = document.createElement("div");
@@ -314,38 +340,64 @@ function buildFormView(){
             <option value="未定" ${attend==="未定"?"selected":""}>未定</option>
           </select>
 
-          <div class="row">
-            <div style="flex:1; min-width:180px;">
-              <label for="${idBase}_date">未定の予定日（未定を選んだときのみ）</label>
-              <input type="date" id="${idBase}_date" value="${pendingYmd}">
+          <div class="pendingWrap" id="${idBase}_pendingWrap" style="${attend==='未定'?'':'display:none'}">
+            <div class="row">
+              <div style="flex:1; min-width:180px;">
+                <label for="${idBase}_date">未定の予定日（未定を選んだときのみ）</label>
+                <input type="date" id="${idBase}_date" value="${pendingYmd}">
+              </div>
+              <div style="flex:2; min-width:220px;">
+                <label for="${idBase}_com">コメント（任意・100文字まで）</label>
+                <input type="text" id="${idBase}_com" value="${row.comment||""}" maxlength="100" placeholder="例：家族の都合で検討中 など">
+              </div>
             </div>
-            <div style="flex:2; min-width:220px;">
-              <label for="${idBase}_com">コメント（任意・100文字まで）</label>
-              <input type="text" id="${idBase}_com" value="${row.comment||""}" maxlength="100" placeholder="例：家族の都合で検討中 など">
-            </div>
+            <div class="small muted">※「未定」選択時は予定日を入れてください</div>
           </div>
-          <div class="small muted">※「未定」選択時は予定日を入れてください</div>
         </div>
       `;
       card.insertAdjacentHTML("beforeend", html);
+
+      // セレクト変更で pendingWrap を切り替える
+      setTimeout(()=>{
+        const sel = document.getElementById(`${idBase}_att`);
+        const wrap = document.getElementById(`${idBase}_pendingWrap`);
+        sel.addEventListener("change", ()=>{
+          if (sel.value === "未定") {
+            wrap.style.display = "";
+          } else {
+            wrap.style.display = "none";
+          }
+        });
+      }, 0);
     });
+
+    // この公演だけ送信ボタン
+    const footer = document.createElement("div");
+    footer.className = "row right";
+    footer.style.marginTop = "6px";
+    footer.innerHTML = `<button class="ghost" type="button" data-event="${e.eventId}">この公演だけ送信</button>`;
+    footer.querySelector("button").onclick = () => onSubmit([e.eventId]);
+    card.appendChild(footer);
 
     box.appendChild(card);
   }
 }
 
-/* ===== 出欠送信 ===== */
-async function onSubmit(){
+/* ===== 出欠送信（eventIds が null ならまとめて） ===== */
+async function onSubmit(eventIds = null){
   if (state.submitting) return;
   state.submitting = true;
-  const btn = $("#btnSubmit");
-  btn.disabled = true; btn.textContent = "送信中…"; logForm("");
+  const allBtn = $("#btnSubmitAll");
+  if (allBtn) { allBtn.disabled = true; allBtn.textContent = "送信中…"; }
+  logForm("");
 
   try{
     const payloads = [];
     const seen = new Set();
+    const targetEvents = eventIds ? new Set(eventIds) : new Set(state.events.map(e=>e.eventId));
 
     for (const e of state.events){
+      if (!targetEvents.has(e.eventId)) continue;
       const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
       performers.forEach((name, idx)=>{
         const idBase = `e${e.eventId}_i${idx}`;
@@ -392,7 +444,7 @@ async function onSubmit(){
     logForm(err.message || String(err));
   }finally{
     state.submitting = false;
-    btn.disabled = false; btn.textContent = "送信する";
+    if (allBtn) { allBtn.disabled = false; allBtn.textContent = "まとめて送信"; }
   }
 }
 
@@ -400,17 +452,17 @@ async function onSubmit(){
 function resetRegisterForm(){
   $("#regInputName").value = state.name || "";
   $("#perfList").innerHTML = "";
-  addPerformerField(); // 最低1行
+  addPerformerField(""); // 最低1行
 }
-
 function addPerformerField(value=""){
+  if (typeof value !== "string") value = ""; // PointerEvent対策
   const id = "perf_" + Math.random().toString(36).slice(2);
   const row = document.createElement("div");
   row.className = "row"; row.style.margin = "6px 0";
   row.innerHTML = `
     <div style="flex:1; min-width:220px;">
       <label for="${id}" class="muted">演奏者名</label>
-      <input type="text" id="${id}" class="regPerf" value="${value}">
+      <input type="text" id="${id}" class="regPerf" value="${value}" placeholder="例：藤塚 太郎">
     </div>
     <div>
       <button type="button" class="ghost" onclick="this.closest('.row').remove()">削除</button>
@@ -418,32 +470,24 @@ function addPerformerField(value=""){
   `;
   $("#perfList").appendChild(row);
 }
-
 async function onRegister(){
   try{
     logReg("");
     const inputName = $("#regInputName").value.trim();
     if (!inputName) throw new Error("入力者氏名を入力してください");
 
-    // 演奏者名を収集（空/重複を除外）
     const names = Array.from(document.querySelectorAll(".regPerf"))
       .map(el => (el.value||"").trim())
       .filter(Boolean);
-
     const uniq = Array.from(new Set(names));
     if (uniq.length === 0) throw new Error("演奏者を1名以上入力してください");
 
-    // 任意：本人が演奏するケースのヒント（強制はしない）
-    // if (!uniq.includes(inputName)) { ... }
-
-    // 送信（registerBulk）
     $("#btnRegister").disabled = true; $("#btnRegister").textContent = "登録中…";
     const url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
     const r = await fetch(url); const j = await r.json();
     if (j.status !== "ok") throw new Error(j.message || "登録に失敗しました");
 
     alert("初回登録が完了しました");
-    // Homeに戻ってデータ再読込
     show("#view-home");
     logHome("更新中…");
     await refreshData();
@@ -453,6 +497,68 @@ async function onRegister(){
     logReg(err.message || String(err));
   }finally{
     $("#btnRegister").disabled = false; $("#btnRegister").textContent = "登録する";
+  }
+}
+
+/* ===== Members 編集ビュー ===== */
+function onOpenMembers(){
+  if (state.members.length === 0){
+    alert("まずは『初回登録』を行ってください。");
+    resetRegisterForm();
+    show("#view-register");
+    return;
+  }
+  $("#memInputName").value = state.members[0]?.inputName || state.name || "";
+  $("#memPerfList").innerHTML = "";
+  const performers = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
+  if (performers.length===0) addMemberPerformerField("");
+  else performers.forEach(n => addMemberPerformerField(n));
+  show("#view-members");
+}
+function addMemberPerformerField(value=""){
+  if (typeof value !== "string") value = "";
+  const id = "memperf_" + Math.random().toString(36).slice(2);
+  const row = document.createElement("div");
+  row.className = "row"; row.style.margin = "6px 0";
+  row.innerHTML = `
+    <div style="flex:1; min-width:220px;">
+      <label for="${id}" class="muted">演奏者名</label>
+      <input type="text" id="${id}" class="memPerf" value="${value}" placeholder="例：藤塚 太郎">
+    </div>
+    <div>
+      <button type="button" class="ghost" onclick="this.closest('.row').remove()">削除</button>
+    </div>
+  `;
+  $("#memPerfList").appendChild(row);
+}
+async function onSaveMembers(){
+  try{
+    logMem("");
+    const inputName = $("#memInputName").value.trim();
+    if (!inputName) throw new Error("入力者氏名を入力してください");
+
+    const names = Array.from(document.querySelectorAll(".memPerf"))
+      .map(el => (el.value||"").trim())
+      .filter(Boolean);
+    const uniq = Array.from(new Set(names));
+    if (uniq.length === 0) throw new Error("演奏者を1名以上入力してください");
+
+    $("#btnSaveMembers").disabled = true; $("#btnSaveMembers").textContent = "保存中…";
+    // 置き換えAPI（GAS側パッチが必要：replaceMembers）
+    const url = `${API_ENDPOINT}?replaceMembers=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
+    const r = await fetch(url); const j = await r.json();
+    if (j.status !== "ok") throw new Error(j.message || "保存に失敗しました");
+
+    alert("登録情報を更新しました");
+    show("#view-home");
+    logHome("更新中…");
+    await refreshData();
+    logHome("");
+
+  }catch(err){
+    logMem(err.message || String(err));
+  }finally{
+    $("#btnSaveMembers").disabled = false; $("#btnSaveMembers").textContent = "保存する";
   }
 }
 
