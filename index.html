@@ -41,17 +41,13 @@
     ::placeholder{ color:#999; }
     .small{ font-size:12px; color:var(--c-muted); }
 
-    /* ② 未定予定日: 常時表示だが、未定選択時のみ入力可 */
-    .pending-date:disabled {
-      background:#f5f5f5; color:#999; cursor:not-allowed;
-    }
+    .pending-date:disabled { background:#f5f5f5; color:#999; cursor:not-allowed; }
   </style>
 </head>
 <body>
 <header>公演 出欠フォーム</header>
 <main>
 
-  <!-- 友だち未追加アラート（任意） -->
   <div id="friendAlert" class="card warn" style="display:none;">
     このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
   </div>
@@ -98,7 +94,7 @@
   <!-- ===== 初回登録／氏名編集 ===== -->
   <section id="view-register" data-view>
     <div class="row" style="justify-content:space-between;">
-      <div class="sectionTitle">氏名登録フォーム（入力者 & 演奏者）</div>
+      <div class="sectionTitle" id="regTitle">氏名登録フォーム（入力者 & 演奏者）</div>
       <button id="btnBackFromReg" class="ghost">トップに戻る</button>
     </div>
 
@@ -126,7 +122,7 @@
 <script>
 /* ===== 設定（置換） ===== */
 const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbydMPG_HVgX5dRh7uVQ26_I8a_KCsOE_2AxecICmvKlqcbj3nPayBhYD-xsJJ5Xb7MoOA/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzCK3kuNag3tOk9EDaD4HKMIasQBGgyRLDlxIkOtjJofRUogsU6FnBZ3fwuGfM2sUnKYQ/exec";
 
 /* ===== 状態 ===== */
 let state = {
@@ -135,7 +131,8 @@ let state = {
   members: [],       // [{lineId,inputName,performerName}]
   events:  [],       // [{eventId,date,time,place}]
   answers: {},       // { eventId: [{performerName,attend,pendingDate,comment,answeredAt}] }
-  submitting: false
+  submitting: false,
+  isEditMembers: false  // ★ 追加：氏名編集モード
 };
 
 /* ===== ユーティリティ ===== */
@@ -202,16 +199,15 @@ async function init(){
     // ボタン
     $("#btnReload").onclick = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
     $("#btnPrimary").onclick = onPrimary;
-    $("#btnEditMembers").onclick = openRegisterWithCurrent; // ④ 氏名登録フォームへ
+    $("#btnEditMembers").onclick = openRegisterWithCurrent; // 編集モードで開く
     $("#btnBackFromForm").onclick = ()=> show("#view-home");
     $("#btnBackFromReg").onclick  = ()=> show("#view-home");
     $("#btnSubmitAll").onclick = onSubmitAll;
 
-    // 初回登録UIのボタン（① PointerEvent混入を防ぐためラップ）
-    $("#btnAddPerf").onclick = () => addPerformerField("");   // ← ここが重要！
+    // 初回登録UIのボタン
+    $("#btnAddPerf").onclick = () => addPerformerField("");   // PointerEvent混入防止
     $("#btnRegister").onclick = onRegister;
 
-    // 演奏者1行目を用意
     resetRegisterForm();
 
     await refreshData();
@@ -222,7 +218,6 @@ async function init(){
 }
 
 function renderHome(){
-  // イベント
   if (!state.events.length){
     $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
@@ -234,7 +229,6 @@ function renderHome(){
     }).join("");
   }
 
-  // 登録状況＋ボタン文言
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
@@ -270,7 +264,10 @@ function renderHome(){
 /* ===== メインボタンの動作 ===== */
 function onPrimary(){
   if (state.members.length === 0){
-    // 初回登録へ
+    // 初回登録へ（登録モード）
+    state.isEditMembers = false;
+    $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
+    $("#btnRegister").textContent = "登録する";
     resetRegisterForm();
     show("#view-register");
   } else {
@@ -339,7 +336,7 @@ function buildFormView(){
       card.insertAdjacentHTML("beforeend", html);
     });
 
-    // ③ この公演のみ送信ボタン
+    // この公演のみ送信
     card.insertAdjacentHTML("beforeend",
       `<div class="row right" style="margin-top:8px;">
          <button type="button" class="ghost" data-submit-one="${e.eventId}">この公演のみ送信</button>
@@ -349,10 +346,8 @@ function buildFormView(){
     box.appendChild(card);
   }
 
-  // ② 未定→予定日入力可の切替をバインド
   bindAttendSelectHandlers();
 
-  // ③ この公演のみ送信
   document.querySelectorAll('[data-submit-one]').forEach(btn=>{
     btn.addEventListener('click', async (ev)=>{
       const eventId = ev.currentTarget.getAttribute('data-submit-one');
@@ -361,7 +356,6 @@ function buildFormView(){
   });
 }
 
-/* ② 未定の時だけ date 有効化 */
 function bindAttendSelectHandlers(){
   const rows = document.querySelectorAll('.attend-select');
   rows.forEach(sel=>{
@@ -373,15 +367,15 @@ function bindAttendSelectHandlers(){
       const v = (sel.value || "").trim();
       const isPending = (v === '未定');
       dateEl.disabled = !isPending;
-      if (!isPending) dateEl.value = ""; // 未定解除で値クリア
+      if (!isPending) dateEl.value = "";
     };
-    sync(); // 初期反映
+    sync();
     sel.addEventListener('change', sync);
     sel.addEventListener('input', sync);
   });
 }
 
-/* ===== ③ 送信：すべてまとめて ===== */
+/* ===== 送信：まとめて ===== */
 async function onSubmitAll(){
   if (state.submitting) return;
   state.submitting = true;
@@ -413,7 +407,7 @@ async function onSubmitAll(){
   }
 }
 
-/* ===== ③ 送信：この公演のみ ===== */
+/* ===== 送信：この公演のみ ===== */
 async function onSubmitEvent(eventId){
   if (state.submitting) return;
   state.submitting = true;
@@ -428,7 +422,6 @@ async function onSubmitEvent(eventId){
     if (j.status !== "ok") throw new Error(`送信失敗（${eventId}）: ${j.message||"unknown"}`);
 
     alert("この公演の回答を送信しました");
-    // 部分更新でもOKだが簡易に全体再読込
     show("#view-home");
     logHome("更新中…");
     await refreshData();
@@ -441,7 +434,6 @@ async function onSubmitEvent(eventId){
   }
 }
 
-/* 収集：全公演まとめ */
 function collectPayloadsForAll(){
   const grouped = {};
   for (const e of state.events){
@@ -451,7 +443,6 @@ function collectPayloadsForAll(){
   return grouped;
 }
 
-/* 収集：特定公演 */
 function collectPayloadsForEvent(eventId){
   const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
   const list = [];
@@ -468,7 +459,7 @@ function collectPayloadsForEvent(eventId){
     const pendingRaw = dateEl ? dateEl.value : "";
     const pendingYmd  = fromInputToYmd(pendingRaw);
 
-    if (!attend) return; // 未選択は送信しない
+    if (!attend) return;
     if (attend==="未定" && !pendingYmd) throw new Error(`「${name}」の未定は予定日が必須です`);
 
     const key = `${eventId}||${name}`;
@@ -484,16 +475,18 @@ function collectPayloadsForEvent(eventId){
 function resetRegisterForm(){
   $("#regInputName").value = state.name || "";
   $("#perfList").innerHTML = "";
-  addPerformerField(""); // 最低1行（① pointerEvent回避）
+  addPerformerField(""); // 最低1行
 }
 
-/* ④ 現在の氏名を読み込んでフォームを開く */
+/* 編集モードで氏名フォームを開く（現在の値を投入） */
 function openRegisterWithCurrent(){
-  // 入力者名：最初のレコードの inputName を採用（なければ表示名）
+  state.isEditMembers = true;
+  $("#regTitle").textContent = "氏名登録フォーム（編集）";
+  $("#btnRegister").textContent = "保存する";
+
   const inputName = state.members.length ? (state.members[0].inputName || "") : (state.name || "");
   $("#regInputName").value = inputName;
 
-  // 演奏者：既存 performers を展開。なければ1行空欄
   $("#perfList").innerHTML = "";
   const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
   if (performers.length){
@@ -505,7 +498,7 @@ function openRegisterWithCurrent(){
   show("#view-register");
 }
 
-/* ① プレースホルダ付き & PointerEvent混入防止済 */
+/* プレースホルダ付き & PointerEvent混入防止済 */
 function addPerformerField(value=""){
   const id = "perf_" + Math.random().toString(36).slice(2);
   const row = document.createElement("div");
@@ -525,24 +518,32 @@ function addPerformerField(value=""){
 async function onRegister(){
   try{
     logReg("");
+
     const inputName = $("#regInputName").value.trim();
     if (!inputName) throw new Error("入力者氏名を入力してください");
 
-    // 演奏者名を収集（空/重複を除外）
     const names = Array.from(document.querySelectorAll(".regPerf"))
       .map(el => (el.value||"").trim())
       .filter(Boolean);
     const uniq = Array.from(new Set(names));
     if (uniq.length === 0) throw new Error("演奏者を1名以上入力してください");
 
-    // 送信（registerBulk）
-    $("#btnRegister").disabled = true; $("#btnRegister").textContent = "登録中…";
-    const url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
+    $("#btnRegister").disabled = true;
+    $("#btnRegister").textContent = state.isEditMembers ? "保存中…" : "登録中…";
+
+    let url;
+    if (state.isEditMembers) {
+      // ★ 編集モード：Membersを置換（削除反映OK）
+      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
+    } else {
+      // 初回登録：追加
+      url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
+    }
+
     const r = await fetch(url); const j = await r.json();
     if (j.status !== "ok") throw new Error(j.message || "登録に失敗しました");
 
-    alert("登録が完了しました");
-    // Homeに戻ってデータ再読込
+    alert(state.isEditMembers ? "保存しました" : "初回登録が完了しました");
     show("#view-home");
     logHome("更新中…");
     await refreshData();
@@ -551,7 +552,8 @@ async function onRegister(){
   }catch(err){
     logReg(err.message || String(err));
   }finally{
-    $("#btnRegister").disabled = false; $("#btnRegister").textContent = "登録する";
+    $("#btnRegister").disabled = false;
+    $("#btnRegister").textContent = state.isEditMembers ? "保存する" : "登録する";
   }
 }
 
