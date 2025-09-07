@@ -11,8 +11,9 @@
       --c-text:#222; --c-muted:#666; --c-ok:#0a7; --c-err:#c33;
     }
     body{ font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin:0; background:var(--c-bg); color:var(--c-text);}
-    header{ padding:14px 16px; font-size:18px; font-weight:700; background:#fff; border-bottom:1px solid var(--c-border);}
+    header{ padding:14px 16px; font-size:18px; font-weight:700; background:#fff; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between; align-items:center;}
     main{ padding:14px 16px; }
+    .ver{ font-size:12px; color:#888; font-weight:500; }
     .card{ background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; margin:10px 0; }
     .muted{ color:var(--c-muted); font-size:13px; }
     .row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
@@ -24,22 +25,28 @@
     .sectionTitle{ font-weight:700; margin:8px 0; }
     .line{ height:1px; background:var(--c-border); margin:10px 0; }
     .warn{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
+
     .pill{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
     .right{ text-align:right; }
+
     [data-view]{ display:none; }
     [data-view].show{ display:block; }
+
     .spinner{ width:18px; height:18px; border:2px solid #ddd; border-top-color:var(--c-primary); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; vertical-align:middle; }
     @keyframes spin{ to{ transform:rotate(360deg); } }
+
     label{ display:block; font-size:14px; margin:6px 0 4px; }
     input[type="text"], input[type="date"], select, textarea{
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
     .small{ font-size:12px; color:var(--c-muted); }
-    .errorText{ color:var(--c-err); font-size:12px; margin-top:4px; }
   </style>
 </head>
 <body>
-<header>公演 出欠フォーム</header>
+<header>
+  <div>公演 出欠フォーム</div>
+  <div class="ver" id="ver"></div>
+</header>
 <main>
 
   <!-- 友だち未追加アラート（任意） -->
@@ -63,7 +70,7 @@
 
     <div class="row" style="margin-top:6px;">
       <button id="btnPrimary">読み込み中...</button>
-      <button id="btnEditMembers" class="ghost" style="display:none;">氏名/演奏者を編集する</button>
+      <button id="btnEditNames" class="ghost" style="display:none;">氏名を編集する</button>
       <button id="btnReload" class="ghost">再読み込み</button>
     </div>
     <div id="homeLog" class="muted" style="margin-top:8px;"></div>
@@ -81,12 +88,12 @@
 
     <div class="line"></div>
     <div class="row right">
-      <button id="btnSubmit">まとめて送信</button>
+      <button id="btnSubmit">送信する</button>
     </div>
     <div id="formLog" class="muted" style="margin-top:8px;"></div>
   </section>
 
-  <!-- ===== 初回登録/再編集 ===== -->
+  <!-- ===== 初回登録/氏名編集 ===== -->
   <section id="view-register" data-view>
     <div class="row" style="justify-content:space-between;">
       <div class="sectionTitle" id="regTitle">初回登録（入力者 & 演奏者）</div>
@@ -95,7 +102,7 @@
 
     <div class="card">
       <label for="regInputName">入力者氏名（あなたの名前）</label>
-      <input type="text" id="regInputName" placeholder="例：藤塚 太郎"/>
+      <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
 
       <div class="line"></div>
       <div class="row" style="justify-content:space-between; align-items:center;">
@@ -116,18 +123,20 @@
 
 <script>
 /* ===== 設定（置換） ===== */
+const FRONT_VERSION = "Front v0.5";
 const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwt3lwdLUr9JtUou6fRKQISfq0jy8zi406rXjMjHWmwJ87HOl9DQ6SqPl_qF5PKr9MDhQ/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwBZonDNypKRyNgclf5qQzWqyDkjnqaH4cGCNwLa4BEpMidMG0Z11GFv_Pe_bwCY6obug/exec";
 
 /* ===== 状態 ===== */
 let state = {
   lineId: "",
   name: "",
   members: [],       // [{lineId,inputName,performerName}]
-  events:  [],       // [{eventId,date,time,place,deadline?}]
+  events:  [],       // [{eventId,date,time,place,deadline,flag}]
   answers: {},       // { eventId: [{performerName,attend,pendingDate,comment,answeredAt}] }
   submitting: false
 };
+let registerMode = "create"; // "create" | "edit"
 
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
@@ -147,10 +156,21 @@ function formatHm(s){
   const m = String(s||"").match(/^(\d{1,2}:\d{2})/);
   return m ? m[1] : String(s||"");
 }
-function toYmdForInput(ymd){ const m=String(ymd||"").match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/); return m?`${m[1]}-${String(m[2]).padStart(2,"0")}-${String(m[3]).padStart(2,"0")}`:""; }
-function fromInputToYmd(v){ const m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})$/); return m?`${m[1]}/${m[2]}/${m[3]}`:""; }
-function todayYmd(){ const d=new Date(); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,"0"); const dd=String(d.getDate()).padStart(2,"0"); return `${y}/${m}/${dd}`; }
-function ymdToInput(ymd){ return toYmdForInput(ymd); }
+function toYmdForInput(ymd){
+  const m=String(ymd||"").match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  return m?`${m[1]}-${String(m[2]).padStart(2,"0")}-${String(m[3]).padStart(2,"0")}`:"";
+}
+function fromInputToYmd(v){
+  const m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m?`${m[1]}/${m[2]}/${m[3]}`:"";
+}
+function todayForInput(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  const day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
 
 /* ===== API ===== */
 async function api(path){ const r = await fetch(API_ENDPOINT + path); return r.json(); }
@@ -160,10 +180,13 @@ async function refreshData(){
   $("#eventsBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
   $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
+  $("#btnEditNames").style.display = "none";
 
-  const ev = await api("?events=1"); // GAS側で Y/S と締切も返すようにする
+  // イベント（Y/S 両方が返る想定）
+  const ev = await api("?events=1");
   state.events = (ev.status==="ok" && Array.isArray(ev.events)) ? ev.events : [];
 
+  // 会員
   const w = await api(`?whoami=1&id=${encodeURIComponent(state.lineId)}`);
   state.members = (w.status==="ok" ? (w.members||[]) : []);
 
@@ -180,6 +203,8 @@ async function refreshData(){
 /* ===== 初期化 ===== */
 async function init(){
   try{
+    $("#ver").textContent = FRONT_VERSION;
+
     await liff.init({ liffId: LIFF_ID });
     if (!liff.isLoggedIn()){ liff.login(); return; }
 
@@ -195,16 +220,16 @@ async function init(){
     // ボタン
     $("#btnReload").onclick = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
     $("#btnPrimary").onclick = onPrimary;
+    $("#btnEditNames").onclick = onEditNames;
     $("#btnBackFromForm").onclick = ()=> show("#view-home");
     $("#btnBackFromReg").onclick  = ()=> show("#view-home");
     $("#btnSubmit").onclick = onSubmit;
-    $("#btnEditMembers").onclick = openEditMembers;
 
     // 初回登録UIのボタン
-    $("#btnAddPerf").onclick = () => addPerformerField("");
+    $("#btnAddPerf").onclick = ()=> addPerformerField("");
     $("#btnRegister").onclick = onRegister;
 
-    // 演奏者1行目を用意
+    // 演奏者1行目を用意（初回のみ）
     resetRegisterForm();
 
     await refreshData();
@@ -214,17 +239,16 @@ async function init(){
   }
 }
 
-/* ===== HOMEレンダリング ===== */
 function renderHome(){
   // イベント
   if (!state.events.length){
     $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
     $("#eventsBox").innerHTML = state.events.map(e=>{
-      const dl = e.deadline ? `（締切：${e.deadline}）` : "";
+      const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
       return `<div class="card" style="margin:8px 0">
-        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)}</div>
-        <div>場所：${e.place||""} ${dl}</div>
+        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr}</div>
+        <div>場所：${e.place||""}</div>
       </div>`;
     }).join("");
   }
@@ -233,7 +257,7 @@ function renderHome(){
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
-  $("#btnEditMembers").style.display = hasMembers ? "" : "none";
+  $("#btnEditNames").style.display = hasMembers ? "" : "none";
 
   if (!hasMembers){
     $("#answersBox").innerHTML = `
@@ -266,6 +290,7 @@ function renderHome(){
 function onPrimary(){
   if (state.members.length === 0){
     // 初回登録へ
+    registerMode = "create";
     resetRegisterForm();
     $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
     $("#btnRegister").textContent = "登録する";
@@ -277,20 +302,11 @@ function onPrimary(){
   }
 }
 
-/* ===== 氏名/演奏者の編集（HOME から） ===== */
-function openEditMembers(){
-  // 既存情報でフォームを埋める
-  const inputName = (state.members[0]?.inputName || state.name || "");
-  $("#regInputName").value = inputName;
-  $("#perfList").innerHTML = "";
-  const perfs = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
-  if (perfs.length === 0) {
-    addPerformerField("");
-  } else {
-    perfs.forEach(n=> addPerformerField(n));
-  }
-  $("#regTitle").textContent = "氏名/演奏者の編集";
-  $("#btnRegister").textContent = "保存する";
+function onEditNames(){
+  registerMode = "edit";
+  buildRegisterFormFromMembers();
+  $("#regTitle").textContent = "氏名編集（入力者 & 演奏者）";
+  $("#btnRegister").textContent = "保存";
   show("#view-register");
 }
 
@@ -300,10 +316,10 @@ function buildFormView(){
     $("#formEventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
     $("#formEventsBox").innerHTML = state.events.map(e=>{
-      const dl = e.deadline ? `（締切：${e.deadline}）` : "";
+      const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
       return `<div class="card">
-        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)}</div>
-        <div>場所：${e.place||""} ${dl}</div>
+        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr}</div>
+        <div>場所：${e.place||""}</div>
       </div>`;
     }).join("");
   }
@@ -314,11 +330,16 @@ function buildFormView(){
   for (const e of state.events){
     const current = state.answers[e.eventId] || [];
     const map = {}; current.forEach(r => map[r.performerName] = r);
+
     const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
 
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `<div class="sectionTitle">【${formatYmdDow(e.date)} ${formatHm(e.time)}】</div>`;
+
+    // min/max for date
+    const minISO = todayForInput();
+    const maxISO = e.deadline ? toYmdForInput(e.deadline) : ""; // 締切未設定ならmaxなし
 
     performers.forEach((name, idx)=>{
       const row = map[name] || {};
@@ -326,9 +347,9 @@ function buildFormView(){
       const pendingYmd = row.pendingDate ? toYmdForInput(row.pendingDate) : "";
       const idBase = `e${e.eventId}_i${idx}`;
 
-      // min/max 設定
-      const todayIn = ymdToInput(todayYmd());
-      const maxIn   = e.deadline ? ymdToInput(e.deadline) : "";
+      const isPending = (attend === "未定");
+      const disabledAttr = isPending ? "" : "disabled";
+      const maxAttr = maxISO ? `max="${maxISO}"` : "";
 
       const html = `
         <div style="border-top:1px dashed var(--c-border); margin:10px 0; padding-top:10px;">
@@ -343,49 +364,51 @@ function buildFormView(){
 
           <div class="row">
             <div style="flex:1; min-width:180px;">
-              <label for="${idBase}_date">未定の予定日（未定のみ入力可）</label>
-              <input type="date" id="${idBase}_date" value="${pendingYmd}" min="${todayIn}" ${maxIn?`max="${maxIn}"`:""} disabled>
-              <div id="${idBase}_err" class="errorText"></div>
+              <label for="${idBase}_date">未定の予定日（未定を選んだときのみ）</label>
+              <input type="date" id="${idBase}_date"
+                     value="${pendingYmd}"
+                     min="${minISO}" ${maxAttr}
+                     ${disabledAttr}>
             </div>
             <div style="flex:2; min-width:220px;">
               <label for="${idBase}_com">コメント（任意・100文字まで）</label>
               <input type="text" id="${idBase}_com" value="${row.comment||""}" maxlength="100" placeholder="例：家族の都合で検討中 など">
             </div>
           </div>
-          <div class="small muted">※「未定」選択時は予定日を入れてください（過去日・締切超過は不可）</div>
+          <div class="small muted">※「未定」選択時は予定日を入れてください（${e.deadline ? `締切 ${e.deadline} まで` : '締切未設定'}）</div>
         </div>
       `;
       card.insertAdjacentHTML("beforeend", html);
 
-      // イベントハンドラ（未定のときだけ date を有効化）
-      const sel = card.querySelector(`#${idBase}_att`);
-      const dateEl = card.querySelector(`#${idBase}_date`);
-      function syncDateEnabled(){
-        const isPending = sel.value === "未定";
-        dateEl.disabled = !isPending;
-      }
-      sel.addEventListener("change", syncDateEnabled);
-      syncDateEnabled();
+      // 未定・その他の選択切り替えで、日付入力の enabled/required を制御
+      setTimeout(() => {
+        const sel = document.getElementById(`${idBase}_att`);
+        const dateEl = document.getElementById(`${idBase}_date`);
+        if (!sel || !dateEl) return;
+
+        function applyPendingState(){
+          const isPendingNow = (sel.value === "未定");
+          dateEl.disabled = !isPendingNow;
+          dateEl.required = isPendingNow;
+          if (!isPendingNow) {
+            // 未定解除で値は消す（任意）
+            dateEl.value = "";
+          } else {
+            // 既に値があって min 以前 / max 以後の場合はクリア
+            if (dateEl.min && dateEl.value && dateEl.value < dateEl.min) dateEl.value = "";
+            if (dateEl.max && dateEl.value && dateEl.value > dateEl.max) dateEl.value = "";
+          }
+        }
+        sel.addEventListener("change", applyPendingState);
+        applyPendingState();
+      }, 0);
     });
 
     box.appendChild(card);
   }
 }
 
-/* ===== 出欠送信 ===== */
-function isPast(ymd){
-  const m=String(ymd||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/); if(!m) return false;
-  const d=new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
-  const t=new Date(); const today = new Date(t.getFullYear(),t.getMonth(),t.getDate());
-  return d.getTime() < today.getTime();
-}
-function isAfter(aYmd, bYmd){ // a > b ?
-  const A=aYmd.match(/^(\d{4})\/(\d{2})\/(\d{2})$/); const B=bYmd && bYmd.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-  if(!A || !B) return false;
-  const a=new Date(+A[1],+A[2]-1,+A[3]), b=new Date(+B[1],+B[2]-1,+B[3]);
-  return a.getTime() > b.getTime();
-}
-
+/* ===== 出欠送信（まとめて） ===== */
 async function onSubmit(){
   if (state.submitting) return;
   state.submitting = true;
@@ -393,44 +416,25 @@ async function onSubmit(){
   btn.disabled = true; btn.textContent = "送信中…"; logForm("");
 
   try{
-    // UI検証（未定の予定日：過去NG・締切超過NG）
-    // eventごとのdeadlineを引く
-    const evMap = {}; state.events.forEach(e=>evMap[e.eventId]=e);
-
     const payloads = [];
     const seen = new Set();
 
     for (const e of state.events){
       const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
-      const deadline = evMap[e.eventId]?.deadline || "";
       performers.forEach((name, idx)=>{
         const idBase = `e${e.eventId}_i${idx}`;
         const sel = document.getElementById(`${idBase}_att`);
         if (!sel) return;
         const attend = sel.value;
+
         const dateEl = document.getElementById(`${idBase}_date`);
         const comEl  = document.getElementById(`${idBase}_com`);
-        const errEl  = document.getElementById(`${idBase}_err`);
-
-        errEl.textContent = "";
-        let pendingYmd = "";
-        if (attend==="未定"){
-          pendingYmd = fromInputToYmd(dateEl.value);
-          if (!pendingYmd) {
-            errEl.textContent = "予定日を入力してください";
-            throw new Error(`「${name}」の未定は予定日が必須です`);
-          }
-          if (isPast(pendingYmd)) {
-            errEl.textContent = "過去日は指定できません";
-            throw new Error(`「${name}」の予定日が過去日です`);
-          }
-          if (deadline && isAfter(pendingYmd, deadline)) {
-            errEl.textContent = `締切（${deadline}）を超えています`;
-            throw new Error(`「${name}」の予定日が締切超過です`);
-          }
-        }
+        const pendingRaw = dateEl ? dateEl.value : "";
+        const pendingYmd  = fromInputToYmd(pendingRaw);
 
         if (!attend) return; // 未選択は送信しない
+        if (attend==="未定" && !pendingYmd) throw new Error(`「${name}」の未定は予定日が必須です`);
+
         const key = `${e.eventId}||${name}`;
         if (seen.has(key)) return; seen.add(key);
 
@@ -440,7 +444,6 @@ async function onSubmit(){
 
     if (!payloads.length){ alert("送信する内容がありません（出欠の選択が未入力です）"); return; }
 
-    // まとめて eventId ごとに送信
     const grouped = {};
     for (const p of payloads){
       if (!grouped[p.eventId]) grouped[p.eventId] = [];
@@ -463,7 +466,7 @@ async function onSubmit(){
     logForm(err.message || String(err));
   }finally{
     state.submitting = false;
-    btn.disabled = false; btn.textContent = "まとめて送信";
+    btn.disabled = false; btn.textContent = "送信する";
   }
 }
 
@@ -471,8 +474,21 @@ async function onSubmit(){
 function resetRegisterForm(){
   $("#regInputName").value = state.name || "";
   $("#perfList").innerHTML = "";
-  addPerformerField("");
+  addPerformerField(""); // 最低1行
 }
+// 既存 Members から編集用に再構築
+function buildRegisterFormFromMembers(){
+  const inputName = (state.members[0]?.inputName || state.name || "");
+  $("#regInputName").value = inputName;
+  $("#perfList").innerHTML = "";
+  const names = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
+  if (names.length === 0) {
+    addPerformerField("");
+  } else {
+    names.forEach(n=> addPerformerField(n));
+  }
+}
+
 function addPerformerField(value=""){
   const id = "perf_" + Math.random().toString(36).slice(2);
   const row = document.createElement("div");
@@ -480,7 +496,7 @@ function addPerformerField(value=""){
   row.innerHTML = `
     <div style="flex:1; min-width:220px;">
       <label for="${id}" class="muted">演奏者名</label>
-      <input type="text" id="${id}" class="regPerf" value="${value}" placeholder="例：藤塚 太郎">
+      <input type="text" id="${id}" class="regPerf" value="${value||""}" placeholder="例：藤塚 太郎">
     </div>
     <div>
       <button type="button" class="ghost" onclick="this.closest('.row').remove()">削除</button>
@@ -495,6 +511,7 @@ async function onRegister(){
     const inputName = $("#regInputName").value.trim();
     if (!inputName) throw new Error("入力者氏名を入力してください");
 
+    // 演奏者名を収集（空/重複を除外）
     const names = Array.from(document.querySelectorAll(".regPerf"))
       .map(el => (el.value||"").trim())
       .filter(Boolean);
@@ -502,13 +519,22 @@ async function onRegister(){
     const uniq = Array.from(new Set(names));
     if (uniq.length === 0) throw new Error("演奏者を1名以上入力してください");
 
-    $("#btnRegister").disabled = true; $("#btnRegister").textContent = "登録中…";
+    $("#btnRegister").disabled = true; $("#btnRegister").textContent = (registerMode==="edit" ? "保存中…" : "登録中…");
 
-    const url = `${API_ENDPOINT}?replaceMembers=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
+    let url = "";
+    if (registerMode === "edit") {
+      // 既存ユーザーの氏名編集：Membersを置き換え（出欠はパージしない）
+      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}&purge=0`;
+    } else {
+      // 初回登録（新規）
+      url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
+    }
+
     const r = await fetch(url); const j = await r.json();
     if (j.status !== "ok") throw new Error(j.message || "登録に失敗しました");
 
-    alert("保存しました");
+    alert(registerMode==="edit" ? "氏名を保存しました" : "初回登録が完了しました");
+    // Homeに戻ってデータ再読込
     show("#view-home");
     logHome("更新中…");
     await refreshData();
@@ -517,7 +543,7 @@ async function onRegister(){
   }catch(err){
     logReg(err.message || String(err));
   }finally{
-    $("#btnRegister").disabled = false; $("#btnRegister").textContent = "保存する";
+    $("#btnRegister").disabled = false; $("#btnRegister").textContent = (registerMode==="edit" ? "保存" : "登録する");
   }
 }
 
