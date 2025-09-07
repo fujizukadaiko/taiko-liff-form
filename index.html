@@ -24,28 +24,21 @@
     .sectionTitle{ font-weight:700; margin:8px 0; }
     .line{ height:1px; background:var(--c-border); margin:10px 0; }
     .warn{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
-
     .pill{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
     .right{ text-align:right; }
-
     [data-view]{ display:none; }
     [data-view].show{ display:block; }
-
     .spinner{ width:18px; height:18px; border:2px solid #ddd; border-top-color:var(--c-primary); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; vertical-align:middle; }
     @keyframes spin{ to{ transform:rotate(360deg); } }
-
     label{ display:block; font-size:14px; margin:6px 0 4px; }
     input[type="text"], input[type="date"], select, textarea{
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
-    ::placeholder{ color:#999; }
     .small{ font-size:12px; color:var(--c-muted); }
-
-    .pending-date:disabled { background:#f5f5f5; color:#999; cursor:not-allowed; }
   </style>
 </head>
 <body>
-<header>公演 出欠フォーム</header>
+<header>公演 出欠フォーム <span class="muted" style="font-size:12px;">Front v0.4</span></header>
 <main>
 
   <div id="friendAlert" class="card warn" style="display:none;">
@@ -68,7 +61,6 @@
 
     <div class="row" style="margin-top:6px;">
       <button id="btnPrimary">読み込み中...</button>
-      <button id="btnEditMembers" class="ghost" style="display:none;">氏名登録フォームへ</button>
       <button id="btnReload" class="ghost">再読み込み</button>
     </div>
     <div id="homeLog" class="muted" style="margin-top:8px;"></div>
@@ -86,21 +78,21 @@
 
     <div class="line"></div>
     <div class="row right">
-      <button id="btnSubmitAll">まとめて送信</button>
+      <button id="btnSubmit">送信する</button>
     </div>
     <div id="formLog" class="muted" style="margin-top:8px;"></div>
   </section>
 
-  <!-- ===== 初回登録／氏名編集 ===== -->
+  <!-- ===== 初回登録 ===== -->
   <section id="view-register" data-view>
     <div class="row" style="justify-content:space-between;">
-      <div class="sectionTitle" id="regTitle">氏名登録フォーム（入力者 & 演奏者）</div>
+      <div class="sectionTitle">初回登録（入力者 & 演奏者）</div>
       <button id="btnBackFromReg" class="ghost">トップに戻る</button>
     </div>
 
     <div class="card">
-      <label for="regInputName">入力者氏名（あなたの氏名）</label>
-      <input type="text" id="regInputName" placeholder="例：藤塚 太郎"/>
+      <label for="regInputName">入力者氏名（あなたの名前）</label>
+      <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
 
       <div class="line"></div>
       <div class="row" style="justify-content:space-between; align-items:center;">
@@ -122,7 +114,7 @@
 <script>
 /* ===== 設定（置換） ===== */
 const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzHzJnpv4erV4QmJsBfVlku2i91ng597-fGj-6TeejSUAe_9aTVO9r3mGZKei_4e26WZQ/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwBE6G2kIbBACdWqXEM_3Cql0M4odo_LGV2NTV8OY0FhuloirpUbhP1elbZD7xFmn2eNg/exec";
 
 /* ===== 状態 ===== */
 let state = {
@@ -131,8 +123,7 @@ let state = {
   members: [],       // [{lineId,inputName,performerName}]
   events:  [],       // [{eventId,date,time,place}]
   answers: {},       // { eventId: [{performerName,attend,pendingDate,comment,answeredAt}] }
-  submitting: false,
-  isEditMembers: false  // ★ 追加：氏名編集モード
+  submitting: false
 };
 
 /* ===== ユーティリティ ===== */
@@ -171,7 +162,6 @@ async function refreshData(){
   const w = await api(`?whoami=1&id=${encodeURIComponent(state.lineId)}`);
   state.members = (w.status==="ok" ? (w.members||[]) : []);
 
-  // 回答
   state.answers = {};
   for (const e of state.events){
     const a = await api(`?getAttendance=1&eventId=${encodeURIComponent(e.eventId)}&lineId=${encodeURIComponent(state.lineId)}`);
@@ -196,16 +186,13 @@ async function init(){
     state.name   = idt && idt.name ? idt.name : "";
     $("#hello").textContent = state.name ? `こんにちは、${state.name} さん` : "";
 
-    // ボタン
     $("#btnReload").onclick = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
     $("#btnPrimary").onclick = onPrimary;
-    $("#btnEditMembers").onclick = openRegisterWithCurrent; // 編集モードで開く
     $("#btnBackFromForm").onclick = ()=> show("#view-home");
     $("#btnBackFromReg").onclick  = ()=> show("#view-home");
-    $("#btnSubmitAll").onclick = onSubmitAll;
+    $("#btnSubmit").onclick = onSubmit;
 
-    // 初回登録UIのボタン
-    $("#btnAddPerf").onclick = () => addPerformerField("");   // PointerEvent混入防止
+    $("#btnAddPerf").onclick = addPerformerField;
     $("#btnRegister").onclick = onRegister;
 
     resetRegisterForm();
@@ -232,7 +219,6 @@ function renderHome(){
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
-  $("#btnEditMembers").style.display = hasMembers ? "" : "none";
 
   if (!hasMembers){
     $("#answersBox").innerHTML = `
@@ -261,17 +247,12 @@ function renderHome(){
   }
 }
 
-/* ===== メインボタンの動作 ===== */
+/* ===== メインボタン ===== */
 function onPrimary(){
   if (state.members.length === 0){
-    // 初回登録へ（登録モード）
-    state.isEditMembers = false;
-    $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
-    $("#btnRegister").textContent = "登録する";
     resetRegisterForm();
     show("#view-register");
   } else {
-    // 出欠フォームへ
     buildFormView();
     show("#view-form");
   }
@@ -313,7 +294,7 @@ function buildFormView(){
         <div style="border-top:1px dashed var(--c-border); margin:10px 0; padding-top:10px;">
           <div class="pill" style="margin-bottom:6px;">${name}</div>
           <label for="${idBase}_att">出欠</label>
-          <select id="${idBase}_att" class="attend-select" data-event="${e.eventId}" data-name="${name}">
+          <select id="${idBase}_att" data-event="${e.eventId}" data-name="${name}">
             <option value="">（選択してください）</option>
             <option value="参加" ${attend==="参加"?"selected":""}>参加</option>
             <option value="欠席" ${attend==="欠席"?"selected":""}>欠席</option>
@@ -322,77 +303,76 @@ function buildFormView(){
 
           <div class="row">
             <div style="flex:1; min-width:180px;">
-              <label for="${idBase}_date">未定の予定日（未定選択時のみ入力可）</label>
-              <input type="date" id="${idBase}_date" class="pending-date" value="${pendingYmd}">
+              <label for="${idBase}_date">未定の予定日（未定を選んだときのみ）</label>
+              <input type="date" id="${idBase}_date" value="${pendingYmd}">
             </div>
             <div style="flex:2; min-width:220px;">
               <label for="${idBase}_com">コメント（任意・100文字まで）</label>
               <input type="text" id="${idBase}_com" value="${row.comment||""}" maxlength="100" placeholder="例：家族の都合で検討中 など">
             </div>
           </div>
-          <div class="small muted">※「未定」選択時は予定日を入れてください</div>
+          <div class="small muted">※「未定」選択時は予定日が必須です</div>
         </div>
       `;
       card.insertAdjacentHTML("beforeend", html);
     });
 
-    // この公演のみ送信
-    card.insertAdjacentHTML("beforeend",
-      `<div class="row right" style="margin-top:8px;">
-         <button type="button" class="ghost" data-submit-one="${e.eventId}">この公演のみ送信</button>
-       </div>`
-    );
-
     box.appendChild(card);
   }
-
-  bindAttendSelectHandlers();
-
-  document.querySelectorAll('[data-submit-one]').forEach(btn=>{
-    btn.addEventListener('click', async (ev)=>{
-      const eventId = ev.currentTarget.getAttribute('data-submit-one');
-      await onSubmitEvent(eventId);
-    });
-  });
 }
 
-function bindAttendSelectHandlers(){
-  const rows = document.querySelectorAll('.attend-select');
-  rows.forEach(sel=>{
-    const idBase = sel.id.replace(/_att$/, '');
-    const dateEl = document.getElementById(`${idBase}_date`);
-    if (!dateEl) return;
-
-    const sync = ()=>{
-      const v = (sel.value || "").trim();
-      const isPending = (v === '未定');
-      dateEl.disabled = !isPending;
-      if (!isPending) dateEl.value = "";
-    };
-    sync();
-    sel.addEventListener('change', sync);
-    sel.addEventListener('input', sync);
-  });
-}
-
-/* ===== 送信：まとめて ===== */
-async function onSubmitAll(){
+/* ===== 出欠送信 ===== */
+async function onSubmit(){
   if (state.submitting) return;
   state.submitting = true;
-  const btn = $("#btnSubmitAll");
+  const btn = $("#btnSubmit");
   btn.disabled = true; btn.textContent = "送信中…"; logForm("");
 
   try{
-    const grouped = collectPayloadsForAll();
-    const eventIds = Object.keys(grouped);
-    if (!eventIds.length){ alert("送信する内容がありません（出欠の選択が未入力です）"); return; }
+    const payloads = [];
+    const seen = new Set();
 
-    for (const eventId of eventIds){
-      const list = grouped[eventId];
+    for (const e of state.events){
+      const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
+      performers.forEach((name, idx)=>{
+        const idBase = `e${e.eventId}_i${idx}`;
+        const sel = document.getElementById(`${idBase}_att`);
+        if (!sel) return;
+        const attend = sel.value;
+
+        const dateEl = document.getElementById(`${idBase}_date`);
+        const comEl  = document.getElementById(`${idBase}_com`);
+        const pendingRaw = dateEl ? dateEl.value : "";
+        const pendingYmd  = fromInputToYmd(pendingRaw);
+
+        if (!attend) return; // 未選択は送信しない
+        if (attend==="未定" && !pendingYmd) throw new Error(`「${name}」の未定は予定日が必須です`);
+
+        const key = `${e.eventId}||${name}`;
+        if (seen.has(key)) return; seen.add(key);
+
+        payloads.push({ eventId:e.eventId, performerName:name, attend, pendingDate:pendingYmd, comment:(comEl?.value||"").trim() });
+      });
+    }
+
+    if (!payloads.length){ alert("送信する内容がありません（出欠の選択が未入力です）"); return; }
+
+    const grouped = {};
+    for (const p of payloads){
+      if (!grouped[p.eventId]) grouped[p.eventId] = [];
+      grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, pendingDate:p.pendingDate, comment:p.comment });
+    }
+
+    for (const [eventId, list] of Object.entries(grouped)){
       const url = `${API_ENDPOINT}?submitBulk=1&eventId=${encodeURIComponent(eventId)}&lineId=${encodeURIComponent(state.lineId)}&bulk=${encodeURIComponent(JSON.stringify(list))}`;
       const r = await fetch(url); const j = await r.json();
-      if (j.status !== "ok") throw new Error(`送信失敗（${eventId}）: ${j.message||"unknown"}`);
+      if (j.status === "closed") {
+        alert("この公演の回答受付は締切済みです。");
+      } else if (j.status !== "ok") {
+        throw new Error(`送信失敗（${eventId}）: ${j.message||"unknown"}`);
+      }
     }
+
     alert("送信しました");
     show("#view-home");
     logHome("更新中…");
@@ -403,110 +383,24 @@ async function onSubmitAll(){
     logForm(err.message || String(err));
   }finally{
     state.submitting = false;
-    btn.disabled = false; btn.textContent = "まとめて送信";
+    btn.disabled = false; btn.textContent = "送信する";
   }
-}
-
-/* ===== 送信：この公演のみ ===== */
-async function onSubmitEvent(eventId){
-  if (state.submitting) return;
-  state.submitting = true;
-  logForm("");
-
-  try{
-    const list = collectPayloadsForEvent(eventId);
-    if (!list.length){ alert("この公演に送信する内容がありません"); return; }
-
-    const url = `${API_ENDPOINT}?submitBulk=1&eventId=${encodeURIComponent(eventId)}&lineId=${encodeURIComponent(state.lineId)}&bulk=${encodeURIComponent(JSON.stringify(list))}`;
-    const r = await fetch(url); const j = await r.json();
-    if (j.status !== "ok") throw new Error(`送信失敗（${eventId}）: ${j.message||"unknown"}`);
-
-    alert("この公演の回答を送信しました");
-    show("#view-home");
-    logHome("更新中…");
-    await refreshData();
-    logHome("");
-
-  }catch(err){
-    logForm(err.message || String(err));
-  }finally{
-    state.submitting = false;
-  }
-}
-
-function collectPayloadsForAll(){
-  const grouped = {};
-  for (const e of state.events){
-    const list = collectPayloadsForEvent(e.eventId);
-    if (list.length) grouped[e.eventId] = list;
-  }
-  return grouped;
-}
-
-function collectPayloadsForEvent(eventId){
-  const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
-  const list = [];
-  const seen = new Set();
-
-  performers.forEach((name, idx)=>{
-    const idBase = `e${eventId}_i${idx}`;
-    const sel = document.getElementById(`${idBase}_att`);
-    if (!sel) return;
-    const attend = sel.value;
-
-    const dateEl = document.getElementById(`${idBase}_date`);
-    const comEl  = document.getElementById(`${idBase}_com`);
-    const pendingRaw = dateEl ? dateEl.value : "";
-    const pendingYmd  = fromInputToYmd(pendingRaw);
-
-    if (!attend) return;
-    if (attend==="未定" && !pendingYmd) throw new Error(`「${name}」の未定は予定日が必須です`);
-
-    const key = `${eventId}||${name}`;
-    if (seen.has(key)) return; seen.add(key);
-
-    list.push({ performerName:name, attend, pendingDate:pendingYmd, comment:(comEl?.value||"").trim() });
-  });
-
-  return list;
 }
 
 /* ===== 初回登録ビュー ===== */
 function resetRegisterForm(){
   $("#regInputName").value = state.name || "";
   $("#perfList").innerHTML = "";
-  addPerformerField(""); // 最低1行
+  addPerformerField();
 }
-
-/* 編集モードで氏名フォームを開く（現在の値を投入） */
-function openRegisterWithCurrent(){
-  state.isEditMembers = true;
-  $("#regTitle").textContent = "氏名登録フォーム（編集）";
-  $("#btnRegister").textContent = "保存する";
-
-  const inputName = state.members.length ? (state.members[0].inputName || "") : (state.name || "");
-  $("#regInputName").value = inputName;
-
-  $("#perfList").innerHTML = "";
-  const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
-  if (performers.length){
-    performers.forEach(n => addPerformerField(n));
-  } else {
-    addPerformerField("");
-  }
-
-  show("#view-register");
-}
-
-/* プレースホルダ付き & PointerEvent混入防止済 */
 function addPerformerField(value=""){
   const id = "perf_" + Math.random().toString(36).slice(2);
   const row = document.createElement("div");
   row.className = "row"; row.style.margin = "6px 0";
   row.innerHTML = `
     <div style="flex:1; min-width:220px;">
-      <label for="${id}" class="muted">演奏者名（氏名）</label>
-      <input type="text" id="${id}" class="regPerf" value="${typeof value==='string' ? value.replace(/"/g,'&quot;') : ''}" placeholder="例：藤塚 太郎">
+      <label for="${id}" class="muted">演奏者名</label>
+      <input type="text" id="${id}" class="regPerf" value="${value}" placeholder="例：藤塚 太郎">
     </div>
     <div>
       <button type="button" class="ghost" onclick="this.closest('.row').remove()">削除</button>
@@ -514,36 +408,25 @@ function addPerformerField(value=""){
   `;
   $("#perfList").appendChild(row);
 }
-
 async function onRegister(){
   try{
     logReg("");
-
     const inputName = $("#regInputName").value.trim();
     if (!inputName) throw new Error("入力者氏名を入力してください");
 
     const names = Array.from(document.querySelectorAll(".regPerf"))
       .map(el => (el.value||"").trim())
       .filter(Boolean);
+
     const uniq = Array.from(new Set(names));
     if (uniq.length === 0) throw new Error("演奏者を1名以上入力してください");
 
-    $("#btnRegister").disabled = true;
-    $("#btnRegister").textContent = state.isEditMembers ? "保存中…" : "登録中…";
-
-    let url;
-    if (state.isEditMembers) {
-      // ★ 編集モード：Membersを置換（削除反映OK）
-      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
-    } else {
-      // 初回登録：追加
-      url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
-    }
-
+    $("#btnRegister").disabled = true; $("#btnRegister").textContent = "登録中…";
+    const url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
     const r = await fetch(url); const j = await r.json();
     if (j.status !== "ok") throw new Error(j.message || "登録に失敗しました");
 
-    alert(state.isEditMembers ? "保存しました" : "初回登録が完了しました");
+    alert("初回登録が完了しました");
     show("#view-home");
     logHome("更新中…");
     await refreshData();
@@ -552,8 +435,7 @@ async function onRegister(){
   }catch(err){
     logReg(err.message || String(err));
   }finally{
-    $("#btnRegister").disabled = false;
-    $("#btnRegister").textContent = state.isEditMembers ? "保存する" : "登録する";
+    $("#btnRegister").disabled = false; $("#btnRegister").textContent = "登録する";
   }
 }
 
