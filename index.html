@@ -40,6 +40,12 @@
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
     .small{ font-size:12px; color:var(--c-muted); }
+
+    /* 追加：日付が不正な時の赤枠表示 */
+    input.invalid{
+      border-color: var(--c-err);
+      background: #fff5f5;
+    }
   </style>
 </head>
 <body>
@@ -122,9 +128,9 @@
 </main>
 
 <script>
-/* ===== 設定（置換） ===== */
-const FRONT_VERSION = "Front v0.5";
-const LIFF_ID = "2008020568-2jVl00Rn";
+/* ===== 設定 ===== */
+const FRONT_VERSION = "Front v0.6";
+const LIFF_ID = "2008020568-2jVl00Rn;
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwBZonDNypKRyNgclf5qQzWqyDkjnqaH4cGCNwLa4BEpMidMG0Z11GFv_Pe_bwCY6obug/exec";
 
 /* ===== 状態 ===== */
@@ -182,7 +188,7 @@ async function refreshData(){
   $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
   $("#btnEditNames").style.display = "none";
 
-  // イベント（Y/S 両方が返る想定）
+  // イベント（Y/S 両方）
   const ev = await api("?events=1");
   state.events = (ev.status==="ok" && Array.isArray(ev.events)) ? ev.events : [];
 
@@ -240,7 +246,6 @@ async function init(){
 }
 
 function renderHome(){
-  // イベント
   if (!state.events.length){
     $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
@@ -340,6 +345,7 @@ function buildFormView(){
     // min/max for date
     const minISO = todayForInput();
     const maxISO = e.deadline ? toYmdForInput(e.deadline) : ""; // 締切未設定ならmaxなし
+    const deadlineDisp = e.deadline || ""; // 表示用
 
     performers.forEach((name, idx)=>{
       const row = map[name] || {};
@@ -369,6 +375,8 @@ function buildFormView(){
                      value="${pendingYmd}"
                      min="${minISO}" ${maxAttr}
                      ${disabledAttr}>
+              <!-- 追加：リアルタイム注意テキスト -->
+              <div id="${idBase}_date_warn" class="small err" style="display:none;"></div>
             </div>
             <div style="flex:2; min-width:220px;">
               <label for="${idBase}_com">コメント（任意・100文字まで）</label>
@@ -380,26 +388,66 @@ function buildFormView(){
       `;
       card.insertAdjacentHTML("beforeend", html);
 
-      // 未定・その他の選択切り替えで、日付入力の enabled/required を制御
+      // 選択切り替え＆リアルタイムバリデーション
       setTimeout(() => {
-        const sel = document.getElementById(`${idBase}_att`);
+        const sel    = document.getElementById(`${idBase}_att`);
         const dateEl = document.getElementById(`${idBase}_date`);
-        if (!sel || !dateEl) return;
+        const warnEl = document.getElementById(`${idBase}_date_warn`);
+        if (!sel || !dateEl || !warnEl) return;
+
+        function validateDate(){
+          // 未定以外は警告非表示
+          if (sel.value !== "未定") {
+            warnEl.style.display = "none";
+            warnEl.textContent = "";
+            dateEl.classList.remove("invalid");
+            return;
+          }
+          const val = dateEl.value; // yyyy-mm-dd
+          if (!val) {
+            warnEl.style.display = "none";
+            warnEl.textContent = "";
+            dateEl.classList.remove("invalid");
+            return;
+          }
+          // 範囲チェック（文字比較でOK）
+          if (dateEl.min && val < dateEl.min) {
+            warnEl.textContent = "過去日が選択されています。今日以降の日付を選んでください。";
+            warnEl.style.display = "";
+            dateEl.classList.add("invalid");
+            return;
+          }
+          if (dateEl.max && val > dateEl.max) {
+            warnEl.textContent = `締切日（${deadlineDisp}）より後の日付が選択されています。締切日までに設定してください。`;
+            warnEl.style.display = "";
+            dateEl.classList.add("invalid");
+            return;
+          }
+          // OK
+          warnEl.style.display = "none";
+          warnEl.textContent = "";
+          dateEl.classList.remove("invalid");
+        }
 
         function applyPendingState(){
           const isPendingNow = (sel.value === "未定");
           dateEl.disabled = !isPendingNow;
           dateEl.required = isPendingNow;
           if (!isPendingNow) {
-            // 未定解除で値は消す（任意）
-            dateEl.value = "";
+            warnEl.style.display = "none";
+            warnEl.textContent = "";
+            dateEl.classList.remove("invalid");
+            // dateEl.value = ""; // 任意：未定解除時に値を消す
           } else {
-            // 既に値があって min 以前 / max 以後の場合はクリア
-            if (dateEl.min && dateEl.value && dateEl.value < dateEl.min) dateEl.value = "";
-            if (dateEl.max && dateEl.value && dateEl.value > dateEl.max) dateEl.value = "";
+            // 既にある値も再チェック
+            validateDate();
           }
         }
+
         sel.addEventListener("change", applyPendingState);
+        dateEl.addEventListener("input", validateDate);
+        dateEl.addEventListener("change", validateDate);
+
         applyPendingState();
       }, 0);
     });
@@ -408,7 +456,7 @@ function buildFormView(){
   }
 }
 
-/* ===== 出欠送信（まとめて） ===== */
+/* ===== 出欠送信 ===== */
 async function onSubmit(){
   if (state.submitting) return;
   state.submitting = true;
@@ -476,7 +524,6 @@ function resetRegisterForm(){
   $("#perfList").innerHTML = "";
   addPerformerField(""); // 最低1行
 }
-// 既存 Members から編集用に再構築
 function buildRegisterFormFromMembers(){
   const inputName = (state.members[0]?.inputName || state.name || "");
   $("#regInputName").value = inputName;
@@ -488,7 +535,6 @@ function buildRegisterFormFromMembers(){
     names.forEach(n=> addPerformerField(n));
   }
 }
-
 function addPerformerField(value=""){
   const id = "perf_" + Math.random().toString(36).slice(2);
   const row = document.createElement("div");
@@ -504,14 +550,12 @@ function addPerformerField(value=""){
   `;
   $("#perfList").appendChild(row);
 }
-
 async function onRegister(){
   try{
     logReg("");
     const inputName = $("#regInputName").value.trim();
     if (!inputName) throw new Error("入力者氏名を入力してください");
 
-    // 演奏者名を収集（空/重複を除外）
     const names = Array.from(document.querySelectorAll(".regPerf"))
       .map(el => (el.value||"").trim())
       .filter(Boolean);
@@ -523,10 +567,8 @@ async function onRegister(){
 
     let url = "";
     if (registerMode === "edit") {
-      // 既存ユーザーの氏名編集：Membersを置き換え（出欠はパージしない）
       url = `${API_ENDPOINT}?replaceMembers=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}&purge=0`;
     } else {
-      // 初回登録（新規）
       url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
     }
 
@@ -534,7 +576,6 @@ async function onRegister(){
     if (j.status !== "ok") throw new Error(j.message || "登録に失敗しました");
 
     alert(registerMode==="edit" ? "氏名を保存しました" : "初回登録が完了しました");
-    // Homeに戻ってデータ再読込
     show("#view-home");
     logHome("更新中…");
     await refreshData();
