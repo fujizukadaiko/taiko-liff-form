@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>公演 出欠フォーム</title>
+  <title>公演 出欠フォーム / 今後の予定</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root{
@@ -36,7 +36,7 @@
     @keyframes spin{ to{ transform:rotate(360deg); } }
 
     label{ display:block; font-size:14px; margin:6px 0 4px; }
-    input[type="text"], input[type="date"], select, textarea, input[type="number"]{
+    input[type="text"], input[type="date"], select, textarea{
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
     .small{ font-size:12px; color:var(--c-muted); }
@@ -47,8 +47,18 @@
       background: #fff5f5;
     }
 
-    .filters{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .filters .item{ min-width:150px; }
+    /* ===== 今後の予定（スケジュール）用 ===== */
+    .badge {
+      display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px;
+      border:1px solid var(--c-border); background:#f5f5f5; color:#333;
+    }
+    .kind-pub { background:#e8f2ff; border-color:#b9d6ff; color:#0b4a9e; } /* 発表 */
+    .kind-trn { background:#eaf9f0; border-color:#bbe8cf; color:#096a36; } /* 練習 */
+    .kind-etc { background:#f8f0ff; border-color:#e1ccff; color:#6a29a6; } /* その他 */
+
+    .schedule-item .title { font-weight:700; margin-bottom:4px; font-size:16px; }
+    .schedule-item .meta  { color:var(--c-muted); font-size:13px; }
+    .schedule-item .memo  { white-space:pre-line; margin-top:6px; }
   </style>
 </head>
 <body>
@@ -129,7 +139,7 @@
     <div id="regLog" class="muted" style="margin-top:8px;"></div>
   </section>
 
-  <!-- ===== 今後の予定 ===== -->
+  <!-- ===== 今後の予定（スケジュール） ===== -->
   <section id="view-schedules" data-view>
     <div class="row" style="justify-content:space-between;">
       <div class="sectionTitle">今後の予定</div>
@@ -137,27 +147,31 @@
     </div>
 
     <div class="card">
-      <div class="filters">
-        <div class="item">
-          <label for="schDays" class="muted">表示期間（日数）</label>
-          <input type="number" id="schDays" value="60" min="1" max="365"/>
-        </div>
-        <div class="item">
-          <label for="schKind" class="muted">種別フィルタ</label>
-          <select id="schKind">
-            <option value="">すべて</option>
+      <div class="row">
+        <div>
+          <label for="selKind" class="muted">種別</label>
+          <select id="selKind">
+            <option value="全て">全て</option>
             <option value="発表">発表</option>
             <option value="練習">練習</option>
             <option value="その他">その他</option>
           </select>
         </div>
-        <div class="item" style="align-self:flex-end;">
-          <button id="btnReloadSchedules" class="ghost">再取得</button>
+        <div>
+          <label for="selDays" class="muted">表示期間（日）</label>
+          <select id="selDays">
+            <option value="30">30</option>
+            <option value="60" selected>60</option>
+            <option value="90">90</option>
+          </select>
+        </div>
+        <div style="align-self:flex-end;">
+          <button id="btnRefetch" class="ghost">再取得</button>
         </div>
       </div>
     </div>
 
-    <div id="schedulesBox" class="muted">読み込み中… <span class="spinner"></span></div>
+    <div id="schedulesList" class="muted">読み込み待ち…</div>
   </section>
 
 </main>
@@ -165,15 +179,15 @@
 <script>
 /* ===== 設定 ===== */
 const FRONT_VERSION = "Front v0.7";
-const LIFF_ID = "2008020568-2jVl00Rn";       // ←あなたのLIFF ID
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwz7xhx9uSKeB3GVc1SxtSY_zCttfu-6BKyiOd2llq2-cV5HgxQvvSU8OF_A2DWxzE-3g/exec";  // ←GAS の web app URL（/exec）
+const LIFF_ID = "2008020568-2jVl00Rn";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwz7xhx9uSKeB3GVc1SxtSY_zCttfu-6BKyiOd2llq2-cV5HgxQvvSU8OF_A2DWxzE-3g/exec";
 
 /* ===== 状態 ===== */
 let state = {
   lineId: "",
   name: "",
   members: [],       // [{lineId,inputName,performerName}]
-  events:  [],       // [{eventId,date,time,place,deadline,flag?}]
+  events:  [],       // [{eventId,date,time,place,deadline,flag}]
   answers: {},       // { eventId: [{performerName,attend,pendingDate,comment,answeredAt}] }
   submitting: false
 };
@@ -185,6 +199,9 @@ function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classLi
 function logHome(t){ $("#homeLog").textContent = t||""; }
 function logForm(t){ $("#formLog").textContent = t||""; }
 function logReg(t){ $("#regLog").textContent = t||""; }
+
+/** HTMLエスケープ（XSS対策） */
+function esc(s){ return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function formatYmdDow(s){
   const d = new Date(s); if (isNaN(d)) return String(s||"");
@@ -216,7 +233,7 @@ function todayForInput(){
 /* ===== API ===== */
 async function api(path){ const r = await fetch(API_ENDPOINT + path); return r.json(); }
 
-/* ===== データ読み直し ===== */
+/* ===== データ読み直し（HOME用） ===== */
 async function refreshData(){
   $("#eventsBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
@@ -266,10 +283,13 @@ async function init(){
     $("#btnBackFromReg").onclick  = ()=> show("#view-home");
     $("#btnSubmit").onclick = onSubmit;
 
-    // 予定関連
-    $("#btnSchedules").onclick = ()=> { show("#view-schedules"); loadSchedules(); };
+    // 今後の予定
+    $("#btnSchedules").onclick = ()=>{
+      bindSchedulesEventsOnce();
+      refreshSchedulesView();
+      show("#view-schedules");
+    };
     $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
-    $("#btnReloadSchedules").onclick = ()=> loadSchedules();
 
     // 初回登録UIのボタン
     $("#btnAddPerf").onclick = ()=> addPerformerField("");
@@ -291,11 +311,9 @@ function renderHome(){
   } else {
     $("#eventsBox").innerHTML = state.events.map(e=>{
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
-      const isNew = (e.flag && String(e.flag).toUpperCase()==="Y"); // flag が返ってくる場合のみ NEW 表示
-      const badge = isNew ? `<span style="color:#d33; font-weight:700; margin-left:6px;">NEW!</span>` : "";
       return `<div class="card" style="margin:8px 0">
-        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr} ${badge}</div>
-        <div>場所：${e.place||""}</div>
+        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr}</div>
+        <div>場所：${esc(e.place||"")}</div>
       </div>`;
     }).join("");
   }
@@ -315,14 +333,14 @@ function renderHome(){
     for (const e of state.events){
       const ans = state.answers[e.eventId] || [];
       if (!ans.length){
-        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${e.place}】</div><div>まだ回答がありません</div></div>`;
+        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${esc(e.place||"")}】</div><div>まだ回答がありません</div></div>`;
       } else {
-        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${e.place}】</div>`;
+        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${esc(e.place||"")}】</div>`;
         ans.forEach(r=>{
           const extra = (r.attend==="未定" && r.pendingDate) ? `（予定日:${r.pendingDate}）` : "";
           html += `<div class="row" style="justify-content:space-between;">
-            <span class="pill">${r.performerName}</span>
-            <span>${r.attend||""}${extra}</span>
+            <span class="pill">${esc(r.performerName)}</span>
+            <span>${esc(r.attend||"")}${extra}</span>
           </div>`;
         });
         html += `</div>`;
@@ -366,7 +384,7 @@ function buildFormView(){
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
       return `<div class="card">
         <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr}</div>
-        <div>場所：${e.place||""}</div>
+        <div>場所：${esc(e.place||"")}</div>
       </div>`;
     }).join("");
   }
@@ -401,7 +419,7 @@ function buildFormView(){
 
       const html = `
         <div style="border-top:1px dashed var(--c-border); margin:10px 0; padding-top:10px;">
-          <div class="pill" style="margin-bottom:6px;">${name}</div>
+          <div class="pill" style="margin-bottom:6px;">${esc(name)}</div>
           <label for="${idBase}_att">出欠</label>
           <select id="${idBase}_att" data-event="${e.eventId}" data-name="${name}">
             <option value="">（選択してください）</option>
@@ -422,7 +440,7 @@ function buildFormView(){
             </div>
             <div style="flex:2; min-width:220px;">
               <label for="${idBase}_com">コメント（任意・100文字まで）</label>
-              <input type="text" id="${idBase}_com" value="${row.comment||""}" maxlength="100" placeholder="例：家族の都合で検討中 など">
+              <input type="text" id="${idBase}_com" value="${esc(row.comment||"")}" maxlength="100" placeholder="例：家族の都合で検討中 など">
             </div>
           </div>
           <div class="small muted">※「未定」選択時は予定日を入れてください（${e.deadline ? `締切 ${e.deadline} まで` : '締切未設定'}）</div>
@@ -480,7 +498,6 @@ function buildFormView(){
             warnEl.textContent = "";
             dateEl.classList.remove("invalid");
           } else {
-            // 既にある値も再チェック
             validateDate();
           }
         }
@@ -583,7 +600,7 @@ function addPerformerField(value=""){
   row.innerHTML = `
     <div style="flex:1; min-width:220px;">
       <label for="${id}" class="muted">演奏者名</label>
-      <input type="text" id="${id}" class="regPerf" value="${value||""}" placeholder="例：藤塚 太郎">
+      <input type="text" id="${id}" class="regPerf" value="${esc(value||"")}" placeholder="例：藤塚 太郎">
     </div>
     <div>
       <button type="button" class="ghost" onclick="this.closest('.row').remove()">削除</button>
@@ -629,43 +646,79 @@ async function onRegister(){
   }
 }
 
-/* ===== 今後の予定 ===== */
-async function loadSchedules(){
-  const days = Math.max(1, Math.min(365, Number($("#schDays").value||60)));
-  const kind = $("#schKind").value || "";
-  $("#schedulesBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
+/* ===== 今後の予定（Schedules） ===== */
+function kindClass(kind){
+  if (kind === "発表") return "kind-pub";
+  if (kind === "練習") return "kind-trn";
+  return "kind-etc";
+}
 
+function bindSchedulesEventsOnce(){
+  const selKind = document.getElementById("selKind");
+  const selDays = document.getElementById("selDays");
+  const btn     = document.getElementById("btnRefetch");
+
+  if (selKind && !selKind.__bound){
+    selKind.addEventListener("change", refreshSchedulesView);
+    selKind.__bound = true;
+  }
+  if (selDays && !selDays.__bound){
+    selDays.addEventListener("change", refreshSchedulesView);
+    selDays.__bound = true;
+  }
+  if (btn && !btn.__bound){
+    btn.addEventListener("click", refreshSchedulesView);
+    btn.__bound = true;
+  }
+}
+
+async function refreshSchedulesView(){
+  const selKind = document.getElementById("selKind");   // 種別
+  const selDays = document.getElementById("selDays");   // 日数
+  const box     = document.getElementById("schedulesList");
+
+  const kind = (selKind?.value || "").trim(); // ""=全て
+  const days = Number(selDays?.value || 60);
+
+  box.innerHTML = `読み込み中… <span class="spinner"></span>`;
   try{
-    const qs = new URLSearchParams({ schedules:"1", days:String(days) });
-    if (kind) qs.set("kind", kind);
-    const res = await fetch(`${API_ENDPOINT}?${qs.toString()}`);
-    const j = await res.json();
+    const qs = new URLSearchParams({ schedules: "1", days: String(days) });
+    if (kind && kind !== "全て") qs.set("kind", kind);
+    const r = await fetch(API_ENDPOINT + "?" + qs.toString());
+    const j = await r.json();
 
-    if (j.status !== "ok"){
-      $("#schedulesBox").innerHTML = `<span class="err">取得失敗：${j.message||"unknown"}</span>`;
+    if (j.status !== "ok") {
+      box.innerHTML = `<span class="err">取得に失敗しました: ${esc(j.message||"unknown")}</span>`;
       return;
     }
     const list = j.schedules || [];
     if (list.length === 0){
-      $("#schedulesBox").innerHTML = `<div>該当する予定はありません</div>`;
+      box.innerHTML = `<div class="muted">指定条件の予定はありません</div>`;
       return;
     }
-    $("#schedulesBox").innerHTML = list.map(sc => {
-       const dateLine  = sc.date + (sc.time ? ` ${sc.time}` : "");
-       const titleLine = sc.title ? `<div><b>${sc.title}</b></div>` : "";
-       const kindLine  = sc.kind ? `<div class="small muted">${sc.kind}</div>` : "";
-       const memo      = sc.memo ? `<div class="small">${sc.memo}</div>` : "";
-       return `<div class="card">
-         ${titleLine}
-         <div>${dateLine}</div>
-         <div>${sc.place||""}</div>
-         ${kindLine}
-         ${memo}
-       </div>`;
-     }).join("");
+
+    box.innerHTML = list.map(it => {
+      const badge = `<span class="badge ${kindClass(it.kind)}">${esc(it.kind||"-")}</span>`;
+      const title = esc(it.title || "(無題)");
+      const date  = esc(it.date || "");
+      const time  = esc(it.time || "");
+      const place = esc(it.place || "");
+      const meta  = [date, time ? time : null, place ? `＠${place}` : null].filter(Boolean).join(" ");
+      const memo  = it.memo ? `<div class="memo">${esc(it.memo)}</div>` : "";
+      return `
+        <div class="card schedule-item">
+          <div class="row" style="justify-content:space-between; align-items:flex-start;">
+            <div class="title">${title}</div>
+            <div>${badge}</div>
+          </div>
+          <div class="meta">${meta}</div>
+          ${memo}
+        </div>
+      `;
+    }).join("");
 
   }catch(err){
-    $("#schedulesBox").innerHTML = `<span class="err">エラー：${err.message||String(err)}</span>`;
+    box.innerHTML = `<span class="err">エラー: ${esc(err.message||err)}</span>`;
   }
 }
 
