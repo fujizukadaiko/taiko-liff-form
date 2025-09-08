@@ -166,7 +166,7 @@
 /* ===== 設定 ===== */
 const FRONT_VERSION = "Front v0.7";
 const LIFF_ID = "2008020568-2jVl00Rn";       // ←あなたのLIFF ID
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzvsM9vndKBKj7qqgxCXwJBYIcvyARveLWv9F7igxZ4kA8FGWgZgS02NO1UzH7y38TlCg/exec";  // ←GAS の web app URL（/exec）
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwz7xhx9uSKeB3GVc1SxtSY_zCttfu-6BKyiOd2llq2-cV5HgxQvvSU8OF_A2DWxzE-3g/exec";  // ←GAS の web app URL（/exec）
 
 /* ===== 状態 ===== */
 let state = {
@@ -651,16 +651,18 @@ async function loadSchedules(){
       return;
     }
     $("#schedulesBox").innerHTML = list.map(sc => {
-      const dateLine = sc.date + (sc.time ? ` ${sc.time}` : "");
-      const kindLine = sc.kind ? `<div class="small muted">${sc.kind}</div>` : "";
-      const memo = sc.memo ? `<div class="small">${sc.memo}</div>` : "";
-      return `<div class="card">
-        <div>${dateLine}</div>
-        <div>${sc.place||""}</div>
-        ${kindLine}
-        ${memo}
-      </div>`;
-    }).join("");
+       const dateLine  = sc.date + (sc.time ? ` ${sc.time}` : "");
+       const titleLine = sc.title ? `<div><b>${sc.title}</b></div>` : "";
+       const kindLine  = sc.kind ? `<div class="small muted">${sc.kind}</div>` : "";
+       const memo      = sc.memo ? `<div class="small">${sc.memo}</div>` : "";
+       return `<div class="card">
+         ${titleLine}
+         <div>${dateLine}</div>
+         <div>${sc.place||""}</div>
+         ${kindLine}
+         ${memo}
+       </div>`;
+     }).join("");
 
   }catch(err){
     $("#schedulesBox").innerHTML = `<span class="err">エラー：${err.message||String(err)}</span>`;
