@@ -36,7 +36,7 @@
     @keyframes spin{ to{ transform:rotate(360deg); } }
 
     label{ display:block; font-size:14px; margin:6px 0 4px; }
-    input[type="text"], input[type="date"], select, textarea{
+    input[type="text"], input[type="date"], select, textarea, input[type="number"]{
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
     .small{ font-size:12px; color:var(--c-muted); }
@@ -46,6 +46,9 @@
       border-color: var(--c-err);
       background: #fff5f5;
     }
+
+    .filters{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .filters .item{ min-width:150px; }
   </style>
 </head>
 <body>
@@ -77,6 +80,7 @@
     <div class="row" style="margin-top:6px;">
       <button id="btnPrimary">読み込み中...</button>
       <button id="btnEditNames" class="ghost" style="display:none;">氏名を編集する</button>
+      <button id="btnSchedules" class="ghost">今後の予定</button>
       <button id="btnReload" class="ghost">再読み込み</button>
     </div>
     <div id="homeLog" class="muted" style="margin-top:8px;"></div>
@@ -125,20 +129,51 @@
     <div id="regLog" class="muted" style="margin-top:8px;"></div>
   </section>
 
+  <!-- ===== 今後の予定 ===== -->
+  <section id="view-schedules" data-view>
+    <div class="row" style="justify-content:space-between;">
+      <div class="sectionTitle">今後の予定</div>
+      <button id="btnBackFromSchedules" class="ghost">トップに戻る</button>
+    </div>
+
+    <div class="card">
+      <div class="filters">
+        <div class="item">
+          <label for="schDays" class="muted">表示期間（日数）</label>
+          <input type="number" id="schDays" value="60" min="1" max="365"/>
+        </div>
+        <div class="item">
+          <label for="schKind" class="muted">種別フィルタ</label>
+          <select id="schKind">
+            <option value="">すべて</option>
+            <option value="発表">発表</option>
+            <option value="練習">練習</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="item" style="align-self:flex-end;">
+          <button id="btnReloadSchedules" class="ghost">再取得</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="schedulesBox" class="muted">読み込み中… <span class="spinner"></span></div>
+  </section>
+
 </main>
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v0.6";
-const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzWqk5VO25UAtOMVSXH0HsWcbYiwH0qW9rQW7tBtq0xJKd6cDONo2ZWm-SywnO2ubkhOA/exec";
+const FRONT_VERSION = "Front v0.7";
+const LIFF_ID = "2008020568-2jVl00Rn";       // ←あなたのLIFF ID
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzvsM9vndKBKj7qqgxCXwJBYIcvyARveLWv9F7igxZ4kA8FGWgZgS02NO1UzH7y38TlCg/exec";  // ←GAS の web app URL（/exec）
 
 /* ===== 状態 ===== */
 let state = {
   lineId: "",
   name: "",
   members: [],       // [{lineId,inputName,performerName}]
-  events:  [],       // [{eventId,date,time,place,deadline,flag}]
+  events:  [],       // [{eventId,date,time,place,deadline,flag?}]
   answers: {},       // { eventId: [{performerName,attend,pendingDate,comment,answeredAt}] }
   submitting: false
 };
@@ -231,6 +266,11 @@ async function init(){
     $("#btnBackFromReg").onclick  = ()=> show("#view-home");
     $("#btnSubmit").onclick = onSubmit;
 
+    // 予定関連
+    $("#btnSchedules").onclick = ()=> { show("#view-schedules"); loadSchedules(); };
+    $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
+    $("#btnReloadSchedules").onclick = ()=> loadSchedules();
+
     // 初回登録UIのボタン
     $("#btnAddPerf").onclick = ()=> addPerformerField("");
     $("#btnRegister").onclick = onRegister;
@@ -251,8 +291,10 @@ function renderHome(){
   } else {
     $("#eventsBox").innerHTML = state.events.map(e=>{
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
+      const isNew = (e.flag && String(e.flag).toUpperCase()==="Y"); // flag が返ってくる場合のみ NEW 表示
+      const badge = isNew ? `<span style="color:#d33; font-weight:700; margin-left:6px;">NEW!</span>` : "";
       return `<div class="card" style="margin:8px 0">
-        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr}</div>
+        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr} ${badge}</div>
         <div>場所：${e.place||""}</div>
       </div>`;
     }).join("");
@@ -375,7 +417,7 @@ function buildFormView(){
                      value="${pendingYmd}"
                      min="${minISO}" ${maxAttr}
                      ${disabledAttr}>
-              <!-- 追加：リアルタイム注意テキスト -->
+              <!-- リアルタイム注意テキスト -->
               <div id="${idBase}_date_warn" class="small err" style="display:none;"></div>
             </div>
             <div style="flex:2; min-width:220px;">
@@ -437,7 +479,6 @@ function buildFormView(){
             warnEl.style.display = "none";
             warnEl.textContent = "";
             dateEl.classList.remove("invalid");
-            // dateEl.value = ""; // 任意：未定解除時に値を消す
           } else {
             // 既にある値も再チェック
             validateDate();
@@ -585,6 +626,44 @@ async function onRegister(){
     logReg(err.message || String(err));
   }finally{
     $("#btnRegister").disabled = false; $("#btnRegister").textContent = (registerMode==="edit" ? "保存" : "登録する");
+  }
+}
+
+/* ===== 今後の予定 ===== */
+async function loadSchedules(){
+  const days = Math.max(1, Math.min(365, Number($("#schDays").value||60)));
+  const kind = $("#schKind").value || "";
+  $("#schedulesBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
+
+  try{
+    const qs = new URLSearchParams({ schedules:"1", days:String(days) });
+    if (kind) qs.set("kind", kind);
+    const res = await fetch(`${API_ENDPOINT}?${qs.toString()}`);
+    const j = await res.json();
+
+    if (j.status !== "ok"){
+      $("#schedulesBox").innerHTML = `<span class="err">取得失敗：${j.message||"unknown"}</span>`;
+      return;
+    }
+    const list = j.schedules || [];
+    if (list.length === 0){
+      $("#schedulesBox").innerHTML = `<div>該当する予定はありません</div>`;
+      return;
+    }
+    $("#schedulesBox").innerHTML = list.map(sc => {
+      const dateLine = sc.date + (sc.time ? ` ${sc.time}` : "");
+      const kindLine = sc.kind ? `<div class="small muted">${sc.kind}</div>` : "";
+      const memo = sc.memo ? `<div class="small">${sc.memo}</div>` : "";
+      return `<div class="card">
+        <div>${dateLine}</div>
+        <div>${sc.place||""}</div>
+        ${kindLine}
+        ${memo}
+      </div>`;
+    }).join("");
+
+  }catch(err){
+    $("#schedulesBox").innerHTML = `<span class="err">エラー：${err.message||String(err)}</span>`;
   }
 }
 
