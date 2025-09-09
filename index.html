@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>公演 出欠フォーム / 今後の予定</title>
+  <title>公演 出欠フォーム</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root{
@@ -36,29 +36,15 @@
     @keyframes spin{ to{ transform:rotate(360deg); } }
 
     label{ display:block; font-size:14px; margin:6px 0 4px; }
-    input[type="text"], input[type="date"], select, textarea{
+    input[type="text"], select, textarea{
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
     .small{ font-size:12px; color:var(--c-muted); }
 
-    /* 追加：日付が不正な時の赤枠表示 */
-    input.invalid{
-      border-color: var(--c-err);
-      background: #fff5f5;
+    .newBadge{
+      display:inline-block; margin-left:6px; font-size:11px; color:#d40;
+      background:#ffeaea; border:1px solid #f5bcbc; padding:2px 6px; border-radius:8px;
     }
-
-    /* ===== 今後の予定（スケジュール）用 ===== */
-    .badge {
-      display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px;
-      border:1px solid var(--c-border); background:#f5f5f5; color:#333;
-    }
-    .kind-pub { background:#e8f2ff; border-color:#b9d6ff; color:#0b4a9e; } /* 発表 */
-    .kind-trn { background:#eaf9f0; border-color:#bbe8cf; color:#096a36; } /* 練習 */
-    .kind-etc { background:#f8f0ff; border-color:#e1ccff; color:#6a29a6; } /* その他 */
-
-    .schedule-item .title { font-weight:700; margin-bottom:4px; font-size:16px; }
-    .schedule-item .meta  { color:var(--c-muted); font-size:13px; }
-    .schedule-item .memo  { white-space:pre-line; margin-top:6px; }
   </style>
 </head>
 <body>
@@ -90,10 +76,13 @@
     <div class="row" style="margin-top:6px;">
       <button id="btnPrimary">読み込み中...</button>
       <button id="btnEditNames" class="ghost" style="display:none;">氏名を編集する</button>
-      <button id="btnSchedules" class="ghost">今後の予定</button>
       <button id="btnReload" class="ghost">再読み込み</button>
     </div>
     <div id="homeLog" class="muted" style="margin-top:8px;"></div>
+
+    <div class="row" style="margin-top:8px;">
+      <button id="btnSchedules" class="ghost">今後の予定</button>
+    </div>
   </section>
 
   <!-- ===== フォーム（出欠） ===== -->
@@ -139,59 +128,57 @@
     <div id="regLog" class="muted" style="margin-top:8px;"></div>
   </section>
 
-  <!-- ===== 今後の予定（スケジュール） ===== -->
+  <!-- ===== 今後の予定 ===== -->
   <section id="view-schedules" data-view>
     <div class="row" style="justify-content:space-between;">
       <div class="sectionTitle">今後の予定</div>
-      <button id="btnBackFromSchedules" class="ghost">トップに戻る</button>
+      <button id="btnBackFromSch" class="ghost">トップに戻る</button>
     </div>
-
     <div class="card">
       <div class="row">
         <div>
-          <label for="selKind" class="muted">種別</label>
-          <select id="selKind">
-            <option value="全て">全て</option>
-            <option value="発表">発表</option>
-            <option value="練習">練習</option>
-            <option value="その他">その他</option>
-          </select>
-        </div>
-        <div>
-          <label for="selDays" class="muted">表示期間（日）</label>
-          <select id="selDays">
+          <label for="schDays" class="small">表示期間（日）</label>
+          <select id="schDays">
             <option value="30">30</option>
             <option value="60" selected>60</option>
             <option value="90">90</option>
           </select>
         </div>
+        <div>
+          <label for="schKind" class="small">種別</label>
+          <select id="schKind">
+            <option value="">すべて</option>
+            <option value="発表">発表</option>
+            <option value="練習">練習</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
         <div style="align-self:flex-end;">
-          <button id="btnRefetch" class="ghost">再取得</button>
+          <button id="btnSchReload" class="ghost">再取得</button>
         </div>
       </div>
+      <div id="schBox" class="muted" style="margin-top:10px;">取得中… <span class="spinner"></span></div>
     </div>
-
-    <div id="schedulesList" class="muted">読み込み待ち…</div>
   </section>
 
 </main>
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v0.7";
+const FRONT_VERSION = "Front v0.8";
 const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwz7xhx9uSKeB3GVc1SxtSY_zCttfu-6BKyiOd2llq2-cV5HgxQvvSU8OF_A2DWxzE-3g/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzPXOhJkQzVC3gAhQJP5T9Fsf1syrzhtOMuG1jO27JqJ6EgcmmcCyYQradA4rUawooAmQ/exec";
 
 /* ===== 状態 ===== */
 let state = {
   lineId: "",
   name: "",
   members: [],       // [{lineId,inputName,performerName}]
-  events:  [],       // [{eventId,date,time,place,deadline,flag}]
-  answers: {},       // { eventId: [{performerName,attend,pendingDate,comment,answeredAt}] }
+  events:  [],       // [{eventId,date,time,place,deadline,initialAt,isNew}]
+  answers: {},       // { eventId: [{performerName,attend,comment,answeredAt}] }
   submitting: false
 };
-let registerMode = "create"; // "create" | "edit"
+let registerMode = "create";
 
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
@@ -199,9 +186,6 @@ function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classLi
 function logHome(t){ $("#homeLog").textContent = t||""; }
 function logForm(t){ $("#formLog").textContent = t||""; }
 function logReg(t){ $("#regLog").textContent = t||""; }
-
-/** HTMLエスケープ（XSS対策） */
-function esc(s){ return String(s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function formatYmdDow(s){
   const d = new Date(s); if (isNaN(d)) return String(s||"");
@@ -214,41 +198,23 @@ function formatHm(s){
   const m = String(s||"").match(/^(\d{1,2}:\d{2})/);
   return m ? m[1] : String(s||"");
 }
-function toYmdForInput(ymd){
-  const m=String(ymd||"").match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-  return m?`${m[1]}-${String(m[2]).padStart(2,"0")}-${String(m[3]).padStart(2,"0")}`:"";
-}
-function fromInputToYmd(v){
-  const m=String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return m?`${m[1]}/${m[2]}/${m[3]}`:"";
-}
-function todayForInput(){
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,"0");
-  const day = String(d.getDate()).padStart(2,"0");
-  return `${y}-${m}-${day}`;
-}
 
 /* ===== API ===== */
 async function api(path){ const r = await fetch(API_ENDPOINT + path); return r.json(); }
 
-/* ===== データ読み直し（HOME用） ===== */
+/* ===== データ読み直し ===== */
 async function refreshData(){
   $("#eventsBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
   $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
   $("#btnEditNames").style.display = "none";
 
-  // イベント（Y/S 両方）
   const ev = await api("?events=1");
   state.events = (ev.status==="ok" && Array.isArray(ev.events)) ? ev.events : [];
 
-  // 会員
   const w = await api(`?whoami=1&id=${encodeURIComponent(state.lineId)}`);
   state.members = (w.status==="ok" ? (w.members||[]) : []);
 
-  // 回答
   state.answers = {};
   for (const e of state.events){
     const a = await api(`?getAttendance=1&eventId=${encodeURIComponent(e.eventId)}&lineId=${encodeURIComponent(state.lineId)}`);
@@ -275,7 +241,6 @@ async function init(){
     state.name   = idt && idt.name ? idt.name : "";
     $("#hello").textContent = state.name ? `こんにちは、${state.name} さん` : "";
 
-    // ボタン
     $("#btnReload").onclick = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
     $("#btnPrimary").onclick = onPrimary;
     $("#btnEditNames").onclick = onEditNames;
@@ -284,18 +249,13 @@ async function init(){
     $("#btnSubmit").onclick = onSubmit;
 
     // 今後の予定
-    $("#btnSchedules").onclick = ()=>{
-      bindSchedulesEventsOnce();
-      refreshSchedulesView();
-      show("#view-schedules");
-    };
-    $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
+    $("#btnSchedules").onclick = ()=>{ show("#view-schedules"); loadSchedules(); };
+    $("#btnBackFromSch").onclick = ()=> show("#view-home");
+    $("#btnSchReload").onclick = loadSchedules;
 
-    // 初回登録UIのボタン
+    // 初回登録UI
     $("#btnAddPerf").onclick = ()=> addPerformerField("");
     $("#btnRegister").onclick = onRegister;
-
-    // 演奏者1行目を用意（初回のみ）
     resetRegisterForm();
 
     await refreshData();
@@ -311,14 +271,14 @@ function renderHome(){
   } else {
     $("#eventsBox").innerHTML = state.events.map(e=>{
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
+      const newBadge = e.isNew ? `<span class="newBadge">NEW</span>` : "";
       return `<div class="card" style="margin:8px 0">
-        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr}</div>
-        <div>場所：${esc(e.place||"")}</div>
+        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr} ${newBadge}</div>
+        <div>場所：${e.place||""}</div>
       </div>`;
     }).join("");
   }
 
-  // 登録状況＋ボタン文言
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
@@ -333,14 +293,13 @@ function renderHome(){
     for (const e of state.events){
       const ans = state.answers[e.eventId] || [];
       if (!ans.length){
-        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${esc(e.place||"")}】</div><div>まだ回答がありません</div></div>`;
+        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${e.place}】</div><div>まだ回答がありません</div></div>`;
       } else {
-        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${esc(e.place||"")}】</div>`;
+        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${e.place}】</div>`;
         ans.forEach(r=>{
-          const extra = (r.attend==="未定" && r.pendingDate) ? `（予定日:${r.pendingDate}）` : "";
           html += `<div class="row" style="justify-content:space-between;">
-            <span class="pill">${esc(r.performerName)}</span>
-            <span>${esc(r.attend||"")}${extra}</span>
+            <span class="pill">${r.performerName}</span>
+            <span>${r.attend||""}</span>
           </div>`;
         });
         html += `</div>`;
@@ -351,22 +310,19 @@ function renderHome(){
   }
 }
 
-/* ===== メインボタンの動作 ===== */
+/* ===== メインボタン ===== */
 function onPrimary(){
   if (state.members.length === 0){
-    // 初回登録へ
     registerMode = "create";
     resetRegisterForm();
     $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
     $("#btnRegister").textContent = "登録する";
     show("#view-register");
   } else {
-    // 出欠フォームへ
     buildFormView();
     show("#view-form");
   }
 }
-
 function onEditNames(){
   registerMode = "edit";
   buildRegisterFormFromMembers();
@@ -375,7 +331,7 @@ function onEditNames(){
   show("#view-register");
 }
 
-/* ===== 出欠フォーム構築 ===== */
+/* ===== 出欠フォーム ===== */
 function buildFormView(){
   if (!state.events.length){
     $("#formEventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
@@ -384,7 +340,7 @@ function buildFormView(){
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
       return `<div class="card">
         <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr}</div>
-        <div>場所：${esc(e.place||"")}</div>
+        <div>場所：${e.place||""}</div>
       </div>`;
     }).join("");
   }
@@ -395,31 +351,20 @@ function buildFormView(){
   for (const e of state.events){
     const current = state.answers[e.eventId] || [];
     const map = {}; current.forEach(r => map[r.performerName] = r);
-
     const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
 
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `<div class="sectionTitle">【${formatYmdDow(e.date)} ${formatHm(e.time)}】</div>`;
 
-    // min/max for date
-    const minISO = todayForInput();
-    const maxISO = e.deadline ? toYmdForInput(e.deadline) : ""; // 締切未設定ならmaxなし
-    const deadlineDisp = e.deadline || ""; // 表示用
-
     performers.forEach((name, idx)=>{
       const row = map[name] || {};
       const attend = row.attend || "";
-      const pendingYmd = row.pendingDate ? toYmdForInput(row.pendingDate) : "";
       const idBase = `e${e.eventId}_i${idx}`;
-
-      const isPending = (attend === "未定");
-      const disabledAttr = isPending ? "" : "disabled";
-      const maxAttr = maxISO ? `max="${maxISO}"` : "";
 
       const html = `
         <div style="border-top:1px dashed var(--c-border); margin:10px 0; padding-top:10px;">
-          <div class="pill" style="margin-bottom:6px;">${esc(name)}</div>
+          <div class="pill" style="margin-bottom:6px;">${name}</div>
           <label for="${idBase}_att">出欠</label>
           <select id="${idBase}_att" data-event="${e.eventId}" data-name="${name}">
             <option value="">（選択してください）</option>
@@ -427,87 +372,10 @@ function buildFormView(){
             <option value="欠席" ${attend==="欠席"?"selected":""}>欠席</option>
             <option value="未定" ${attend==="未定"?"selected":""}>未定</option>
           </select>
-
-          <div class="row">
-            <div style="flex:1; min-width:180px;">
-              <label for="${idBase}_date">未定の予定日（未定を選んだときのみ）</label>
-              <input type="date" id="${idBase}_date"
-                     value="${pendingYmd}"
-                     min="${minISO}" ${maxAttr}
-                     ${disabledAttr}>
-              <!-- リアルタイム注意テキスト -->
-              <div id="${idBase}_date_warn" class="small err" style="display:none;"></div>
-            </div>
-            <div style="flex:2; min-width:220px;">
-              <label for="${idBase}_com">コメント（任意・100文字まで）</label>
-              <input type="text" id="${idBase}_com" value="${esc(row.comment||"")}" maxlength="100" placeholder="例：家族の都合で検討中 など">
-            </div>
-          </div>
-          <div class="small muted">※「未定」選択時は予定日を入れてください（${e.deadline ? `締切 ${e.deadline} まで` : '締切未設定'}）</div>
+          <div class="small muted">※ 未定の場合は、予定が決まり次第ここから変更してください（締切7日前に1回だけリマインドされます）。</div>
         </div>
       `;
       card.insertAdjacentHTML("beforeend", html);
-
-      // 選択切り替え＆リアルタイムバリデーション
-      setTimeout(() => {
-        const sel    = document.getElementById(`${idBase}_att`);
-        const dateEl = document.getElementById(`${idBase}_date`);
-        const warnEl = document.getElementById(`${idBase}_date_warn`);
-        if (!sel || !dateEl || !warnEl) return;
-
-        function validateDate(){
-          // 未定以外は警告非表示
-          if (sel.value !== "未定") {
-            warnEl.style.display = "none";
-            warnEl.textContent = "";
-            dateEl.classList.remove("invalid");
-            return;
-          }
-          const val = dateEl.value; // yyyy-mm-dd
-          if (!val) {
-            warnEl.style.display = "none";
-            warnEl.textContent = "";
-            dateEl.classList.remove("invalid");
-            return;
-          }
-          // 範囲チェック（文字比較でOK）
-          if (dateEl.min && val < dateEl.min) {
-            warnEl.textContent = "過去日が選択されています。今日以降の日付を選んでください。";
-            warnEl.style.display = "";
-            dateEl.classList.add("invalid");
-            return;
-          }
-          if (dateEl.max && val > dateEl.max) {
-            warnEl.textContent = `締切日（${deadlineDisp}）より後の日付が選択されています。締切日までに設定してください。`;
-            warnEl.style.display = "";
-            dateEl.classList.add("invalid");
-            return;
-          }
-          // OK
-          warnEl.style.display = "none";
-          warnEl.textContent = "";
-          dateEl.classList.remove("invalid");
-        }
-
-        function applyPendingState(){
-          const isPendingNow = (sel.value === "未定");
-          dateEl.disabled = !isPendingNow;
-          dateEl.required = isPendingNow;
-          if (!isPendingNow) {
-            warnEl.style.display = "none";
-            warnEl.textContent = "";
-            dateEl.classList.remove("invalid");
-          } else {
-            validateDate();
-          }
-        }
-
-        sel.addEventListener("change", applyPendingState);
-        dateEl.addEventListener("input", validateDate);
-        dateEl.addEventListener("change", validateDate);
-
-        applyPendingState();
-      }, 0);
     });
 
     box.appendChild(card);
@@ -532,19 +400,12 @@ async function onSubmit(){
         const sel = document.getElementById(`${idBase}_att`);
         if (!sel) return;
         const attend = sel.value;
-
-        const dateEl = document.getElementById(`${idBase}_date`);
-        const comEl  = document.getElementById(`${idBase}_com`);
-        const pendingRaw = dateEl ? dateEl.value : "";
-        const pendingYmd  = fromInputToYmd(pendingRaw);
-
-        if (!attend) return; // 未選択は送信しない
-        if (attend==="未定" && !pendingYmd) throw new Error(`「${name}」の未定は予定日が必須です`);
+        if (!attend) return;
 
         const key = `${e.eventId}||${name}`;
         if (seen.has(key)) return; seen.add(key);
 
-        payloads.push({ eventId:e.eventId, performerName:name, attend, pendingDate:pendingYmd, comment:(comEl?.value||"").trim() });
+        payloads.push({ eventId:e.eventId, performerName:name, attend, comment:"" });
       });
     }
 
@@ -553,7 +414,7 @@ async function onSubmit(){
     const grouped = {};
     for (const p of payloads){
       if (!grouped[p.eventId]) grouped[p.eventId] = [];
-      grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, pendingDate:p.pendingDate, comment:p.comment });
+      grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, comment:p.comment });
     }
 
     for (const [eventId, list] of Object.entries(grouped)){
@@ -600,7 +461,7 @@ function addPerformerField(value=""){
   row.innerHTML = `
     <div style="flex:1; min-width:220px;">
       <label for="${id}" class="muted">演奏者名</label>
-      <input type="text" id="${id}" class="regPerf" value="${esc(value||"")}" placeholder="例：藤塚 太郎">
+      <input type="text" id="${id}" class="regPerf" value="${value||""}" placeholder="例：藤塚 太郎">
     </div>
     <div>
       <button type="button" class="ghost" onclick="this.closest('.row').remove()">削除</button>
@@ -646,79 +507,30 @@ async function onRegister(){
   }
 }
 
-/* ===== 今後の予定（Schedules） ===== */
-function kindClass(kind){
-  if (kind === "発表") return "kind-pub";
-  if (kind === "練習") return "kind-trn";
-  return "kind-etc";
-}
-
-function bindSchedulesEventsOnce(){
-  const selKind = document.getElementById("selKind");
-  const selDays = document.getElementById("selDays");
-  const btn     = document.getElementById("btnRefetch");
-
-  if (selKind && !selKind.__bound){
-    selKind.addEventListener("change", refreshSchedulesView);
-    selKind.__bound = true;
-  }
-  if (selDays && !selDays.__bound){
-    selDays.addEventListener("change", refreshSchedulesView);
-    selDays.__bound = true;
-  }
-  if (btn && !btn.__bound){
-    btn.addEventListener("click", refreshSchedulesView);
-    btn.__bound = true;
-  }
-}
-
-async function refreshSchedulesView(){
-  const selKind = document.getElementById("selKind");   // 種別
-  const selDays = document.getElementById("selDays");   // 日数
-  const box     = document.getElementById("schedulesList");
-
-  const kind = (selKind?.value || "").trim(); // ""=全て
-  const days = Number(selDays?.value || 60);
-
-  box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+/* ===== 今後の予定 ===== */
+async function loadSchedules(){
+  $("#schBox").innerHTML = `取得中… <span class="spinner"></span>`;
+  const days = Number($("#schDays").value||"60");
+  const kind = $("#schKind").value || "";
+  const q = `?schedules=1&days=${days}${kind?`&kind=${encodeURIComponent(kind)}`:""}`;
   try{
-    const qs = new URLSearchParams({ schedules: "1", days: String(days) });
-    if (kind && kind !== "全て") qs.set("kind", kind);
-    const r = await fetch(API_ENDPOINT + "?" + qs.toString());
-    const j = await r.json();
-
-    if (j.status !== "ok") {
-      box.innerHTML = `<span class="err">取得に失敗しました: ${esc(j.message||"unknown")}</span>`;
-      return;
-    }
-    const list = j.schedules || [];
-    if (list.length === 0){
-      box.innerHTML = `<div class="muted">指定条件の予定はありません</div>`;
-      return;
-    }
-
-    box.innerHTML = list.map(it => {
-      const badge = `<span class="badge ${kindClass(it.kind)}">${esc(it.kind||"-")}</span>`;
-      const title = esc(it.title || "(無題)");
-      const date  = esc(it.date || "");
-      const time  = esc(it.time || "");
-      const place = esc(it.place || "");
-      const meta  = [date, time ? time : null, place ? `＠${place}` : null].filter(Boolean).join(" ");
-      const memo  = it.memo ? `<div class="memo">${esc(it.memo)}</div>` : "";
-      return `
-        <div class="card schedule-item">
-          <div class="row" style="justify-content:space-between; align-items:flex-start;">
-            <div class="title">${title}</div>
-            <div>${badge}</div>
-          </div>
-          <div class="meta">${meta}</div>
-          ${memo}
+    const j = await api(q);
+    if (j.status!=="ok"){ $("#schBox").textContent = "取得に失敗しました"; return; }
+    const list = j.schedules||[];
+    if (!list.length){ $("#schBox").textContent = "該当の予定はありません"; return; }
+    $("#schBox").innerHTML = list.map(it => `
+      <div class="card">
+        <div class="row" style="justify-content:space-between;">
+          <div><b>${it.date}</b> ${it.time?` ${it.time}`:""} </div>
+          <div class="pill">${it.kind||""}</div>
         </div>
-      `;
-    }).join("");
-
+        <div style="margin-top:4px;">${it.title||""}</div>
+        <div class="muted">${it.place||""}</div>
+        ${it.memo ? `<div class="small muted">${it.memo}</div>` : ""}
+      </div>
+    `).join("");
   }catch(err){
-    box.innerHTML = `<span class="err">エラー: ${esc(err.message||err)}</span>`;
+    $("#schBox").textContent = `取得エラー: ${err.message||err}`;
   }
 }
 
