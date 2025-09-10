@@ -186,9 +186,9 @@
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v0.7";
+const FRONT_VERSION = "Front v0.8";
 const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbydybS57DkwnQ0g1isbDxMfb_qEahBwgD87mhlhaenZ04eFV27-YZcn3M3j3HVbkEqRdA/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzGAEJcYOiXy9y3AtfzHZ5Z4hbamA5kpK-jroZVB_S4NWQBDv3UMqyEkMJQP4f7DPKHZg/exec";
 
 /* ===== 状態 ===== */
 let state = {
@@ -196,13 +196,11 @@ let state = {
   name: "",
   members: [],       // [{lineId,inputName,performerName}]
   events:  [],       // [{eventId,date,time,place,deadline,initialAt,isNew}]
-  answers: {},       // { eventId: [{performerName,attend,comment,answeredAt,...} ] }
-  submitting: false,
-  // schedules view
-  schedules: [],     // [{id,date,time,title,place,kind,memo}]
-  schDays: 60,
-  schKind: ""
+  answers: {},       // { eventId: [{performerName,attend,comment,answeredAt,pendingDate(互換)}] }
+  schedules: [],     // 今後の予定の表示用
+  submitting: false
 };
+let registerMode = "create"; // "create" | "edit"
 
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
@@ -211,79 +209,64 @@ function logHome(t){ $("#homeLog").textContent = t||""; }
 function logForm(t){ $("#formLog").textContent = t||""; }
 function logReg(t){ $("#regLog").textContent = t||""; }
 
-function formatYmdDow(s){
-  const d = new Date(s); if (isNaN(d)) return String(s||"");
-  const dow = "日月火水木金土"[d.getDay()];
-  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getDate()).padStart(2,"0")}（${dow}）`;
+function z(n){ return String(n).padStart(2,"0"); }
+function ymdDow(d){
+  if (!(d instanceof Date) || isNaN(d)) return "";
+  const yo = "日月火水木金土"[d.getDay()];
+  return `${d.getFullYear()}/${z(d.getMonth()+1)}/${z(d.getDate())}（${yo}）`;
 }
-function formatHm(s){
+function hmFromTimeCell(v){
+  // GAS側は "Sat Dec 30 1899 HH:MM..." 形式のDate相当が来ることがある
+  const s = String(v||"").trim();
+  const tryDate = new Date(s);
+  if (!isNaN(tryDate)) return `${z(tryDate.getHours())}:${z(tryDate.getMinutes())}`;
+  // "H:MM" / "HH:MM"
+  const m = s.match(/^(\d{1,2}):(\d{2})$/); 
+  if (m) return `${z(m[1])}:${m[2]}`;
+  return "";
+}
+function parseDateLike(s){
+  // "Mon Sep 15 2025 ..." or "2025/09/15" など雑に対応
   const d = new Date(s);
-  if (!isNaN(d)) return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-  const m = String(s||"").match(/^(\d{1,2}):(\d{2})$/);
-  if (m) return `${String(m[1]).padStart(2,"0")}:${m[2]}`;
-  return String(s||"");
+  return isNaN(d) ? null : d;
 }
-function escapeHtml(s){
-  return String(s||"")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;").replace(/"/g,"&quot;")
-    .replace(/'/g,"&#39;");
+function todayISO(){
+  const d = new Date();
+  return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
 }
-  
+function esc(s){ return encodeURIComponent(String(s||"")); }
+
+/* Google Calendar 追加URLを生成（開始・終了が必要） */
+const DFLT_MIN = { "発表":90, "練習":150, "その他":60 };
+function toDatesParam(ymdStr, hmStr, kind){
+  // ymdStr: "yyyy/MM/dd", hmStr: "HH:mm" or ""
+  const m = String(ymdStr||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (!m) return "";
+  const H = hmStr ? Number(hmStr.split(":")[0]) : 0;
+  const M = hmStr ? Number(hmStr.split(":")[1]) : 0;
+  const st = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), H, M, 0);
+  const mins = DFLT_MIN[kind] || 60;
+  const ed = new Date(st.getTime() + mins*60000);
+  const fmt = (d)=>{
+    return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}T${z(d.getHours())}${z(d.getMinutes())}00`;
+  };
+  return `${fmt(st)}/${fmt(ed)}`;
+}
+function makeGoogleCalUrl(title, ymd, hm, place, kind, memo){
+  const base = "https://calendar.google.com/calendar/render?action=TEMPLATE";
+  const dates = toDatesParam(ymd, hm, kind);
+  const params = [
+    `text=${esc(title)}`,
+    dates ? `dates=${dates}` : "",
+    place ? `location=${esc(place)}` : "",
+    memo  ? `details=${esc(memo)}` : "",
+    `ctz=${esc("Asia/Tokyo")}`
+  ].filter(Boolean).join("&");
+  return `${base}&${params}`;
+}
+
 /* ===== API ===== */
-async function api(path){
-  const r = await fetch(API_ENDPOINT + path, { cache:"no-store" });
-  return r.json();
-}
-
-/* ===== データ読み直し（HOME） ===== */
-async function refreshData(){
-  $("#eventsBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
-  $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
-  $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
-  $("#btnEditNames").style.display = "none";
-
-  // イベント（Y/S 両方, initialAt/isNew 付き）
-  const ev = await api("?events=1");
-  state.events = (ev.status==="ok" && Array.isArray(ev.events)) ? ev.events : [];
-
-  // 会員
-  const w = await api(`?whoami=1&id=${encodeURIComponent(state.lineId)}`);
-  state.members = (w.status==="ok" ? (w.members||[]) : []);
-
-  // 回答（高速化：一括取得）
-  state.answers = {};
-  try {
-    const ids = state.events.map(ev => ev.eventId);
-    const res = await api(`?getAttendanceAll=1&lineId=${encodeURIComponent(state.lineId)}&eventIds=${encodeURIComponent(JSON.stringify(ids))}`);
-    if (res.status === "ok" && res.map) {
-      state.answers = res.map; // { eventId: [rows...] }
-    } else {
-      // フォールバック（サーバ未対応時）：並列取得（従来の逐次より速い）
-      const results = await Promise.all(state.events.map(e => 
-        api(`?getAttendance=1&eventId=${encodeURIComponent(e.eventId)}&lineId=${encodeURIComponent(state.lineId)}`)
-          .catch(_=>({status:"error"}))
-      ));
-      results.forEach((a, i) => {
-        const evId = state.events[i].eventId;
-        state.answers[evId] = (a && a.status==="ok") ? (a.rows||[]) : [];
-      });
-    }
-  } catch(err){
-    console.warn("getAttendanceAll failed, fallback:", err);
-    // 失敗時フォールバック（並列）
-    const results = await Promise.all(state.events.map(e => 
-      api(`?getAttendance=1&eventId=${encodeURIComponent(e.eventId)}&lineId=${encodeURIComponent(state.lineId)}`)
-        .catch(_=>({status:"error"}))
-    ));
-    results.forEach((a, i) => {
-      const evId = state.events[i].eventId;
-      state.answers[evId] = (a && a.status==="ok") ? (a.rows||[]) : [];
-    });
-  }
-
-  renderHome();
-}
+async function api(path){ const r = await fetch(API_ENDPOINT + path); return r.json(); }
 
 /* ===== 初期化 ===== */
 async function init(){
@@ -306,34 +289,21 @@ async function init(){
     $("#hello").textContent = state.name ? `こんにちは、${state.name} さん` : "";
 
     // ボタン
-    $("#btnReload").onclick = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
-    $("#btnPrimary").onclick = onPrimary;
-    $("#btnEditNames").onclick = onEditNames;
-    $("#btnBackFromForm").onclick = ()=> show("#view-home");
-    $("#btnBackFromReg").onclick  = ()=> show("#view-home");
-    $("#btnSubmit").onclick = onSubmit;
+    $("#btnReload").onclick      = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
+    $("#btnPrimary").onclick     = onPrimary;
+    $("#btnEditNames").onclick   = onEditNames;
+    $("#btnBackFromForm").onclick= ()=> show("#view-home");
+    $("#btnBackFromReg").onclick = ()=> show("#view-home");
+    $("#btnSubmit").onclick      = onSubmit;
 
-    // 今後の予定
-    $("#btnSchedules").onclick = ()=>{
-      show("#view-schedules");
-      initSchedulesView();
-    };
+    $("#btnAddPerf").onclick     = ()=> addPerformerField("");
+    $("#btnRegister").onclick    = onRegister;
+
+    $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); renderSchedules(true); };
     $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
-    $("#btnFetchSchedules").onclick = fetchSchedules;
+    $("#btnFetchSchedules").onclick    = ()=> renderSchedules(false);
 
-    // フィルタの初期値
-    $("#selDays").value = String(state.schDays);
-    $("#selKind").value = state.schKind;
-    $("#selDays").onchange = ()=>{ state.schDays = Number($("#selDays").value||60); };
-    $("#selKind").onchange = ()=>{ state.schKind = $("#selKind").value||""; };
-
-    // 初回登録UIのボタン
-    $("#btnAddPerf").onclick = ()=> addPerformerField("");
-    $("#btnRegister").onclick = onRegister;
-
-    // 演奏者1行目を用意（初回のみ）
     resetRegisterForm();
-
     await refreshData();
 
   }catch(err){
@@ -341,27 +311,58 @@ async function init(){
   }
 }
 
-/* ===== HOME 描画 ===== */
+/* ===== データ読み直し（高速化版：getAttendanceAll） ===== */
+async function refreshData(){
+  $("#eventsBox").innerHTML  = `読み込み中… <span class="spinner"></span>`;
+  $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
+  $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
+  $("#btnEditNames").style.display = "none";
+
+  // イベント（Y/S 両方）
+  const ev = await api("?events=1");
+  state.events = (ev.status==="ok" && Array.isArray(ev.events)) ? ev.events : [];
+
+  // 会員（Members）
+  const w = await api(`?whoami=1&id=${esc(state.lineId)}`);
+  state.members = (w.status==="ok" ? (w.members||[]) : []);
+
+  // 既存回答（まとめ取得）
+  state.answers = {};
+  if (state.events.length > 0){
+    const ids = state.events.map(e=>e.eventId);
+    const r = await api(`?getAttendanceAll=1&lineId=${esc(state.lineId)}&eventIds=${esc(JSON.stringify(ids))}`);
+    if (r.status === "ok" && r.map) state.answers = r.map;
+  }
+
+  renderHome();
+}
+
+/* ===== HOME描画 ===== */
 function renderHome(){
+  // 現在配信中の公演（New バッジ・締切表示）
   if (!state.events.length){
     $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
     $("#eventsBox").innerHTML = state.events.map(e=>{
+      const d = parseDateLike(e.date);
+      const dateDisp = ymdDow(d);
+      const timeDisp = hmFromTimeCell(e.time);
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
-      const newBadge = e.isNew ? `<span class="badge">NEW</span>` : "";
+      const badge = e.isNew ? `<span class="badge">NEW</span>` : "";
       return `<div class="card" style="margin:8px 0">
-        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr} ${newBadge}</div>
-        <div>場所：${e.place||""}</div>
+        <div><b>${dateDisp} ${timeDisp}</b> @ ${e.place||""} ${badge}</div>
+        <div class="small muted">${deadlineStr}</div>
       </div>`;
     }).join("");
   }
 
-  // 登録状況＋ボタン文言
+  // ボタンの切り替え
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
   $("#btnEditNames").style.display = hasMembers ? "" : "none";
 
+  // あなたの登録状況（イベント別にサマリ）
   if (!hasMembers){
     $("#answersBox").innerHTML = `
       <div>まだ「初回登録」が済んでいません。</div>
@@ -369,19 +370,34 @@ function renderHome(){
   } else {
     let html = "";
     for (const e of state.events){
-      const ans = state.answers[e.eventId] || [];
-      if (!ans.length){
-        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${e.place}】</div><div>まだ回答がありません</div></div>`;
-      } else {
-        html += `<div class="card"><div class="muted">【${formatYmdDow(e.date)} ${formatHm(e.time)} @${e.place}】</div>`;
-        ans.forEach(r=>{
-          html += `<div class="row" style="justify-content:space-between;">
-            <span class="pill">${r.performerName}</span>
-            <span>${r.attend||""}${r.comment?`（${r.comment}）`:""}</span>
-          </div>`;
-        });
-        html += `</div>`;
-      }
+      const ans = state.answers[e.eventId] || []; // [{performerName,attend,comment,...}]
+      const perfs = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
+      const map = {}; ans.forEach(r => { map[r.performerName] = r; });
+
+      const d = parseDateLike(e.date);
+      const dateDisp = ymdDow(d);
+      const timeDisp = hmFromTimeCell(e.time);
+
+      let rows = perfs.map(name=>{
+        const a = map[name];
+        let cls="stat-na", label="未回答";
+        if (a && a.attend){
+          if (a.attend==="参加") { cls="stat-ok"; label="参加"; }
+          else if (a.attend==="欠席"){ cls="stat-ng"; label="欠席"; }
+          else if (a.attend==="未定"){ cls="stat-pd"; label="未定"; }
+        }
+        return `<div class="row" style="justify-content:space-between;">
+          <span class="pill">${name}</span>
+          <span class="pill sm ${cls}">${label}</span>
+        </div>`;
+      }).join("");
+
+      if (!rows) rows = `<div class="muted">演奏者が未登録です（初回登録をしてください）</div>`;
+
+      html += `<div class="card">
+        <div class="muted">【${dateDisp} ${timeDisp} @${e.place||""}】${e.isNew?` <span class="badge">NEW</span>`:""}</div>
+        ${rows}
+      </div>`;
     }
     if (!html) html = `<div class="muted">配信中の公演がありません</div>`;
     $("#answersBox").innerHTML = html;
@@ -403,7 +419,6 @@ function onPrimary(){
     show("#view-form");
   }
 }
-
 function onEditNames(){
   registerMode = "edit";
   buildRegisterFormFromMembers();
@@ -412,70 +427,55 @@ function onEditNames(){
   show("#view-register");
 }
 
-/* ===== 出欠フォーム構築（未定予定日UIは廃止） ===== */
-function renderFormHeaderSummary(){
-  const box = $("#formEventsBox");
-
+/* ===== 出欠フォーム構築（ヘッダ簡易サマリ＋入力欄） ===== */
+function buildFormView(){
+  // ヘッダ：イベント簡易サマリ（HOMEの「あなたの登録状況」と同等）
   if (!state.events.length){
-    box.innerHTML = `<span>現在配信中の公演はありません</span>`;
-    return;
+    $("#formEventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
+  } else {
+    const headerHtml = state.events.map(e=>{
+      const d = parseDateLike(e.date);
+      const dateDisp = ymdDow(d);
+      const timeDisp = hmFromTimeCell(e.time);
+      const ans = state.answers[e.eventId] || [];
+      const perfs = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
+      const map = {}; ans.forEach(r => { map[r.performerName] = r; });
+      const rows = perfs.map(name=>{
+        const a = map[name];
+        let cls="stat-na", label="未回答";
+        if (a && a.attend){
+          if (a.attend==="参加") { cls="stat-ok"; label="参加"; }
+          else if (a.attend==="欠席"){ cls="stat-ng"; label="欠席"; }
+          else if (a.attend==="未定"){ cls="stat-pd"; label="未定"; }
+        }
+        return `<span class="pill sm ${cls}">${name}:${label}</span>`;
+      }).join(" ");
+      return `<div class="card" style="margin:8px 0">
+        <div><b>${dateDisp} ${timeDisp}</b> @ ${e.place||""} ${e.isNew?`<span class="badge">NEW</span>`:""}</div>
+        <div class="small muted">${e.deadline?`締切：${e.deadline}`:""}</div>
+        <div style="margin-top:6px;">${rows||""}</div>
+      </div>`;
+    }).join("");
+    $("#formEventsBox").innerHTML = headerHtml;
   }
 
-  const html = state.events.map(e=>{
-    const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
-    const newBadge = e.isNew ? `<span class="badge">NEW</span>` : "";
-    const place = e.place || "";
-    const dateStr = `${formatYmdDow(e.date)} ${formatHm(e.time)}`;
-
-    // この入力者の演奏者一覧
-    const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
-
-    // 既存回答のマップ
-    const ans = state.answers[e.eventId] || [];
-    const ansMap = new Map(ans.map(r => [r.performerName, r.attend])); // name -> attend
-
-    // 集計とピル
-    let cOK=0,cNG=0,cPD=0,cNA=0;
-    const pills = performers.map(name=>{
-      const st = ansMap.get(name) || "未回答";
-      let cls = "stat-na";
-      if (st==="参加") { cls="stat-ok"; cOK++; }
-      else if (st==="欠席") { cls="stat-ng"; cNG++; }
-      else if (st==="未定") { cls="stat-pd"; cPD++; }
-      else { cNA++; }
-      return `<span class="pill sm ${cls}">${escapeHtml(name)}：${st}</span>`;
-    }).join(" ");
-
-    const summary = `参加${cOK} / 欠席${cNG} / 未定${cPD} / 未回答${cNA}`;
-
-    return `
-      <div class="card" style="margin:8px 0">
-        <div><strong>${dateStr}</strong> @${escapeHtml(place)} ${deadlineStr} ${newBadge}</div>
-        <div class="small muted" style="margin-top:4px;">${summary}</div>
-        ${performers.length ? `<div class="row" style="margin-top:6px; gap:6px;">${pills}</div>` : `<div class="small muted" style="margin-top:6px;">（演奏者が未登録です）</div>`}
-      </div>
-    `;
-  }).join("");
-
-  box.innerHTML = html;
-}
-  
-function buildFormView(){
-  // ← ヘッダー部分：簡易版の登録状況サマリを表示
-  renderFormHeaderSummary();
-
+  // 入力欄：各イベント×演奏者
   const box = $("#formFields");
   box.innerHTML = "";
+  if (!state.events.length) return;
 
   for (const e of state.events){
     const current = state.answers[e.eventId] || [];
     const map = {}; current.forEach(r => map[r.performerName] = r);
-
     const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
+
+    const d = parseDateLike(e.date);
+    const dateDisp = ymdDow(d);
+    const timeDisp = hmFromTimeCell(e.time);
 
     const card = document.createElement("div");
     card.className = "card";
-    card.innerHTML = `<div class="sectionTitle">【${formatYmdDow(e.date)} ${formatHm(e.time)}】</div>`;
+    card.innerHTML = `<div class="sectionTitle">【${dateDisp} ${timeDisp}】@${e.place||""}</div>`;
 
     performers.forEach((name, idx)=>{
       const row = map[name] || {};
@@ -495,11 +495,6 @@ function buildFormView(){
 
           <label for="${idBase}_com">コメント（任意・100文字まで）</label>
           <input type="text" id="${idBase}_com" value="${row.comment||""}" maxlength="100" placeholder="例：家族の都合で検討中 など">
-
-          <div class="small muted" style="margin-top:6px;">
-            ※「未定」を選んだ場合、後日わかり次第「参加」または「欠席」に変更してください。<br>
-            ※ 締切7日前に1回だけリマインド通知が送られます。
-          </div>
         </div>
       `;
       card.insertAdjacentHTML("beforeend", html);
@@ -509,7 +504,7 @@ function buildFormView(){
   }
 }
 
-/* ===== 出欠送信 ===== */
+/* ===== 出欠送信（submitBulk） ===== */
 async function onSubmit(){
   if (state.submitting) return;
   state.submitting = true;
@@ -527,16 +522,16 @@ async function onSubmit(){
         const sel = document.getElementById(`${idBase}_att`);
         if (!sel) return;
         const attend = sel.value;
+
         const comEl  = document.getElementById(`${idBase}_com`);
-        const comment = (comEl?.value||"").trim();
+        const comment = (comEl?.value || "").trim();
 
         if (!attend) return; // 未選択は送信しない
 
         const key = `${e.eventId}||${name}`;
         if (seen.has(key)) return; seen.add(key);
 
-        // pendingDate は廃止（空で送信）
-        payloads.push({ eventId:e.eventId, performerName:name, attend, pendingDate:"", comment });
+        payloads.push({ eventId:e.eventId, performerName:name, attend, comment });
       });
     }
 
@@ -545,11 +540,12 @@ async function onSubmit(){
     const grouped = {};
     for (const p of payloads){
       if (!grouped[p.eventId]) grouped[p.eventId] = [];
-      grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, pendingDate:p.pendingDate, comment:p.comment });
+      grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, comment:p.comment });
     }
 
+    // まとめ送信
     for (const [eventId, list] of Object.entries(grouped)){
-      const url = `${API_ENDPOINT}?submitBulk=1&eventId=${encodeURIComponent(eventId)}&lineId=${encodeURIComponent(state.lineId)}&bulk=${encodeURIComponent(JSON.stringify(list))}`;
+      const url = `${API_ENDPOINT}?submitBulk=1&eventId=${esc(eventId)}&lineId=${esc(state.lineId)}&bulk=${esc(JSON.stringify(list))}`;
       const r = await fetch(url); const j = await r.json();
       if (j.status !== "ok") throw new Error(`送信失敗（${eventId}）: ${j.message||"unknown"}`);
     }
@@ -569,8 +565,6 @@ async function onSubmit(){
 }
 
 /* ===== 初回登録ビュー ===== */
-let registerMode = "create"; // "create" | "edit"
-
 function resetRegisterForm(){
   $("#regInputName").value = state.name || "";
   $("#perfList").innerHTML = "";
@@ -619,9 +613,9 @@ async function onRegister(){
 
     let url = "";
     if (registerMode === "edit") {
-      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}&purge=0`;
+      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list=${esc(JSON.stringify(uniq))}&purge=0`;
     } else {
-      url = `${API_ENDPOINT}?registerBulk=1&lineId=${encodeURIComponent(state.lineId)}&inputName=${encodeURIComponent(inputName)}&list=${encodeURIComponent(JSON.stringify(uniq))}`;
+      url = `${API_ENDPOINT}?registerBulk=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list=${esc(JSON.stringify(uniq))}`;
     }
 
     const r = await fetch(url); const j = await r.json();
@@ -641,48 +635,79 @@ async function onRegister(){
 }
 
 /* ===== 今後の予定（Schedules） ===== */
-function initSchedulesView(){
-  // 現在のフィルタで読み込み
-  $("#schedulesBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
-  fetchSchedules();
-}
-async function fetchSchedules(){
+async function renderSchedules(initial=false){
+  const box = $("#schedulesBox");
+  box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+
   try{
-    $("#schedulesBox").innerHTML = `取得中… <span class="spinner"></span>`;
-    const q = new URLSearchParams();
-    q.set("schedules","1");
-    q.set("days", String(state.schDays||60));
-    if (state.schKind) q.set("kind", state.schKind);
+    const days = Number($("#selDays").value || 60);
+    const kind = $("#selKind").value || "";
 
-    const res = await api("?" + q.toString());
-    state.schedules = (res.status==="ok" && Array.isArray(res.schedules)) ? res.schedules : [];
+    const url = kind
+      ? `?schedules=1&days=${esc(days)}&kind=${esc(kind)}`
+      : `?schedules=1&days=${esc(days)}`;
 
-    renderSchedules();
-  }catch(err){
-    $("#schedulesBox").innerHTML = `<span class="err">取得に失敗しました: ${err.message||err}</span>`;
-  }
-}
-function renderSchedules(){
-  if (!state.schedules.length){
-    $("#schedulesBox").innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
-    return;
-  }
-  const html = state.schedules.map(s => {
-    const timeStr = s.time ? s.time : "";
-    const memoStr = s.memo ? `<div class="small muted">${s.memo}</div>` : "";
-    // s.id は今後のICSボタン用に保持（今回は表示しない）
-    return `<div class="card" data-id="${s.id}">
-      <div class="row" style="justify-content:space-between; align-items:flex-start;">
-        <div>
-          <div><strong>${s.date}</strong> ${timeStr?`<span class="muted">${timeStr}</span>`:""}</div>
-          <div>${s.title || ""}</div>
-          <div class="small muted">${s.place || ""}（${s.kind || ""}）</div>
-          ${memoStr}
+    const r = await api(url);
+    if (r.status !== "ok" || !Array.isArray(r.schedules)) {
+      box.innerHTML = `<span class="err">取得に失敗しました</span>`;
+      return;
+    }
+    state.schedules = r.schedules;
+
+    if (!state.schedules.length){
+      box.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+      return;
+    }
+
+    // ICS購読リンク
+    const feedUrl = `${API_ENDPOINT}?icsFeed=1`;
+    let html = `<div class="small muted" style="margin-bottom:8px;">
+      ・各予定から「Googleカレンダー」/「iOS(ICS)」に追加できます。購読（自動反映）は下のリンクから登録してください。
+    </div>`;
+
+    html += state.schedules.map(it=>{
+      // it: { id, date, time, title, place, kind, memo }
+      const ymd = (it.date || "").replace(/（.）/,"").trim().slice(0,10); // "yyyy/MM/dd"
+      const gcal = makeGoogleCalUrl(it.title, ymd, it.time||"", it.place, it.kind, it.memo||"");
+      const ics  = `${API_ENDPOINT}?ics=1&id=${esc(it.id)}`;
+
+      return `<div class="card">
+        <div><b>${it.date} ${it.time||""}</b> @ ${it.place||""}</div>
+        <div class="small muted">${it.kind||""} ${it.title||""}</div>
+        ${it.memo?`<div class="small">${it.memo}</div>`:""}
+        <div class="row" style="margin-top:8px;">
+          <button class="ghost" onclick="window.open('${gcal}','_blank')">Googleカレンダー</button>
+          <button class="ghost" onclick="window.open('${ics}','_blank')">iOS/ICS</button>
+        </div>
+      </div>`;
+    }).join("");
+
+    html += `
+      <div class="card" style="margin-top:12px;">
+        <div class="sectionTitle" style="margin:0 0 8px;">購読（自動反映）</div>
+        <div class="small">以下のURLをカレンダーアプリの「カレンダーを購読」等の項目に貼り付けてください。</div>
+        <div class="row" style="margin-top:6px; gap:8px; flex-wrap:wrap;">
+          <input type="text" id="icsFeedUrl" value="${feedUrl}" style="flex:1; min-width:240px;" readonly>
+          <button class="ghost" onclick="copyIcsFeed()">コピー</button>
+          <button class="ghost" onclick="window.open('${feedUrl}','_blank')">開く</button>
+        </div>
+        <div class="small muted" style="margin-top:6px;">
+          ※ Googleカレンダーに購読を追加する場合は、Googleカレンダーの「他のカレンダー」→「URL で追加」から登録してください。
         </div>
       </div>
-    </div>`;
-  }).join("");
-  $("#schedulesBox").innerHTML = html;
+    `;
+
+    box.innerHTML = html;
+
+  }catch(err){
+    box.innerHTML = `<span class="err">エラー: ${err.message||err}</span>`;
+  }
+}
+function copyIcsFeed(){
+  const ipt = $("#icsFeedUrl");
+  ipt.select();
+  document.execCommand("copy");
+  alert("購読URLをコピーしました");
 }
 
 /* ===== 起動 ===== */
