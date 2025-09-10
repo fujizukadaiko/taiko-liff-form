@@ -169,7 +169,7 @@
 /* ===== 設定 ===== */
 const FRONT_VERSION = "Front v0.7";
 const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxWAP9Zoa-8qMoIHuHgu27cj9Xyti5L8Y-w-Ai2_6VfTVpzegNq9V51SKah6jxSnvGT_A/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbydybS57DkwnQ0g1isbDxMfb_qEahBwgD87mhlhaenZ04eFV27-YZcn3M3j3HVbkEqRdA/exec";
 
 /* ===== 状態 ===== */
 let state = {
@@ -226,11 +226,35 @@ async function refreshData(){
   const w = await api(`?whoami=1&id=${encodeURIComponent(state.lineId)}`);
   state.members = (w.status==="ok" ? (w.members||[]) : []);
 
-  // 回答
+  // 回答（高速化：一括取得）
   state.answers = {};
-  for (const e of state.events){
-    const a = await api(`?getAttendance=1&eventId=${encodeURIComponent(e.eventId)}&lineId=${encodeURIComponent(state.lineId)}`);
-    state.answers[e.eventId] = (a.status==="ok" ? (a.rows||[]) : []);
+  try {
+    const ids = state.events.map(ev => ev.eventId);
+    const res = await api(`?getAttendanceAll=1&lineId=${encodeURIComponent(state.lineId)}&eventIds=${encodeURIComponent(JSON.stringify(ids))}`);
+    if (res.status === "ok" && res.map) {
+      state.answers = res.map; // { eventId: [rows...] }
+    } else {
+      // フォールバック（サーバ未対応時）：並列取得（従来の逐次より速い）
+      const results = await Promise.all(state.events.map(e => 
+        api(`?getAttendance=1&eventId=${encodeURIComponent(e.eventId)}&lineId=${encodeURIComponent(state.lineId)}`)
+          .catch(_=>({status:"error"}))
+      ));
+      results.forEach((a, i) => {
+        const evId = state.events[i].eventId;
+        state.answers[evId] = (a && a.status==="ok") ? (a.rows||[]) : [];
+      });
+    }
+  } catch(err){
+    console.warn("getAttendanceAll failed, fallback:", err);
+    // 失敗時フォールバック（並列）
+    const results = await Promise.all(state.events.map(e => 
+      api(`?getAttendance=1&eventId=${encodeURIComponent(e.eventId)}&lineId=${encodeURIComponent(state.lineId)}`)
+        .catch(_=>({status:"error"}))
+    ));
+    results.forEach((a, i) => {
+      const evId = state.events[i].eventId;
+      state.answers[evId] = (a && a.status==="ok") ? (a.rows||[]) : [];
+    });
   }
 
   renderHome();
