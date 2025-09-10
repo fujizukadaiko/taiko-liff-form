@@ -44,6 +44,25 @@
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
     .listEmpty{ color:#888; font-size:14px; }
+
+    /* NEW バッジ（既に入っていれば不要） */
+    .badge{
+      display:inline-block;
+      margin-left:6px;
+      padding:2px 6px;
+      font-size:12px;
+      color:#fff;
+      background:#e53935;
+      border-radius:999px;
+      vertical-align:middle;
+    }
+    
+    /* 小さめのピルと状態色 */
+    .pill.sm { font-size:12px; padding:2px 8px; }
+    .stat-ok  { background:#e8f8f3; border:1px solid #cdeee4; color:#0a7; }   /* 参加 */
+    .stat-ng  { background:#fdeaea; border:1px solid #f6cccc; color:#c33; }   /* 欠席 */
+    .stat-pd  { background:#fff7d6; border:1px solid #f3d27a; color:#7a5b00;} /* 未定 */
+    .stat-na  { background:#f5f5f5; border:1px solid var(--c-border); color:#666;} /* 未回答 */
   </style>
 </head>
 <body>
@@ -204,7 +223,13 @@ function formatHm(s){
   if (m) return `${String(m[1]).padStart(2,"0")}:${m[2]}`;
   return String(s||"");
 }
-
+function escapeHtml(s){
+  return String(s||"")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;").replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+}
+  
 /* ===== API ===== */
 async function api(path){
   const r = await fetch(API_ENDPOINT + path, { cache:"no-store" });
@@ -388,19 +413,56 @@ function onEditNames(){
 }
 
 /* ===== 出欠フォーム構築（未定予定日UIは廃止） ===== */
-function buildFormView(){
+function renderFormHeaderSummary(){
+  const box = $("#formEventsBox");
+
   if (!state.events.length){
-    $("#formEventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
-  } else {
-    $("#formEventsBox").innerHTML = state.events.map(e=>{
-      const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
-      const newBadge = e.isNew ? `<span class="badge">NEW</span>` : "";
-      return `<div class="card">
-        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr} ${newBadge}</div>
-        <div>場所：${e.place||""}</div>
-      </div>`;
-    }).join("");
+    box.innerHTML = `<span>現在配信中の公演はありません</span>`;
+    return;
   }
+
+  const html = state.events.map(e=>{
+    const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
+    const newBadge = e.isNew ? `<span class="badge">NEW</span>` : "";
+    const place = e.place || "";
+    const dateStr = `${formatYmdDow(e.date)} ${formatHm(e.time)}`;
+
+    // この入力者の演奏者一覧
+    const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
+
+    // 既存回答のマップ
+    const ans = state.answers[e.eventId] || [];
+    const ansMap = new Map(ans.map(r => [r.performerName, r.attend])); // name -> attend
+
+    // 集計とピル
+    let cOK=0,cNG=0,cPD=0,cNA=0;
+    const pills = performers.map(name=>{
+      const st = ansMap.get(name) || "未回答";
+      let cls = "stat-na";
+      if (st==="参加") { cls="stat-ok"; cOK++; }
+      else if (st==="欠席") { cls="stat-ng"; cNG++; }
+      else if (st==="未定") { cls="stat-pd"; cPD++; }
+      else { cNA++; }
+      return `<span class="pill sm ${cls}">${escapeHtml(name)}：${st}</span>`;
+    }).join(" ");
+
+    const summary = `参加${cOK} / 欠席${cNG} / 未定${cPD} / 未回答${cNA}`;
+
+    return `
+      <div class="card" style="margin:8px 0">
+        <div><strong>${dateStr}</strong> @${escapeHtml(place)} ${deadlineStr} ${newBadge}</div>
+        <div class="small muted" style="margin-top:4px;">${summary}</div>
+        ${performers.length ? `<div class="row" style="margin-top:6px; gap:6px;">${pills}</div>` : `<div class="small muted" style="margin-top:6px;">（演奏者が未登録です）</div>`}
+      </div>
+    `;
+  }).join("");
+
+  box.innerHTML = html;
+}
+  
+function buildFormView(){
+  // ← ヘッダー部分：簡易版の登録状況サマリを表示
+  renderFormHeaderSummary();
 
   const box = $("#formFields");
   box.innerHTML = "";
