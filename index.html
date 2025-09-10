@@ -9,6 +9,7 @@
     :root{
       --c-primary:#0b74de; --c-bg:#fafafa; --c-border:#e5e5e5;
       --c-text:#222; --c-muted:#666; --c-ok:#0a7; --c-err:#c33;
+      --c-accent:#ff6b6b;
     }
     body{ font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin:0; background:var(--c-bg); color:var(--c-text);}
     header{ padding:14px 16px; font-size:18px; font-weight:700; background:#fff; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between; align-items:center;}
@@ -17,17 +18,20 @@
     .card{ background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; margin:10px 0; }
     .muted{ color:var(--c-muted); font-size:13px; }
     .row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .row-space{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
     button{ appearance:none; border:none; border-radius:10px; padding:10px 14px; background:var(--c-primary); color:#fff; font-size:16px; }
     button.ghost{ background:#f4f4f4; color:#222; border:1px solid var(--c-border); }
+    button.warn{ background:#ffb703; color:#222; }
     button:disabled{ opacity:.6; cursor:not-allowed; }
     .ok{ color:var(--c-ok); }
     .err{ color:var(--c-err); }
     .sectionTitle{ font-weight:700; margin:8px 0; }
     .line{ height:1px; background:var(--c-border); margin:10px 0; }
-    .warn{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
-
+    .warnBox{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
     .pill{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
     .right{ text-align:right; }
+    .badge{ display:inline-block; font-size:12px; padding:2px 6px; background:var(--c-accent); color:#fff; border-radius:999px; margin-left:8px; }
+    .small{ font-size:12px; color:var(--c-muted); }
 
     [data-view]{ display:none; }
     [data-view].show{ display:block; }
@@ -36,15 +40,10 @@
     @keyframes spin{ to{ transform:rotate(360deg); } }
 
     label{ display:block; font-size:14px; margin:6px 0 4px; }
-    input[type="text"], select, textarea{
+    input[type="text"], input[type="date"], select, textarea{
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
-    .small{ font-size:12px; color:var(--c-muted); }
-
-    .newBadge{
-      display:inline-block; margin-left:6px; font-size:11px; color:#d40;
-      background:#ffeaea; border:1px solid #f5bcbc; padding:2px 6px; border-radius:8px;
-    }
+    .listEmpty{ color:#888; font-size:14px; }
   </style>
 </head>
 <body>
@@ -55,7 +54,7 @@
 <main>
 
   <!-- 友だち未追加アラート（任意） -->
-  <div id="friendAlert" class="card warn" style="display:none;">
+  <div id="friendAlert" class="card warnBox" style="display:none;">
     このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
   </div>
 
@@ -76,18 +75,15 @@
     <div class="row" style="margin-top:6px;">
       <button id="btnPrimary">読み込み中...</button>
       <button id="btnEditNames" class="ghost" style="display:none;">氏名を編集する</button>
+      <button id="btnSchedules" class="ghost">今後の予定を見る</button>
       <button id="btnReload" class="ghost">再読み込み</button>
     </div>
     <div id="homeLog" class="muted" style="margin-top:8px;"></div>
-
-    <div class="row" style="margin-top:8px;">
-      <button id="btnSchedules" class="ghost">今後の予定</button>
-    </div>
   </section>
 
   <!-- ===== フォーム（出欠） ===== -->
   <section id="view-form" data-view>
-    <div class="row" style="justify-content:space-between;">
+    <div class="row-space">
       <div class="sectionTitle">出欠入力フォーム</div>
       <button id="btnBackFromForm" class="ghost">トップに戻る</button>
     </div>
@@ -104,7 +100,7 @@
 
   <!-- ===== 初回登録/氏名編集 ===== -->
   <section id="view-register" data-view>
-    <div class="row" style="justify-content:space-between;">
+    <div class="row-space">
       <div class="sectionTitle" id="regTitle">初回登録（入力者 & 演奏者）</div>
       <button id="btnBackFromReg" class="ghost">トップに戻る</button>
     </div>
@@ -114,7 +110,7 @@
       <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
 
       <div class="line"></div>
-      <div class="row" style="justify-content:space-between; align-items:center;">
+      <div class="row-space">
         <div class="sectionTitle" style="margin:0;">演奏者（家族も追加可）</div>
         <button id="btnAddPerf" class="ghost" type="button">＋ 演奏者を追加</button>
       </div>
@@ -130,34 +126,40 @@
 
   <!-- ===== 今後の予定 ===== -->
   <section id="view-schedules" data-view>
-    <div class="row" style="justify-content:space-between;">
+    <div class="row-space">
       <div class="sectionTitle">今後の予定</div>
-      <button id="btnBackFromSch" class="ghost">トップに戻る</button>
+      <button id="btnBackFromSchedules" class="ghost">トップに戻る</button>
     </div>
+
     <div class="card">
-      <div class="row">
+      <div class="row" style="gap:12px;">
         <div>
-          <label for="schDays" class="small">表示期間（日）</label>
-          <select id="schDays">
-            <option value="30">30</option>
-            <option value="60" selected>60</option>
-            <option value="90">90</option>
+          <label for="selDays">表示期間（日数）</label>
+          <select id="selDays">
+            <option value="30">30日</option>
+            <option value="60" selected>60日</option>
+            <option value="90">90日</option>
           </select>
         </div>
         <div>
-          <label for="schKind" class="small">種別</label>
-          <select id="schKind">
-            <option value="">すべて</option>
+          <label for="selKind">種別フィルタ</label>
+          <select id="selKind">
+            <option value="">（すべて）</option>
             <option value="発表">発表</option>
             <option value="練習">練習</option>
             <option value="その他">その他</option>
           </select>
         </div>
         <div style="align-self:flex-end;">
-          <button id="btnSchReload" class="ghost">再取得</button>
+          <button id="btnFetchSchedules" class="ghost">再取得</button>
         </div>
       </div>
-      <div id="schBox" class="muted" style="margin-top:10px;">取得中… <span class="spinner"></span></div>
+      <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
+    </div>
+
+    <div class="small muted">
+      ※ 予定はシート「Schedules（公開=Yes, ステータス=active）」から表示されます。<br>
+      ※ 過去日と期間外の予定は自動的に表示から除外されます。
     </div>
   </section>
 
@@ -165,9 +167,9 @@
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v0.8";
+const FRONT_VERSION = "Front v0.7";
 const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzPXOhJkQzVC3gAhQJP5T9Fsf1syrzhtOMuG1jO27JqJ6EgcmmcCyYQradA4rUawooAmQ/exec";
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxWAP9Zoa-8qMoIHuHgu27cj9Xyti5L8Y-w-Ai2_6VfTVpzegNq9V51SKah6jxSnvGT_A/exec";
 
 /* ===== 状態 ===== */
 let state = {
@@ -175,10 +177,13 @@ let state = {
   name: "",
   members: [],       // [{lineId,inputName,performerName}]
   events:  [],       // [{eventId,date,time,place,deadline,initialAt,isNew}]
-  answers: {},       // { eventId: [{performerName,attend,comment,answeredAt}] }
-  submitting: false
+  answers: {},       // { eventId: [{performerName,attend,comment,answeredAt,...} ] }
+  submitting: false,
+  // schedules view
+  schedules: [],     // [{id,date,time,title,place,kind,memo}]
+  schDays: 60,
+  schKind: ""
 };
-let registerMode = "create";
 
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
@@ -195,26 +200,33 @@ function formatYmdDow(s){
 function formatHm(s){
   const d = new Date(s);
   if (!isNaN(d)) return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-  const m = String(s||"").match(/^(\d{1,2}:\d{2})/);
-  return m ? m[1] : String(s||"");
+  const m = String(s||"").match(/^(\d{1,2}):(\d{2})$/);
+  if (m) return `${String(m[1]).padStart(2,"0")}:${m[2]}`;
+  return String(s||"");
 }
 
 /* ===== API ===== */
-async function api(path){ const r = await fetch(API_ENDPOINT + path); return r.json(); }
+async function api(path){
+  const r = await fetch(API_ENDPOINT + path, { cache:"no-store" });
+  return r.json();
+}
 
-/* ===== データ読み直し ===== */
+/* ===== データ読み直し（HOME） ===== */
 async function refreshData(){
   $("#eventsBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
   $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
   $("#btnEditNames").style.display = "none";
 
+  // イベント（Y/S 両方, initialAt/isNew 付き）
   const ev = await api("?events=1");
   state.events = (ev.status==="ok" && Array.isArray(ev.events)) ? ev.events : [];
 
+  // 会員
   const w = await api(`?whoami=1&id=${encodeURIComponent(state.lineId)}`);
   state.members = (w.status==="ok" ? (w.members||[]) : []);
 
+  // 回答
   state.answers = {};
   for (const e of state.events){
     const a = await api(`?getAttendance=1&eventId=${encodeURIComponent(e.eventId)}&lineId=${encodeURIComponent(state.lineId)}`);
@@ -233,7 +245,10 @@ async function init(){
     if (!liff.isLoggedIn()){ liff.login(); return; }
 
     if (liff.getFriendship){
-      try{ const fr = await liff.getFriendship(); if (fr && fr.friendFlag===false) $("#friendAlert").style.display=""; }catch(_){}
+      try{
+        const fr = await liff.getFriendship();
+        if (fr && fr.friendFlag===false) $("#friendAlert").style.display="";
+      }catch(_){}
     }
 
     const idt = liff.getDecodedIDToken();
@@ -241,6 +256,7 @@ async function init(){
     state.name   = idt && idt.name ? idt.name : "";
     $("#hello").textContent = state.name ? `こんにちは、${state.name} さん` : "";
 
+    // ボタン
     $("#btnReload").onclick = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
     $("#btnPrimary").onclick = onPrimary;
     $("#btnEditNames").onclick = onEditNames;
@@ -249,13 +265,24 @@ async function init(){
     $("#btnSubmit").onclick = onSubmit;
 
     // 今後の予定
-    $("#btnSchedules").onclick = ()=>{ show("#view-schedules"); loadSchedules(); };
-    $("#btnBackFromSch").onclick = ()=> show("#view-home");
-    $("#btnSchReload").onclick = loadSchedules;
+    $("#btnSchedules").onclick = ()=>{
+      show("#view-schedules");
+      initSchedulesView();
+    };
+    $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
+    $("#btnFetchSchedules").onclick = fetchSchedules;
 
-    // 初回登録UI
+    // フィルタの初期値
+    $("#selDays").value = String(state.schDays);
+    $("#selKind").value = state.schKind;
+    $("#selDays").onchange = ()=>{ state.schDays = Number($("#selDays").value||60); };
+    $("#selKind").onchange = ()=>{ state.schKind = $("#selKind").value||""; };
+
+    // 初回登録UIのボタン
     $("#btnAddPerf").onclick = ()=> addPerformerField("");
     $("#btnRegister").onclick = onRegister;
+
+    // 演奏者1行目を用意（初回のみ）
     resetRegisterForm();
 
     await refreshData();
@@ -265,13 +292,14 @@ async function init(){
   }
 }
 
+/* ===== HOME 描画 ===== */
 function renderHome(){
   if (!state.events.length){
     $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
     $("#eventsBox").innerHTML = state.events.map(e=>{
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
-      const newBadge = e.isNew ? `<span class="newBadge">NEW</span>` : "";
+      const newBadge = e.isNew ? `<span class="badge">NEW</span>` : "";
       return `<div class="card" style="margin:8px 0">
         <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr} ${newBadge}</div>
         <div>場所：${e.place||""}</div>
@@ -279,6 +307,7 @@ function renderHome(){
     }).join("");
   }
 
+  // 登録状況＋ボタン文言
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
@@ -299,7 +328,7 @@ function renderHome(){
         ans.forEach(r=>{
           html += `<div class="row" style="justify-content:space-between;">
             <span class="pill">${r.performerName}</span>
-            <span>${r.attend||""}</span>
+            <span>${r.attend||""}${r.comment?`（${r.comment}）`:""}</span>
           </div>`;
         });
         html += `</div>`;
@@ -310,19 +339,22 @@ function renderHome(){
   }
 }
 
-/* ===== メインボタン ===== */
+/* ===== メインボタンの動作 ===== */
 function onPrimary(){
   if (state.members.length === 0){
+    // 初回登録へ
     registerMode = "create";
     resetRegisterForm();
     $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
     $("#btnRegister").textContent = "登録する";
     show("#view-register");
   } else {
+    // 出欠フォームへ
     buildFormView();
     show("#view-form");
   }
 }
+
 function onEditNames(){
   registerMode = "edit";
   buildRegisterFormFromMembers();
@@ -331,15 +363,16 @@ function onEditNames(){
   show("#view-register");
 }
 
-/* ===== 出欠フォーム ===== */
+/* ===== 出欠フォーム構築（未定予定日UIは廃止） ===== */
 function buildFormView(){
   if (!state.events.length){
     $("#formEventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
     $("#formEventsBox").innerHTML = state.events.map(e=>{
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
+      const newBadge = e.isNew ? `<span class="badge">NEW</span>` : "";
       return `<div class="card">
-        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr}</div>
+        <div>日時：${formatYmdDow(e.date)} ${formatHm(e.time)} ${deadlineStr} ${newBadge}</div>
         <div>場所：${e.place||""}</div>
       </div>`;
     }).join("");
@@ -351,6 +384,7 @@ function buildFormView(){
   for (const e of state.events){
     const current = state.answers[e.eventId] || [];
     const map = {}; current.forEach(r => map[r.performerName] = r);
+
     const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
 
     const card = document.createElement("div");
@@ -372,7 +406,14 @@ function buildFormView(){
             <option value="欠席" ${attend==="欠席"?"selected":""}>欠席</option>
             <option value="未定" ${attend==="未定"?"selected":""}>未定</option>
           </select>
-          <div class="small muted">※ 未定の場合は、予定が決まり次第ここから変更してください（締切7日前に1回だけリマインドされます）。</div>
+
+          <label for="${idBase}_com">コメント（任意・100文字まで）</label>
+          <input type="text" id="${idBase}_com" value="${row.comment||""}" maxlength="100" placeholder="例：家族の都合で検討中 など">
+
+          <div class="small muted" style="margin-top:6px;">
+            ※「未定」を選んだ場合、後日わかり次第「参加」または「欠席」に変更してください。<br>
+            ※ 締切7日前に1回だけリマインド通知が送られます。
+          </div>
         </div>
       `;
       card.insertAdjacentHTML("beforeend", html);
@@ -400,12 +441,16 @@ async function onSubmit(){
         const sel = document.getElementById(`${idBase}_att`);
         if (!sel) return;
         const attend = sel.value;
-        if (!attend) return;
+        const comEl  = document.getElementById(`${idBase}_com`);
+        const comment = (comEl?.value||"").trim();
+
+        if (!attend) return; // 未選択は送信しない
 
         const key = `${e.eventId}||${name}`;
         if (seen.has(key)) return; seen.add(key);
 
-        payloads.push({ eventId:e.eventId, performerName:name, attend, comment:"" });
+        // pendingDate は廃止（空で送信）
+        payloads.push({ eventId:e.eventId, performerName:name, attend, pendingDate:"", comment });
       });
     }
 
@@ -414,7 +459,7 @@ async function onSubmit(){
     const grouped = {};
     for (const p of payloads){
       if (!grouped[p.eventId]) grouped[p.eventId] = [];
-      grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, comment:p.comment });
+      grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, pendingDate:p.pendingDate, comment:p.comment });
     }
 
     for (const [eventId, list] of Object.entries(grouped)){
@@ -438,6 +483,8 @@ async function onSubmit(){
 }
 
 /* ===== 初回登録ビュー ===== */
+let registerMode = "create"; // "create" | "edit"
+
 function resetRegisterForm(){
   $("#regInputName").value = state.name || "";
   $("#perfList").innerHTML = "";
@@ -507,31 +554,49 @@ async function onRegister(){
   }
 }
 
-/* ===== 今後の予定 ===== */
-async function loadSchedules(){
-  $("#schBox").innerHTML = `取得中… <span class="spinner"></span>`;
-  const days = Number($("#schDays").value||"60");
-  const kind = $("#schKind").value || "";
-  const q = `?schedules=1&days=${days}${kind?`&kind=${encodeURIComponent(kind)}`:""}`;
+/* ===== 今後の予定（Schedules） ===== */
+function initSchedulesView(){
+  // 現在のフィルタで読み込み
+  $("#schedulesBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
+  fetchSchedules();
+}
+async function fetchSchedules(){
   try{
-    const j = await api(q);
-    if (j.status!=="ok"){ $("#schBox").textContent = "取得に失敗しました"; return; }
-    const list = j.schedules||[];
-    if (!list.length){ $("#schBox").textContent = "該当の予定はありません"; return; }
-    $("#schBox").innerHTML = list.map(it => `
-      <div class="card">
-        <div class="row" style="justify-content:space-between;">
-          <div><b>${it.date}</b> ${it.time?` ${it.time}`:""} </div>
-          <div class="pill">${it.kind||""}</div>
-        </div>
-        <div style="margin-top:4px;">${it.title||""}</div>
-        <div class="muted">${it.place||""}</div>
-        ${it.memo ? `<div class="small muted">${it.memo}</div>` : ""}
-      </div>
-    `).join("");
+    $("#schedulesBox").innerHTML = `取得中… <span class="spinner"></span>`;
+    const q = new URLSearchParams();
+    q.set("schedules","1");
+    q.set("days", String(state.schDays||60));
+    if (state.schKind) q.set("kind", state.schKind);
+
+    const res = await api("?" + q.toString());
+    state.schedules = (res.status==="ok" && Array.isArray(res.schedules)) ? res.schedules : [];
+
+    renderSchedules();
   }catch(err){
-    $("#schBox").textContent = `取得エラー: ${err.message||err}`;
+    $("#schedulesBox").innerHTML = `<span class="err">取得に失敗しました: ${err.message||err}</span>`;
   }
+}
+function renderSchedules(){
+  if (!state.schedules.length){
+    $("#schedulesBox").innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+    return;
+  }
+  const html = state.schedules.map(s => {
+    const timeStr = s.time ? s.time : "";
+    const memoStr = s.memo ? `<div class="small muted">${s.memo}</div>` : "";
+    // s.id は今後のICSボタン用に保持（今回は表示しない）
+    return `<div class="card" data-id="${s.id}">
+      <div class="row" style="justify-content:space-between; align-items:flex-start;">
+        <div>
+          <div><strong>${s.date}</strong> ${timeStr?`<span class="muted">${timeStr}</span>`:""}</div>
+          <div>${s.title || ""}</div>
+          <div class="small muted">${s.place || ""}（${s.kind || ""}）</div>
+          ${memoStr}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  $("#schedulesBox").innerHTML = html;
 }
 
 /* ===== 起動 ===== */
