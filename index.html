@@ -353,7 +353,7 @@
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v1.1.0";
+const FRONT_VERSION = "Front v1.1.1";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzroeIl_JJwQLM2XRsAIDfpCvfFrUmmXSMylAqiJeGeEy7ZLDrz4Hfm9TxnNTtwwDbL8Q/exec";     // ←差し替え
 
@@ -525,12 +525,11 @@ function bindHandlers(){
   $("#btnAdminReset").onclick = ()=> enterAdminCreateMode();
   $("#ad_type").addEventListener("change", adminTypeChangeAdapt);
 
-  // レポート
+  // レポート (管理者)
   $("#btnReportBack").onclick = ()=> show("#view-home");
   $("#btnReportReload").onclick = ()=> reportReload();
-  $("#repSearch").addEventListener("input", renderReport);
+  $("#repEvent").addEventListener("change", renderReport);
   $("#repAttend").addEventListener("change", renderReport);
-  $("#repAccepting").addEventListener("change", renderReport);
 }
 
 /* ===== データ読み直し ===== */
