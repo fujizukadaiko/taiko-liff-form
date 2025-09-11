@@ -46,207 +46,198 @@
        ※ :root は「和風（白藤系）」のパレットを採用
        ※ ここでは Tailwind の @apply は使わない（通常のCSS）
   ========================================================== -->
-  <style>
-    /* =========================================
-       カラーパレット（白藤ベース＋アクセント）
-    ========================================== */
-    :root{
-      /* 白藤系の基調色 */
-      --c-bg:        #f7f5fa;   /* 背景（ごく淡い白藤） */
-      --c-panel:     #ffffff;   /* カード背景 */
-      --c-border:    #e8e2f0;   /* 藤がかった薄い罫線 */
-  
-      /* テキストとアクセント */
-      --c-text:      #202022;
-      --c-muted:     #6b6b6b;
-  
-      /* 藤の主色 */
-      --c-primary:   #7f6aa5;
-      --c-primary-2: #6d5a93;
-      --c-accent:    #a678b0;   /* バッジなど */
-  
-      /* 追加アクセント（ご希望の2色＋濃淡） */
-      --c-acc1:      #d2e5b1;   /* 薄い抹茶／若草系（白藤と相性良） */
-      --c-acc2:      #9ce78f;   /* 明るい若緑 */
-      --c-acc2-dark: #6aa96a;   /* 深い常磐系の緑（ボタン影など） */
-  
-      /* 和紙テクスチャ（!! 直リンクの画像URLに差し替えてください !!）
-         例：PNG/JPG 直URL（CORS可）にする必要があります。 */
-      --c-washi: url('https://beiz.jp/images_S/japanese-paper/japanese-paper_00147.jpg');
-      /* うまく出ないときはブラウザで画像を右クリック→「画像アドレスをコピー」を使い、
-         .png / .jpg のファイル直リンクに貼り替えてください。 */
-    }
-  
-    /* =========================================
-       フォント設定（見出し＝明朝／本文＝ゴシック）
-    ========================================== */
-    body{
-      font-family: "Noto Sans JP", system-ui, -apple-system, Segoe UI, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
-      margin:0; color:var(--c-text);
-      /* 背景をやさしく */
-      background:
-        radial-gradient(1200px 600px at 20% 10%, rgba(127,106,165,.05), transparent 40%),
-        radial-gradient(900px  500px at 80% 60%, rgba(127,106,165,.04), transparent 35%),
-        var(--c-bg);
-      letter-spacing: 0.02em;
-    }
-  
-    /* ヘッダー左側（「公演 出欠フォーム」）を明朝体に */
-    header > div:first-child{
-      font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
-      letter-spacing: 0.03em;
-      font-weight: 700;
-    }
-  
-    /* セクションタイトルはゴシック太字（読みやすさ重視） */
-    .sectionTitle{
-      font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-  
-    /* =========================================
-       カードに“和紙”の質感をオーバーレイ
-    ========================================== */
-    .card{
-      overflow: hidden; /* 角丸からテクスチャをはみ出さないため */
-    }
-    .card::before{
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      background-image: var(--c-washi);
-      background-repeat: repeat;
-      background-size: 700px auto; /* ← 粒の大きさ。600〜900pxで微調整 */
-      opacity: .12;                /* ← 濃さ。0.08〜0.18くらいでお好み調整 */
-      mix-blend-mode: multiply;    /* ← 下地に馴染ませる */
-      border-radius: inherit;
-    }
-  
-    /* =========================================
-       既存コンポーネントの微調整（任意）
-    ========================================== */
-    /* バッジの余白など微調整 */
-    .badge { line-height: 1.2; }
-  
-    /* 小さめのボタンにしたいとき（任意で class 追加できる場合） */
-    .btn--sm { padding: 6px 10px; font-size: 14px; border-radius: 10px; }
-  
-    /* Ghostボタンのアクティブ時（軽く薄く） */
-    button.ghost:active { filter: brightness(1.08); }
-  
-    /* スピナー（既に Tailwind 側で上書き済みだが保険で） */
-    .spinner{ border-top-color: rgb(79 70 229); }
-  </style>
+<!-- 3) 既存のベースCSS（通常CSS：必ず残す） -->
+<style>
+  /* =========================================
+     カラーパレット（白藤ベース＋アクセント）
+  ========================================== */
+  :root{
+    --c-bg:        #f7f5fa;
+    --c-panel:     #ffffff;
+    --c-border:    #e8e2f0;
 
-  <!-- =========================================================
-    4) Tailwind の @apply で既存クラスを“和風リッチ”に
-       ※ 必ず CDN の後に置く
-  ========================================================== -->
-  <script type="text/tailwindcss">
-    @layer components {
-  
-      /* =========================
-         レイアウト＆ベースUI
-      ========================== */
-      header {
-        @apply bg-white border-b border-[color:var(--c-border)] px-4 py-3 flex items-center justify-between;
-      }
-      .card {
-        @apply rounded-xl border p-4 shadow-card;
-        @apply border-[color:var(--c-border)];
-        background-color: var(--c-panel); /* 和紙は下の通常CSSで重ねます */
-        position: relative; /* 和紙オーバーレイ用 */
-      }
-      .sectionTitle { 
-        @apply font-bold text-[17px] text-[color:var(--c-text)];
-      }
-      .sectionTitle::after{
-        content:""; display:block; height:3px; width:72px; margin-top:6px; border-radius:999px;
-        /* 藤 → 白藤 → アクセント緑のグラデ */
-        background: linear-gradient(90deg, var(--c-primary) 0%, #c9b8e6 60%, var(--c-acc1) 100%);
-      }
-      .line { @apply h-px my-3 bg-[color:var(--c-border)]; }
-  
-      /* 入力UI：境界＆フォーカスを藤色に */
-      input[type="text"], input[type="date"], input[type="time"], select, textarea {
-        @apply rounded-lg border px-3 py-2 bg-white text-[15px]
-               border-[color:var(--c-border)]
-               focus:outline-none focus:ring-2 focus:ring-[color:var(--c-primary)]/25;
-      }
-  
-      /* ピル/バッジ/タグ（淡い和トーン） */
-      .pill { 
-        @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm;
-        @apply bg-slate-50 border-[color:var(--c-border)] text-slate-700; 
-      }
-      .pill.sm { @apply text-xs px-2 py-0.5; }
-  
-      .badge { 
-        @apply ml-2 inline-block rounded-full px-2 py-0.5 text-xs text-white;
-        background-image: linear-gradient(to bottom right, var(--c-accent), #8f6aa1);
-      }
-  
-      .tag { 
-        @apply inline-block rounded-full px-2 py-0.5 text-xs border;
-        @apply bg-slate-50 border-[color:var(--c-border)] text-slate-600; 
-      }
-      .tag.open   { @apply text-emerald-700; background: linear-gradient(90deg, #dff6dc, var(--c-acc1)); border-color: #cdeccc; }
-      .tag.closed { @apply text-rose-700;    background: linear-gradient(90deg, #fde7ea, #f7d4d9);       border-color: #f5c6cd; }
-  
-      /* 出欠ステータス（優しい色調） */
-      .stat-ok { @apply bg-emerald-50 border border-emerald-200 text-emerald-700; }
-      .stat-ng { @apply bg-rose-50    border border-rose-200    text-rose-700; }
-      .stat-pd { @apply bg-amber-50   border border-amber-200   text-amber-700; }
-      .stat-na { @apply bg-slate-50   border border-slate-200   text-slate-500; }
-  
-      /* =========================
-         ボタン（“ボタン感”強化）
-      ========================== */
-      button {
-        @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold text-white shadow-md transition;
-        /* 藤のグラデ（軽い艶） */
-        background-image: linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2));
-      }
-      button:hover  { @apply brightness-105; transform: translateY(-0.5px); }
-      button:active { filter: brightness(1.2); transform: translateY(0); } /* ← タップで“薄く明るく” */
-      button:disabled { @apply opacity-60 cursor-not-allowed; }
-  
-      /* ゴーストボタン（余白感は保つ） */
-      button.ghost {
-        @apply text-slate-800 bg-white border border-[color:var(--c-border)] shadow-sm;
-      }
-      button.ghost:hover { @apply bg-slate-50; }
-  
-      /* 警告（和の黄） */
-      button.warn  { 
-        @apply text-slate-900; 
-        background-image: linear-gradient(to bottom right, #ffd36b, #ffb703);
-      }
-  
-      /* 管理メニューなど“わかりやすく”アクセント色ボタンへ小さめに */
-      #btnAdminMenuSchedules, 
-      #btnAdminMenuReport {
-        font-size: 14px; /* 小さめ */
-        color: #0f1a0f;
-        background-image: linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark));
-        border: 1px solid color-mix(in srgb, var(--c-acc2-dark), #000 10%);
-      }
-      #btnAdminMenuSchedules:hover, 
-      #btnAdminMenuReport:hover {
-        filter: brightness(1.05);
-      }
-      #btnAdminMenuSchedules:active, 
-      #btnAdminMenuReport:active {
-        filter: brightness(1.2);
-      }
-  
-      /* スピナー（藤系に寄せる） */
-      .spinner { border-top-color: rgb(79 70 229); } /* indigo-600 相当 */
-    }
-  </script>
+    --c-text:      #202022;
+    --c-muted:     #6b6b6b;
 
+    --c-primary:   #7f6aa5;
+    --c-primary-2: #6d5a93;
+    --c-accent:    #a678b0;
+
+    /* 追加アクセント */
+    --c-acc1:      #d2e5b1;
+    --c-acc2:      #9ce78f;
+    --c-acc2-dark: #6aa96a;
+
+    /* 和紙テクスチャ（ダイレクト画像） */
+    --c-washi: url('https://beiz.jp/images_S/japanese-paper/japanese-paper_00147.jpg');
+  }
+
+  /* =========================================
+     フォント＆背景（通常CSS）
+  ========================================== */
+  body{
+    font-family: "Noto Sans JP", system-ui, -apple-system, Segoe UI, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+    margin:0; color:var(--c-text);
+    background:
+      radial-gradient(1200px 600px at 20% 10%, rgba(127,106,165,.05), transparent 40%),
+      radial-gradient(900px  500px at 80% 60%, rgba(127,106,165,.04), transparent 35%),
+      var(--c-bg);
+    letter-spacing: 0.02em;
+  }
+  header > div:first-child{
+    font-family: "Shippori Mincho","Yu Mincho","Hiragino Mincho ProN","MS PMincho",serif;
+    letter-spacing: .03em; font-weight: 700;
+  }
+  .sectionTitle{
+    font-family: "Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+    font-weight: 700; letter-spacing: .02em;
+  }
+
+  /* =========================================
+     フォールバック（Tailwind失敗時でも見た目確保）
+  ========================================== */
+  header{
+    background:#fff; border-bottom:1px solid var(--c-border);
+    padding:14px 16px; display:flex; justify-content:space-between; align-items:center;
+  }
+  header.is-sticky{
+    position: sticky; top:0; z-index:50;
+    backdrop-filter: blur(6px); background: rgba(255,255,255,0.9);
+  }
+  .card{
+    background: var(--c-panel);
+    border:1px solid var(--c-border);
+    border-radius: 12px;
+    padding: 12px; margin:10px 0;
+    position: relative;    /* ← 重要：和紙オーバレイ用 */
+    overflow: hidden;      /* 角丸からはみ出さない */
+  }
+  .card::before{
+    content: ""; position: absolute; inset:0; pointer-events:none;
+    background-image: var(--c-washi);
+    background-repeat: repeat;
+    background-size: 700px auto; /* 600〜900pxで粒度調整 */
+    opacity: .12; mix-blend-mode: multiply; border-radius: inherit;
+  }
+  .line{ height:1px; background:var(--c-border); margin:10px 0; }
+  .badge{ line-height: 1.2; }
+  .btn--sm { padding: 6px 10px; font-size: 14px; border-radius: 10px; }
+  button.ghost:active { filter: brightness(1.08); }
+  .spinner{ border-top-color: rgb(79 70 229); }
+</style>
+
+<!-- 4) Tailwindの上乗せ（JITが効けば“和風リッチ”に） -->
+<script type="text/tailwindcss">
+  @layer components {
+
+    /* =========================
+       レイアウト＆ベースUI
+    ========================== */
+    header {
+      @apply bg-white border-b px-4 py-3 flex items-center justify-between;
+      border-color: var(--c-border);
+    }
+    .card {
+      @apply rounded-xl p-4 shadow-md;
+      background-color: var(--c-panel);
+      border: 1px solid var(--c-border);
+      position: relative; /* 和紙オーバレイ */
+    }
+    .sectionTitle { 
+      @apply font-bold text-[17px];
+      color: var(--c-text);
+    }
+    .sectionTitle::after{
+      content:""; display:block; height:3px; width:72px; margin-top:6px; border-radius:999px;
+      background: linear-gradient(90deg, var(--c-primary) 0%, #c9b8e6 60%, var(--c-acc1) 100%);
+    }
+    .line { @apply my-3; background: var(--c-border); height:1px; }
+
+    /* 入力UI：境界＆フォーカスを藤色に */
+    input[type="text"], input[type="date"], input[type="time"], select, textarea {
+      @apply rounded-lg px-3 py-2 bg-white text-[15px];
+      border: 1px solid var(--c-border);
+      outline: none;
+    }
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    input[type="time"]:focus,
+    select:focus, textarea:focus {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary), transparent 75%);
+      /* ↑ Safariでcolor-mixが効かない時はフォールバックが効くように通常CSSも残しています */
+    }
+
+    /* ピル/バッジ/タグ */
+    .pill { 
+      @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm;
+      background: #f8fafc; /* slate-50相当 */
+      border: 1px solid var(--c-border);
+      color: #334155;      /* slate-700相当 */
+    }
+    .pill.sm { @apply text-xs px-2 py-0.5; }
+
+    .badge { 
+      @apply ml-2 inline-block rounded-full px-2 py-0.5 text-xs text-white;
+      background-image: linear-gradient(to bottom right, var(--c-accent), #8f6aa1);
+    }
+
+    .tag { 
+      @apply inline-block rounded-full px-2 py-0.5 text-xs;
+      background: #f8fafc;
+      border: 1px solid var(--c-border);
+      color: #475569; /* slate-600 */
+    }
+    .tag.open   { color:#166534; background: linear-gradient(90deg, #dff6dc, var(--c-acc1)); border-color: #cdeccc; }
+    .tag.closed { color:#b91c1c; background: linear-gradient(90deg, #fde7ea, #f7d4d9);       border-color: #f5c6cd; }
+
+    /* 出欠ステータス */
+    .stat-ok { @apply border; background:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+    .stat-ng { @apply border; background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+    .stat-pd { @apply border; background:#fffbeb; border-color:#fde68a; color:#92400e; }
+    .stat-na { @apply border; background:#f8fafc; border-color:#e2e8f0; color:#64748b; }
+
+    /* =========================
+       ボタン
+    ========================== */
+    button {
+      @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold text-white transition;
+      background-image: linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2));
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    button:hover  { filter: brightness(1.05); transform: translateY(-0.5px); }
+    button:active { filter: brightness(1.2);  transform: translateY(0); }
+    button:disabled { @apply opacity-60 cursor-not-allowed; }
+
+    button.ghost {
+      @apply text-slate-800;
+      background: #fff;
+      border: 1px solid var(--c-border);
+      box-shadow: 0 1px 4px rgba(0,0,0,.05);
+    }
+    button.ghost:hover { background: #f8fafc; }
+
+    button.warn  { 
+      @apply text-slate-900; 
+      background-image: linear-gradient(to bottom right, #ffd36b, #ffb703);
+    }
+
+    /* 管理メニューのボタン（小型＋アクセント緑） */
+    #btnAdminMenuSchedules, 
+    #btnAdminMenuReport {
+      font-size: 14px;
+      color: #0f1a0f;
+      background-image: linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark));
+      border: 1px solid var(--c-acc2-dark);
+    }
+    #btnAdminMenuSchedules:hover, 
+    #btnAdminMenuReport:hover { filter: brightness(1.05); }
+    #btnAdminMenuSchedules:active, 
+    #btnAdminMenuReport:active { filter: brightness(1.2); }
+
+    /* スピナー */
+    .spinner { border-top-color: rgb(79 70 229); }
+  }
+</script>
   <!-- =========================================================
     5) LIFF SDK（ここでもOK／重いようなら </body> 直前へ）
   ========================================================== -->
@@ -543,7 +534,7 @@
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.2.0";
+const FRONT_VERSION = "Front v2.3.0";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
