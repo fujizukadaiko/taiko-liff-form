@@ -58,6 +58,12 @@
     .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--c-border); background:#f7f7f7; color:#444; }
     .tag.open   { background:#e8f8f3; border-color:#cdeee4; color:#0a7; }
     .tag.closed { background:#fdeaea; border-color:#f6cccc; color:#c33; }
+    /* 追加：disabled時の見た目を統一して薄くする */
+    input:disabled, select:disabled, textarea:disabled {
+      background: #f7f7f7 !important;
+      color: #999 !important;
+      border-color: #eee !important;
+    }
   </style>
 </head>
 <body>
@@ -221,7 +227,7 @@
           </select>
         </div>
         <div>
-          <label>公演日 *</label>
+          <label>日付 *</label>
           <input id="ad_ymd" type="date">
         </div>
         <div>
@@ -307,44 +313,41 @@
   </section>
 
   <!-- ===== 出欠結果一覧（管理者） ===== -->
-  <section id="view-admin-report" data-view>
-    <div class="row-space">
-      <div class="sectionTitle">出欠結果一覧（管理者）</div>
-      <div class="row" style="gap:8px;">
-        <button id="btnReportBack" class="ghost">トップに戻る</button>
-        <button id="btnReportReload" class="ghost">再取得</button>
+<section id="view-admin-report" data-view>
+  <div class="row-space">
+    <div class="sectionTitle">出欠結果一覧（管理者）</div>
+    <div class="row" style="gap:8px;">
+      <button id="btnReportBack" class="ghost">トップに戻る</button>
+      <button id="btnReportReload" class="ghost">再取得</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="gap:12px;">
+      <div style="min-width:260px; flex:1;">
+        <label for="repEvent">公演を選択</label>
+        <select id="repEvent">
+          <option value="">（選択してください）</option>
+          <!-- JSで公演一覧を流し込み -->
+        </select>
+      </div>
+      <div>
+        <label for="repAttend">出欠フィルタ</label>
+        <select id="repAttend">
+          <option value="">（すべて）</option>
+          <option value="参加">参加</option>
+          <option value="欠席">欠席</option>
+          <option value="未定">未定</option>
+        </select>
       </div>
     </div>
-
-    <div class="card">
-      <div class="row" style="gap:12px;">
-        <div style="min-width:200px; flex:1;">
-          <label for="repSearch">検索（タイトル/氏名/コメント）</label>
-          <input id="repSearch" type="text" placeholder="例：祭 / 山田 / 調整中 など">
-        </div>
-        <div>
-          <label for="repAttend">出欠フィルタ</label>
-          <select id="repAttend">
-            <option value="">（すべて）</option>
-            <option value="参加">参加</option>
-            <option value="欠席">欠席</option>
-            <option value="未定">未定</option>
-          </select>
-        </div>
-        <div>
-          <label for="repAccepting">受付状態</label>
-          <select id="repAccepting">
-            <option value="">（すべて）</option>
-            <option value="open">受付中</option>
-            <option value="closed">受付終了</option>
-          </select>
-        </div>
-      </div>
-      <div class="small muted" style="margin-top:6px;">※ 対象は「公開=Yes」かつ配信フラグが Y/S/D の予定のみ</div>
+    <div class="small muted" style="margin-top:6px;">
+      ※ 対象は「公開=Yes」かつ配信フラグが Y/S/D の予定のみ
     </div>
+  </div>
 
-    <div id="repBox" class="muted">読み込み待機中</div>
-  </section>
+  <div id="repBox" class="muted">公演を選択してください</div>
+</section>
 
 </main>
 
@@ -495,7 +498,12 @@ function bindHandlers(){
   $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); renderSchedules(true); };
   $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
   $("#btnFetchSchedules").onclick    = ()=> renderSchedules(false);
-
+  // レポート
+  $("#btnReportBack").onclick = ()=> show("#view-home");
+  $("#btnReportReload").onclick = ()=> reportReload();
+  $("#repEvent").addEventListener("change", renderReport); // 追加：公演選択で描画
+  $("#repAttend").addEventListener("change", renderReport);
+  
   // 管理メニュー（HOME）
   $("#btnAdminMenuSchedules").onclick = ()=>{
     if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
@@ -1201,74 +1209,89 @@ async function reportReload(){
       $("#repBox").innerHTML = `<span class="err">取得に失敗しました</span>`;
       return;
     }
-    state.report = r.list; // [{id, ymd, time, title, place, flag, accepting, rows:[{name,attend,comment,answeredAt}]}]
-    renderReport();
+    state.report = r.list; // [{id, ymd, time, title, place, flag, accepting, rows:[...]}]
+
+    // 公演セレクトを構築
+    const sel = $("#repEvent");
+    // 先頭に「選択してください」を維持し、他は一度クリア
+    sel.innerHTML = `<option value="">（選択してください）</option>`;
+    // 日時→時間→タイトルでソート
+    const items = [...state.report].sort((a,b)=> 
+      (String(a.ymd||"").localeCompare(b.ymd||"") || String(a.time||"").localeCompare(b.time||"") || String(a.title||"").localeCompare(b.title||""))
+    );
+    for (const e of items){
+      const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
+      const opt = document.createElement("option");
+      opt.value = e.id;
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+
+    // 初期表示は選択待ち
+    $("#repBox").innerHTML = `公演を選択してください`;
+
   }catch(err){
     $("#repBox").innerHTML = `<span class="err">エラー：${err.message||err}</span>`;
   }
 }
 function renderReport(){
   const box = $("#repBox");
-  const q   = ($("#repSearch").value||"").trim().toLowerCase();
-  const fAtt= $("#repAttend").value;
-  const fAcc= $("#repAccepting").value; // "open"/"closed"/""
-
   if (!state.report || state.report.length===0){
+    box.innerHTML = `<div class="listEmpty">データがありません。再取得してください。</div>`;
+    return;
+  }
+
+  const selId = $("#repEvent").value; // 公演ID
+  const fAtt  = $("#repAttend").value; // 出欠フィルタ
+
+  if (!selId){
+    box.innerHTML = `公演を選択してください`;
+    return;
+  }
+
+  const ev = state.report.find(x => String(x.id) === String(selId));
+  if (!ev){
+    box.innerHTML = `<div class="listEmpty">選択した公演が見つかりません</div>`;
+    return;
+  }
+
+  // rows をフィルタ
+  let rows = Array.isArray(ev.rows) ? ev.rows : [];
+  if (fAtt) rows = rows.filter(r => (r.attend||"") === fAtt);
+
+  if (rows.length === 0){
     box.innerHTML = `<div class="listEmpty">該当データがありません</div>`;
     return;
   }
 
-  // フラット化
-  const rows = [];
-  for (const ev of state.report){
-    const accepting = ev.accepting || (ev.flag==="D" ? "closed":"open");
-    if (fAcc && accepting !== fAcc) continue;
+  // 並び：氏名→回答日時
+  rows.sort((a,b)=> (String(a.name||"").localeCompare(String(b.name||"")) || String(a.answeredAt||"").localeCompare(String(b.answeredAt||""))));
 
-    if ((ev.rows||[]).length === 0){
-      // 回答なしでもイベント見出しのみ表示する場合はここで rows.push しても良い
-      continue;
-    }
-    for (const r of (ev.rows||[])){
-      // 絞り込み
-      if (fAtt && r.attend !== fAtt) continue;
-      const hay = `${ev.title||""} ${r.name||""} ${r.comment||""}`.toLowerCase();
-      if (q && !hay.includes(q)) continue;
-
-      rows.push({
-        id: ev.id, ymd: ev.ymd, time: ev.time||"", title: ev.title||"", place: ev.place||"",
-        accepting, flag: ev.flag||"",
-        name: r.name||"", attend: r.attend||"", comment: r.comment||"", answeredAt: r.answeredAt||""
-      });
-    }
-  }
-
-  if (rows.length === 0){
-    box.innerHTML = `<div class="listEmpty">絞り込み条件に一致するデータがありません</div>`;
-    return;
-  }
-
-  // 並び：日付→時間→タイトル→氏名
-  rows.sort((a,b)=> (a.ymd.localeCompare(b.ymd) || (a.time||"").localeCompare(b.time||"") || a.title.localeCompare(b.title) || a.name.localeCompare(b.name)));
-
-  const html = rows.map(r=>{
-    const dateDisp = r.ymd ? `${r.ymd}${r.time?` ${r.time}`:""}` : "";
-    const tag = r.accepting==="open" ? `<span class="tag open">受付中</span>` : `<span class="tag closed">受付終了</span>`;
-    return `<div class="card">
+  const dateDisp = `${ev.ymd || ""}${ev.time ? " " + ev.time : ""}`;
+  const header = `
+    <div class="card">
       <div class="row-space">
-        <div><b>${dateDisp}</b> @ ${r.place||""}</div>
-        <div>${tag}</div>
+        <div><b>${dateDisp}</b> @ ${ev.place||""}</div>
+        <div><span class="tag ${ev.accepting==="open"?"open":"closed"}">${ev.accepting==="open"?"受付中":"受付終了"}</span></div>
       </div>
-      <div class="small muted">${r.title||""} <span class="small muted">（ID: ${r.id}）</span></div>
-      <div class="row" style="justify-content:space-between; margin-top:6px;">
-        <div><span class="pill">${r.name}</span></div>
-        <div><span class="pill sm ${r.attend==="参加"?"stat-ok":r.attend==="欠席"?"stat-ng":r.attend==="未定"?"stat-pd":"stat-na"}">${r.attend||"未回答"}</span></div>
+      <div class="small muted">${ev.title||""} <span class="small muted">（ID: ${ev.id}）</span></div>
+    </div>
+  `;
+
+  const body = rows.map(r=>{
+    return `<div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div><span class="pill">${r.name||""}</span></div>
+        <div><span class="pill sm ${
+          r.attend==="参加" ? "stat-ok" : r.attend==="欠席" ? "stat-ng" : r.attend==="未定" ? "stat-pd" : "stat-na"
+        }">${r.attend||"未回答"}</span></div>
       </div>
       ${r.comment?`<div class="small" style="margin-top:4px;">コメント：${r.comment}</div>`:""}
       ${r.answeredAt?`<div class="small muted" style="margin-top:4px;">回答：${r.answeredAt}</div>`:""}
     </div>`;
   }).join("");
 
-  box.innerHTML = html;
+  box.innerHTML = header + body;
 }
 
 /* ===== 起動 ===== */
