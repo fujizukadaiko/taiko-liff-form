@@ -5,9 +5,26 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>公演 出欠フォーム</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <link rel="stylesheet"
-        href="https://unpkg.com/@picocss/pico@2/css/pico.classless.min.css">
-
+  <script>
+    // 既存CSSを壊さないため、ベースリセット（preflight）を無効化
+    tailwind = undefined; // 念のため初期化
+    tailwind = tailwind || {};
+    tailwind.config = {
+      corePlugins: { preflight: false },  // ←重要！
+      theme: {
+        extend: {
+          colors: {
+            primary: '#0b74de' // 任意：var(--c-primary)も使えます
+          },
+          boxShadow: {
+            'card': '0 2px 10px rgba(0,0,0,0.04)'
+          }
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  
   <style>
     :root{
       --c-primary:#0b74de; --c-bg:#fafafa; --c-border:#e5e5e5;
@@ -61,49 +78,55 @@
     .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--c-border); background:#f7f7f7; color:#444; }
     .tag.open   { background:#e8f8f3; border-color:#cdeee4; color:#0a7; }
     .tag.closed { background:#fdeaea; border-color:#f6cccc; color:#c33; }
-    /* 追加：disabled時の見た目を統一して薄くする */
-    /* ← 既存の input[type="text"], input[type="date"] ... の定義の「後」に置いてください */
-    input:disabled, select:disabled, textarea:disabled {
-      background-color: #f7f7f7 !important;
-      color: #999 !important;
-      border-color: #eee !important;
-      -webkit-text-fill-color: #999;  /* iOS/Safari対策 */
-    }
-    /* 既存の input:disabled, select:disabled ... の直後 or CSSの一番最後に置いてください */
-    #ad_meetPlace:disabled {
-      background-color: #f7f7f7 !important;
-      color: #999 !important;
-      border-color: #eee !important;
-      -webkit-text-fill-color: #999 !important; /* Safari/iOS */
-    }
-    #ad_meetPlace:disabled::placeholder {
-      color: #bbb !important;
-    }
+    /*-- Tailwindで既存クラスをリッチにする */
+    <script type="text/tailwindcss">
+      @layer components {
     
-    /* Chrome/Safariのオートフィル対策（disabledでも色が残るのを上書き） */
-    #ad_meetPlace:-webkit-autofill:disabled {
-      -webkit-text-fill-color: #999 !important;
-      -webkit-box-shadow: 0 0 0px 1000px #f7f7f7 inset !important;
-      box-shadow: inset 0 0 0px 1000px #f7f7f7 !important;
-    }
-    input:disabled::placeholder {
-      color: #bbb;  /* placeholderも薄く */
-    }
-    /* ====== Pico適用後の軽い微調整（あなたのCSSの最後に追記） ====== */
-    /* カードに軽い影（Picoのフラットさを少し持ち上げ） */
-    .card {
-      box-shadow: 0 2px 10px rgba(0,0,0,.04);
-    }
+        /* レイアウトの軽い上乗せ（任意） */
+        header { @apply bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between; }
+        main   { @apply; } /* ここでは適用なし。次章で wrapper案を紹介 */
     
-    /* 余白・見出しの密度調整（モバイルで少し詰め気味に） */
-    main { padding: 16px 18px; }
-    .sectionTitle { font-size: 1.05rem; margin: 6px 0 10px; }
+        /* カードの質感アップ */
+        .card { @apply rounded-xl border border-slate-200 bg-white p-4 shadow-card; }
     
-    /* ボタンを少し丸く＆高さを揃える（Picoの上から上書き） */
-    button { padding: 10px 14px; border-radius: 10px; }
+        /* 見出し/区切り */
+        .sectionTitle { @apply font-bold; }
+        .line { @apply h-px bg-slate-200 my-3; }
     
-    /* カードの見出しに少し太字を足す（雰囲気アップ） */
-    header { font-weight: 700; }
+        /* ボタン（既存クラスを活かしつつ質感アップ） */
+        button { @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-white transition;
+                 @apply bg-[color:var(--c-primary)] hover:brightness-110 disabled:opacity-60; }
+        button.ghost { @apply bg-white text-slate-700 border border-slate-200 hover:bg-slate-50; }
+        button.warn  { @apply bg-amber-400 text-slate-900 hover:brightness-110; }
+    
+        /* ピル/バッジ */
+        .pill { @apply inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-sm; }
+        .pill.sm { @apply text-xs px-2 py-0.5; }
+        .badge { @apply ml-2 inline-block rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white; }
+    
+        /* 出欠ステータス色 */
+        .stat-ok { @apply bg-emerald-50 border-emerald-200 text-emerald-600; }
+        .stat-ng { @apply bg-rose-50    border-rose-200    text-rose-600; }
+        .stat-pd { @apply bg-amber-50   border-amber-200   text-amber-700; }
+        .stat-na { @apply bg-slate-50   border-slate-200   text-slate-500; }
+    
+        /* タグ（受付中/終了） */
+        .tag { @apply inline-block rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600; }
+        .tag.open   { @apply bg-emerald-50 border-emerald-200 text-emerald-600; }
+        .tag.closed { @apply bg-rose-50    border-rose-200    text-rose-600; }
+    
+        /* フィールド類のふるまいを統一（境界/フォーカス） */
+        input[type="text"], input[type="date"], input[type="time"], select, textarea {
+          @apply rounded-lg border border-slate-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[color:var(--c-primary)]/30;
+        }
+    
+        /* スピナー色をTailwindの青に寄せる（任意） */
+        .spinner {
+          /* Tailwindの@applyではborder-top-colorの任意色指定は難しいので手書き */
+          border-top-color: theme('colors.blue.600');
+        }
+      }
+    </script>
   </style>
 </head>
 <body>
