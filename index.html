@@ -29,8 +29,7 @@
       theme: {
         extend: {
           colors: {
-            // 必要ならTailwindクラスでも使えるように登録（任意）
-            primary: '#7f6aa5',
+            primary: '#7f6aa5', // 藤の主色（任意でTailwindクラスとしても使える）
           },
           boxShadow: {
             card: '0 2px 10px rgba(0,0,0,0.04)'
@@ -48,7 +47,7 @@
   ========================================================== -->
   <style>
     :root{
-      /* 白藤系の基調色（必要に応じて調整可） */
+      /* 白藤系の基調色 */
       --c-bg:        #f7f5fa;  /* 背景（ごく淡い藤） */
       --c-panel:     #ffffff;  /* カード背景 */
       --c-border:    #e8e2f0;  /* 枠線（藤みのある薄グレー） */
@@ -59,6 +58,11 @@
       --c-primary:   #7f6aa5;  /* 主色（藤） */
       --c-primary-2: #6d5a93;  /* 影・強調（濃い藤） */
       --c-accent:    #a678b0;  /* バッジ等の差し色 */
+
+      /* アクセント（若草・若緑） */
+      --c-acc1:      #d2e5b1;  /* 明るい若草（淡い） */
+      --c-acc2:      #9ce78f;  /* 若緑（本色） */
+      --c-acc2-dark: #6aa96a;  /* 濃いめの緑（影やグラデ用） */
 
       /* 成功/警告/エラー（必要なら和色に寄せ替え可） */
       --c-ok:  #0a7;
@@ -84,7 +88,11 @@
     }
 
     /* 既存スタイル（必要最小限に整理） */
-    header{ padding:14px 16px; font-size:18px; font-weight:700; background:#fff; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between; align-items:center; }
+    header{
+      padding:14px 16px; font-size:18px; font-weight:700;
+      background:#fff; border-bottom:1px solid var(--c-border);
+      display:flex; justify-content:space-between; align-items:center;
+    }
     main{ padding:14px 16px; }
     .ver{ font-size:12px; color:#888; font-weight:500; }
     .card{ background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; margin:10px 0; }
@@ -147,6 +155,99 @@
       background: rgba(255,255,255,0.9);
       z-index: 50;
     }
+
+    /* =========================================================
+       Button（a と button 共通）
+       - a.btn / button.btn に適用
+       - 既存の見た目は維持しつつ“ボタン感”を足すだけ
+       - 色は白藤×若草×藤のパレットに統一
+    ========================================================= */
+    a.btn, button.btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+
+      min-height: 40px;
+      padding: 10px 14px;
+      border-radius: 12px;
+
+      border: 1px solid var(--c-border);
+      background: #fff;                  /* 既定は白背景 */
+      color: var(--c-text);
+      text-decoration: none;             /* a の下線を消す */
+
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: .01em;
+      line-height: 1;
+
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
+      cursor: pointer;
+    }
+    a.btn:hover, button.btn:hover {
+      filter: brightness(1.02);
+      transform: translateY(-0.5px);
+    }
+    a.btn:active, button.btn:active {
+      filter: brightness(1.06);
+      transform: translateY(0);
+    }
+    a.btn:focus-visible, button.btn:focus-visible {
+      outline: none;
+      box-shadow:
+        0 2px 8px rgba(0,0,0,.06),
+        0 0 0 3px color-mix(in srgb, var(--c-primary), transparent 75%);
+    }
+    button.btn:disabled,
+    a.btn[aria-disabled="true"] {
+      opacity: .6;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    /* バリエーション */
+    .btn-primary {
+      color: #fff;
+      border-color: color-mix(in srgb, var(--c-primary-2), #000 6%);
+      background-image: linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2));
+    }
+    .btn-primary:hover  { filter: brightness(1.06); }
+    .btn-primary:active { filter: brightness(1.12); }
+
+    .btn-accent {
+      color: #0f1a0f;
+      border-color: color-mix(in srgb, var(--c-acc2-dark), #000 10%);
+      background-image: linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark));
+    }
+    .btn-accent:hover  { filter: brightness(1.05); }
+    .btn-accent:active { filter: brightness(1.12); }
+
+    .btn-ghost {
+      background: #fff;
+      color: var(--c-text);
+      border-color: var(--c-border);
+    }
+    .btn-ghost:hover  { background: #f9fafb; }
+    .btn-ghost:active { filter: brightness(1.04); }
+
+    .btn-outline {
+      background: #fff;
+      color: var(--c-primary-2);
+      border-color: var(--c-primary-2);
+    }
+    .btn-outline:hover  { background: #faf7ff; }
+    .btn-outline:active { filter: brightness(1.06); }
+
+    /* サイズ */
+    .btn-sm { padding: 8px 12px; min-height: 36px; font-size: 14px; border-radius: 10px; }
+    .btn-lg { padding: 12px 16px; min-height: 44px; font-size: 16px; border-radius: 14px; }
+
+    /* アイコン付き（先頭アイコンとの間隔） */
+    .btn > .icon { display:inline-block; margin-right: .4em; line-height:0; }
+
+    /* 横並びボタン置き場（任意） */
+    .btnRow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
   </style>
 
   <!-- =========================================================
@@ -195,7 +296,7 @@
       .stat-pd { @apply bg-amber-50   border border-amber-200   text-amber-700; }
       .stat-na { @apply bg-slate-50   border border-slate-200   text-slate-500; }
 
-      /* ボタン：はっきり“ボタン感”を出す */
+      /* ボタン：はっきり“ボタン感”を出す（button要素のみ。aは .btn を使用） */
       button {
         @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold text-white shadow-md transition;
         background-image: linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2));
