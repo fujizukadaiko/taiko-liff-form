@@ -319,6 +319,27 @@ let adminMode = "create";    // "create" | "edit"（予定登録フォーム）
 let adminEditingId = "";     // 編集対象ID
 
 /* ===== ユーティリティ ===== */
+/** 文字列/Dateどちらでも受け取り、Dateに変換（失敗時は null） */
+function parseDateLike(s){
+  if (s instanceof Date) return s;
+  const str = String(s||"").trim();
+  // "yyyy/MM/dd" / "yyyy-MM-dd" など
+  const m = str.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return isNaN(d) ? null : d;
+  }
+  const d2 = new Date(str);
+  return isNaN(d2) ? null : d2;
+}
+
+/** Date → "yyyy/MM/dd（曜）" */
+function ymdDow(d){
+  if (!(d instanceof Date) || isNaN(d)) return "";
+  const z = n => String(n).padStart(2,"0");
+  const yo = "日月火水木金土"[d.getDay()];
+  return `${d.getFullYear()}/${z(d.getMonth()+1)}/${z(d.getDate())}（${yo}）`;
+}  
 const $ = s => document.querySelector(s);
 function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classList.remove("show")); $(id).classList.add("show"); }
 function logHome(t){ $("#homeLog").textContent = t||""; }
