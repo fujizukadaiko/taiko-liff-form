@@ -59,10 +59,15 @@
     .tag.open   { background:#e8f8f3; border-color:#cdeee4; color:#0a7; }
     .tag.closed { background:#fdeaea; border-color:#f6cccc; color:#c33; }
     /* 追加：disabled時の見た目を統一して薄くする */
+    /* ← 既存の input[type="text"], input[type="date"] ... の定義の「後」に置いてください */
     input:disabled, select:disabled, textarea:disabled {
-      background: #f7f7f7 !important;
+      background-color: #f7f7f7 !important;
       color: #999 !important;
       border-color: #eee !important;
+      -webkit-text-fill-color: #999;  /* iOS/Safari対策 */
+    }
+    input:disabled::placeholder {
+      color: #bbb;  /* placeholderも薄く */
     }
   </style>
 </head>
