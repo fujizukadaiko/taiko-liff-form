@@ -301,7 +301,7 @@
 /* ===== 設定 ===== */
 const FRONT_VERSION = "Front v0.9-admin-min";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw8DwdGANNinkbPOGYMAYg0gMeFK8dM21bZ64FAi_u2-3Ltl6-kUFBn2bbvb7K3O_d1pg/exec";     // ←差し替え
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxHjY_eXY2Asc9t4W6y-qMD77iGy8Vrer81PFvasEEmCos8B2S8ZBf9ZkgjRQHrhwoBkg/exec";     // ←差し替え
 
 /* ===== 状態 ===== */
 let state = {
@@ -340,9 +340,17 @@ function hmFromTimeCell(v){
   if (m) return `${z(m[1])}:${m[2]}`;
   return "";
 }
-function parseDateLike(s){
-  const d = new Date(s);
-  return isNaN(d) ? null : d;
+// "yyyy/MM/dd" / "yyyy-MM-dd" を確実に Date 化（iOS/Safari対策）
+function parseYmdStrict(s){
+  const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+  if (!m) {
+    // それ以外（たとえば Date文字列）の場合は最後に new Date に委ねる
+    const d = new Date(s);
+    return isNaN(d) ? null : d;
+  }
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  const dt = new Date(y, mo-1, d);
+  return isNaN(dt) ? null : dt;
 }
 function esc(s){ return encodeURIComponent(String(s||"")); }
 function toYmdSlashFromDateInput(v){ // "yyyy-mm-dd" -> "yyyy/MM/dd"
@@ -505,7 +513,7 @@ function renderHome(){
     $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
     $("#eventsBox").innerHTML = state.events.map(e=>{
-      const d = parseDateLike(e.date);
+      const d = parseYmdStrict(e.date);
       const dateDisp = ymdDow(d);
       const timeDisp = hmFromTimeCell(e.time);
       const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
@@ -592,7 +600,7 @@ function buildFormView(){
     $("#formEventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
     const headerHtml = state.events.map(e=>{
-      const d = parseDateLike(e.date);
+      const d = parseYmdStrict(e.date);
       const dateDisp = ymdDow(d);
       const timeDisp = hmFromTimeCell(e.time);
       const ans = state.answers[e.eventId] || [];
