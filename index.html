@@ -247,10 +247,10 @@
         </div>
         <div>
           <label>ステータス</label>
-          <select id="ad_status">
-            <option value="active" selected>active</option>
-            <option value="inactive">inactive</option>
-          </select>
+        <select id="ad_status">
+          <option value="active" selected>active</option>
+          <option value="archived">archived</option>
+        </select>
         </div>
         <div>
           <label>配信フラグ</label>
@@ -299,7 +299,7 @@
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v0.9.1";
+const FRONT_VERSION = "Front v0.9.2";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzX8iZTWv8fLne0xM47uwmhqItZ6_V7z-favSDUvhcTvnnskbC0BKTOWQN5xmXUy5f11A/exec";     // ←差し替え
 
@@ -733,22 +733,33 @@ async function onSubmit(){
 
     if (!payloads.length){ alert("送信する内容がありません（出欠の選択が未入力です）"); return; }
 
-    // まとめ送信
+    // まとめ送信（イベントIDでグループ化）
     const grouped = {};
-    for (const p of payloads){
+    const eventCommentMap = {}; // 公演ごとの共通コメント（最初に見つかったもの）
+    for (const p of payloads) {
       if (!grouped[p.eventId]) grouped[p.eventId] = [];
-      grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, comment:p.comment });
+      grouped[p.eventId].push({ performerName: p.performerName, attend: p.attend });
+    
+      if (eventCommentMap[p.eventId] === undefined) {
+        eventCommentMap[p.eventId] = (p._eventComment || "");
+      }
     }
-    for (const [eventId, list] of Object.entries(grouped)){
-       // 先頭一件だけにコメントを入れる（それ以外は空）
-      const list = listRaw.map((it, idx) => ({
+    
+    for (const [eventId, list] of Object.entries(grouped)) {
+      const eCom = String(eventCommentMap[eventId] || "");
+      // 先頭1件のみにコメントを付与
+      const bulk = list.map((it, idx) => ({
         performerName: it.performerName,
         attend: it.attend,
-        comment: (idx === 0) ? (it._eventComment || "") : ""
+        comment: (idx === 0 ? eCom : "")
       }));
-      
-      const url = `${API_ENDPOINT}?submitBulk=1&eventId=${esc(eventId)}&lineId=${esc(state.lineId)}&bulk=${esc(JSON.stringify(list))}`;
-      const r = await fetch(url); const j = await r.json();
+    
+      const url = `${API_ENDPOINT}?submitBulk=1`
+                + `&eventId=${esc(eventId)}`
+                + `&lineId=${esc(state.lineId)}`
+                + `&bulk=${esc(JSON.stringify(bulk))}`;
+      const r = await fetch(url);
+      const j = await r.json();
       if (j.status !== "ok") throw new Error(`送信失敗（${eventId}）: ${j.message||"unknown"}`);
     }
 
@@ -981,34 +992,38 @@ async function adminSubmit(){
     $("#btnAdminSubmit").textContent = (adminMode==="edit" ? "保存中…" : "登録中…");
 
     let res;
-    if (adminMode === "create"){
-      const url = `?addSchedule=1&lineId=${esc(state.lineId)}`
-        + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
-        + (hm?`&hm=${esc(hm)}`:"")
-        + (place?`&place=${esc(place)}`:"")
-        + (meetAtSend?`&meetAt=${esc(meetAtSend)}`:"")
-        + (meetPl?`&meetPlace=${esc(meetPl)}`:"")
-        + `&attendTarget=${esc(attSend)}`
-        + (dl?`&deadline=${esc(dl)}`:"")
-        + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
-      res = await api(url);
-      if (res.status!=="ok") throw new Error(res.message||"登録に失敗しました");
-      alert(`登録しました（ID: ${res.inserted?.id||"(不明)"}）`);
-      enterAdminCreateMode();
-      await adminListFetch();
-    } else {
-      if (!adminEditingId){ throw new Error("編集対象IDが不正です"); }
-      // すべて送って上書き（GAS側は与えたキーのみ更新）
-      const url = `?updateSchedule=1&lineId=${esc(state.lineId)}&id=${esc(adminEditingId)}`
-        + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
-        + `&hm=${esc(hm)}&place=${esc(place)}&meetAt=${esc(meetAtSend)}&meetPlace=${esc(meetPl)}`
-        + `&attendTarget=${esc(attSend)}&deadline=${esc(dl)}`
-        + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
-      res = await api(url);
-      if (res.status!=="ok") throw new Error(res.message||"保存に失敗しました");
-      alert("保存しました");
-      await adminListFetch();
-    }
+if (adminMode === "create"){
+  const url = `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}`
+    + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
+    + (hm?`&hm=${esc(hm)}`:"")
+    + (place?`&place=${esc(place)}`:"")
+    + (meetAtSend?`&meetAt=${esc(meetAtSend)}`:"")
+    + (meetPl?`&meetPlace=${esc(meetPl)}`:"")
+    + `&attendTarget=${esc(attSend)}`
+    + (dl?`&deadline=${esc(dl)}`:"")
+    + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
+  res = await api(url);
+  if (res.status!=="ok") throw new Error(res.message||"登録に失敗しました");
+  alert(`登録しました（ID: ${res.id || res.inserted?.id || "(不明)"}）`);
+  enterAdminCreateMode();
+  await adminListFetch();
+
+} else {
+  if (!adminEditingId){ throw new Error("編集対象IDが不正です"); }
+  const url = `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}&id=${esc(adminEditingId)}`
+    + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
+    + (hm?`&hm=${esc(hm)}`:"")
+    + (place?`&place=${esc(place)}`:"")
+    + (meetAtSend?`&meetAt=${esc(meetAtSend)}`:"")
+    + (meetPl?`&meetPlace=${esc(meetPl)}`:"")
+    + `&attendTarget=${esc(attSend)}`
+    + (dl?`&deadline=${esc(dl)}`:"")
+    + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
+  res = await api(url);
+  if (res.status!=="ok") throw new Error(res.message||"保存に失敗しました");
+  alert("保存しました");
+  await adminListFetch();
+}
   }catch(err){
     logAdmin(err.message || String(err));
   }finally{
@@ -1020,25 +1035,45 @@ async function adminListFetch(){
   try{
     $("#adminListBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
     const days = Number($("#ad_days").value || 60);
-    const r = await api(`?listSchedulesAdmin=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
-    if (r.status !== "ok" || !Array.isArray(r.schedules)){
+    const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
+    if (r.status !== "ok" || !Array.isArray(r.items)){
       $("#adminListBox").innerHTML = `<span class="err">取得に失敗しました</span>`;
       return;
     }
-    if (r.schedules.length === 0){
+    if (r.items.length === 0){
       $("#adminListBox").innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
       return;
     }
-    const html = r.schedules.map(it=>{
+    
+    // GASは { items:[{id,type,title,ymd,hm,place,publish,status,flag,deadline}] } を返す想定
+    const html = r.items.map(raw=>{
+      // フロントが使うキーに合わせて安全に整形
+      const it = {
+        id: raw.id || "",
+        type: raw.type || "",
+        title: raw.title || "",
+        ymd: raw.ymd || "",
+        hm: raw.hm || "",
+        place: raw.place || "",
+        // 下記はGASレスポンスにない場合があるため空にフォールバック
+        meetAt: raw.meetAt || "",
+        meetPlace: raw.meetPlace || "",
+        attendTarget: raw.attendTarget || "N",
+        deadline: raw.deadline || "",
+        publish: raw.publish || "No",
+        status: raw.status || "archived",
+        flag: raw.flag || "N"
+      };
       return `<div class="card">
         <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
         <div class="small">${it.type||""}：${it.title||""}</div>
-        <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"inactive"} / 配信:${it.flag||"N"}</div>
+        <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
         <div class="row" style="margin-top:8px;">
           <button class="ghost" type="button" onclick='adminEdit(${JSON.stringify(it).replace(/"/g,"&quot;")})'>編集</button>
         </div>
       </div>`;
     }).join("");
+  
     $("#adminListBox").innerHTML = html;
   }catch(err){
     $("#adminListBox").innerHTML = `<span class="err">エラー：${err.message||err}</span>`;
