@@ -4,51 +4,93 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>公演 出欠フォーム</title>
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <!-- =========================================================
+    1) Google Fonts：CSSより前に置く（必須）
+       和の雰囲気：本文=ゴシック（Noto Sans JP）
+                 見出し/セクション=明朝（Shippori Mincho）
+       ※ FOUCを抑えるため preconnect を追加
+  ========================================================== -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Shippori+Mincho:wght@500;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <!-- =========================================================
+    2) Tailwind CDN（preflightは無効化）
+       ※ tailwind.config は CDN 読み込み「前」に書くのが正解
+  ========================================================== -->
   <script>
-    // 既存CSSを壊さないため、ベースリセット（preflight）を無効化
-    tailwind = undefined; // 念のため初期化
-    tailwind = tailwind || {};
+    window.tailwind = window.tailwind || {};
     tailwind.config = {
-      corePlugins: { preflight: false },  // ←重要！
+      corePlugins: { preflight: false }, // 既存CSSを壊さない
       theme: {
         extend: {
           colors: {
-            primary: '#0b74de' // 任意：var(--c-primary)も使えます
+            // 必要ならTailwindクラスでも使えるように登録（任意）
+            primary: '#7f6aa5',
           },
           boxShadow: {
-            'card': '0 2px 10px rgba(0,0,0,0.04)'
+            card: '0 2px 10px rgba(0,0,0,0.04)'
           }
         }
       }
     };
   </script>
   <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-  
+
+  <!-- =========================================================
+    3) 既存のベースCSS（変数やレイアウトの基本）
+       ※ :root は「和風（白藤系）」のパレットを採用
+       ※ ここでは Tailwind の @apply は使わない（通常のCSS）
+  ========================================================== -->
   <style>
     :root{
-      --c-primary:#0b74de; --c-bg:#fafafa; --c-border:#e5e5e5;
-      --c-text:#222; --c-muted:#666; --c-ok:#0a7; --c-err:#c33;
-      --c-accent:#ff6b6b;
+      /* 白藤系の基調色（必要に応じて調整可） */
+      --c-bg:        #f7f5fa;  /* 背景（ごく淡い藤） */
+      --c-panel:     #ffffff;  /* カード背景 */
+      --c-border:    #e8e2f0;  /* 枠線（藤みのある薄グレー） */
+
+      /* テキストとアクセント */
+      --c-text:      #202022;
+      --c-muted:     #6b6b6b;
+      --c-primary:   #7f6aa5;  /* 主色（藤） */
+      --c-primary-2: #6d5a93;  /* 影・強調（濃い藤） */
+      --c-accent:    #a678b0;  /* バッジ等の差し色 */
+
+      /* 成功/警告/エラー（必要なら和色に寄せ替え可） */
+      --c-ok:  #0a7;
+      --c-err: #c33;
     }
-    body{ font-family: system-ui, -apple-system, Segoe UI, sans-serif; margin:0; background:var(--c-bg); color:var(--c-text);}
-    header{ padding:14px 16px; font-size:18px; font-weight:700; background:#fff; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between; align-items:center;}
+
+    /* フォント：本文はゴシック、見出しは明朝 */
+    body{
+      margin:0;
+      background: var(--c-bg);
+      color: var(--c-text);
+      font-family: "Noto Sans JP", system-ui, -apple-system, Segoe UI, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+      letter-spacing: 0.02em;
+      /* 和紙っぽい淡い背景（任意） */
+      background:
+        radial-gradient(1200px 600px at 20% 10%, rgba(127,106,165,.05), transparent 40%),
+        radial-gradient(900px  500px at 80% 60%, rgba(127,106,165,.04), transparent 35%),
+        var(--c-bg);
+    }
+    h1,h2,h3,.sectionTitle{
+      font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+      letter-spacing: 0.03em;
+    }
+
+    /* 既存スタイル（必要最小限に整理） */
+    header{ padding:14px 16px; font-size:18px; font-weight:700; background:#fff; border-bottom:1px solid var(--c-border); display:flex; justify-content:space-between; align-items:center; }
     main{ padding:14px 16px; }
     .ver{ font-size:12px; color:#888; font-weight:500; }
     .card{ background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; margin:10px 0; }
     .muted{ color:var(--c-muted); font-size:13px; }
     .row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
     .row-space{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    button{ appearance:none; border:none; border-radius:10px; padding:10px 14px; background:var(--c-primary); color:#fff; font-size:16px; }
-    button.ghost{ background:#f4f4f4; color:#222; border:1px solid var(--c-border); }
-    button.warn{ background:#ffb703; color:#222; }
-    button:disabled{ opacity:.6; cursor:not-allowed; }
-    .ok{ color:var(--c-ok); }
-    .err{ color:var(--c-err); }
-    .sectionTitle{ font-weight:700; margin:8px 0; }
-    .line{ height:1px; background:var(--c-border); margin:10px 0; }
-    .warnBox{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
-    .pill{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
     .right{ text-align:right; }
     .badge{ display:inline-block; font-size:12px; padding:2px 6px; background:var(--c-accent); color:#fff; border-radius:999px; margin-left:8px; }
     .small{ font-size:12px; color:var(--c-muted); }
@@ -56,7 +98,7 @@
     [data-view]{ display:none; }
     [data-view].show{ display:block; }
 
-    .spinner{ width:18px; height:18px; border:2px solid #ddd; border-top-color:var(--c-primary); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; vertical-align:middle; }
+    .spinner{ width:18px; height:18px; border:2px solid #ddd; border-top-color: var(--c-primary); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; vertical-align:middle; }
     @keyframes spin{ to{ transform:rotate(360deg); } }
 
     label{ display:block; font-size:14px; margin:6px 0 4px; }
@@ -65,7 +107,9 @@
     }
     .listEmpty{ color:#888; font-size:14px; }
 
+    .pill{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
     .pill.sm { font-size:12px; padding:2px 8px; }
+
     .stat-ok  { background:#e8f8f3; border:1px solid #cdeee4; color:#0a7; }   /* 参加 */
     .stat-ng  { background:#fdeaea; border:1px solid #f6cccc; color:#c33; }   /* 欠席 */
     .stat-pd  { background:#fff7d6; border:1px solid #f3d27a; color:#7a5b00;} /* 未定 */
@@ -78,63 +122,114 @@
     .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--c-border); background:#f7f7f7; color:#444; }
     .tag.open   { background:#e8f8f3; border-color:#cdeee4; color:#0a7; }
     .tag.closed { background:#fdeaea; border-color:#f6cccc; color:#c33; }
-    /*-- Tailwindで既存クラスをリッチにする */
-    <script type="text/tailwindcss">
-      @layer components {
-    
-        /* レイアウトの軽い上乗せ（任意） */
-        header { @apply bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between; }
-        main   { @apply; } /* ここでは適用なし。次章で wrapper案を紹介 */
-    
-        /* カードの質感アップ */
-        .card { @apply rounded-xl border border-slate-200 bg-white p-4 shadow-card; }
-    
-        /* 見出し/区切り */
-        .sectionTitle { @apply font-bold; }
-        .line { @apply h-px bg-slate-200 my-3; }
-    
-        /* ボタン（既存クラスを活かしつつ質感アップ） */
-        button { @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-white transition;
-                 @apply bg-[color:var(--c-primary)] hover:brightness-110 disabled:opacity-60; }
-        button.ghost { @apply bg-white text-slate-700 border border-slate-200 hover:bg-slate-50; }
-        button.warn  { @apply bg-amber-400 text-slate-900 hover:brightness-110; }
-    
-        /* ピル/バッジ */
-        .pill { @apply inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-sm; }
-        .pill.sm { @apply text-xs px-2 py-0.5; }
-        .badge { @apply ml-2 inline-block rounded-full bg-rose-500 px-2 py-0.5 text-xs text-white; }
-    
-        /* 出欠ステータス色 */
-        .stat-ok { @apply bg-emerald-50 border-emerald-200 text-emerald-600; }
-        .stat-ng { @apply bg-rose-50    border-rose-200    text-rose-600; }
-        .stat-pd { @apply bg-amber-50   border-amber-200   text-amber-700; }
-        .stat-na { @apply bg-slate-50   border-slate-200   text-slate-500; }
-    
-        /* タグ（受付中/終了） */
-        .tag { @apply inline-block rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600; }
-        .tag.open   { @apply bg-emerald-50 border-emerald-200 text-emerald-600; }
-        .tag.closed { @apply bg-rose-50    border-rose-200    text-rose-600; }
-    
-        /* フィールド類のふるまいを統一（境界/フォーカス） */
-        input[type="text"], input[type="date"], input[type="time"], select, textarea {
-          @apply rounded-lg border border-slate-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[color:var(--c-primary)]/30;
-        }
-    
-        /* スピナー色をTailwindの青に寄せる（任意） */
-        .spinner {
-          /* Tailwindの@applyではborder-top-colorの任意色指定は難しいので手書き */
-          border-top-color: theme('colors.blue.600');
-        }
-      }
-    </script>
+
+    /* 入力不可の見た目（既存） */
+    input:disabled, select:disabled, textarea:disabled {
+      background-color: #f7f7f7 !important;
+      color: #999 !important;
+      border-color: #eee !important;
+      -webkit-text-fill-color: #999;
+    }
+    #ad_meetPlace:disabled { background-color:#f7f7f7 !important; color:#999 !important; border-color:#eee !important; -webkit-text-fill-color:#999 !important; }
+    #ad_meetPlace:disabled::placeholder { color:#bbb !important; }
+    #ad_meetPlace:-webkit-autofill:disabled {
+      -webkit-text-fill-color: #999 !important;
+      -webkit-box-shadow: 0 0 0px 1000px #f7f7f7 inset !important;
+      box-shadow: inset 0 0 0px 1000px #f7f7f7 !important;
+    }
+    input:disabled::placeholder { color: #bbb; }
+
+    /* ヘッダーのスティッキー（※HTML内に直接書いていたものを正しい場所へ移動） */
+    header.is-sticky {
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(6px);
+      background: rgba(255,255,255,0.9);
+      z-index: 50;
+    }
   </style>
+
+  <!-- =========================================================
+    4) Tailwind の @apply で既存クラスを“和風リッチ”に
+       ※ 必ず CDN の後に置く
+  ========================================================== -->
+  <script type="text/tailwindcss">
+    @layer components {
+      /* ヘッダー：さりげない下線＆余白（ベースCSSに上乗せ） */
+      header { @apply border-b border-[color:var(--c-border)] px-4 py-3 flex items-center justify-between; }
+
+      /* カード：淡い影と柔らかいボーダー（和紙の板感） */
+      .card { @apply rounded-xl border bg-[color:var(--c-panel)] p-4 shadow-card border-[color:var(--c-border)]; }
+
+      /* セクションタイトル：明朝＋下部に藤のグラデ棒 */
+      .sectionTitle { @apply font-bold text-[17px] text-[color:var(--c-text)]; }
+      .sectionTitle::after{
+        content:""; display:block; height:3px; width:72px; margin-top:6px; border-radius:999px;
+        background: linear-gradient(90deg, var(--c-primary) 0%, #c9b8e6 100%);
+      }
+
+      /* 区切り線を淡く */
+      .line { @apply h-px my-3 bg-[color:var(--c-border)]; }
+
+      /* 入力UI：境界＆フォーカスを藤色に */
+      input[type="text"], input[type="date"], input[type="time"], select, textarea {
+        @apply rounded-lg border px-3 py-2 bg-white text-[15px]
+               border-[color:var(--c-border)]
+               focus:outline-none focus:ring-2 focus:ring-[color:var(--c-primary)]/25;
+      }
+
+      /* ピル/バッジ/タグを藤寄せに */
+      .pill { @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm
+                     bg-slate-50 border-[color:var(--c-border)] text-slate-700; }
+      .pill.sm { @apply text-xs px-2 py-0.5; }
+      .badge { @apply ml-2 inline-block rounded-full px-2 py-0.5 text-xs text-white; @apply bg-[color:var(--c-accent)]; }
+
+      .tag { @apply inline-block rounded-full px-2 py-0.5 text-xs border
+                   bg-slate-50 border-[color:var(--c-border)] text-slate-600; }
+      .tag.open   { @apply bg-emerald-50 border-emerald-200 text-emerald-600; }
+      .tag.closed { @apply bg-rose-50    border-rose-200    text-rose-600; }
+
+      /* 出欠ステータスの色味は控えめトーンで */
+      .stat-ok { @apply bg-emerald-50 border border-emerald-200 text-emerald-700; }
+      .stat-ng { @apply bg-rose-50    border border-rose-200    text-rose-700; }
+      .stat-pd { @apply bg-amber-50   border border-amber-200   text-amber-700; }
+      .stat-na { @apply bg-slate-50   border border-slate-200   text-slate-500; }
+
+      /* ボタン：はっきり“ボタン感”を出す */
+      button {
+        @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold text-white shadow-md transition;
+        background-image: linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2));
+      }
+      button:hover { @apply brightness-105; transform: translateY(-0.5px); }
+      button:active{ transform: translateY(0); }
+      button:disabled { @apply opacity-60 cursor-not-allowed; }
+
+      /* ゴーストボタン：白藤の余白感 */
+      button.ghost { @apply text-slate-800 bg-white border border-[color:var(--c-border)] shadow-sm hover:bg-slate-50; }
+
+      /* 警告ボタン（やや和の黄） */
+      button.warn  { @apply text-slate-900; background-image: linear-gradient(to bottom right, #ffd36b, #ffb703); }
+
+      /* スピナーの色を藤に寄せる（border-top-colorは個別指定） */
+      .spinner { border-top-color: rgb(79 70 229); } /* indigo-600相当 */
+    }
+  </script>
+
+  <!-- =========================================================
+    5) LIFF SDK（ここでもOK／重いようなら </body> 直前へ）
+  ========================================================== -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
+
 <body>
-<header>
-  <div>公演 出欠フォーム</div>
-  <div class="ver" id="ver"></div>
-</header>
-<main>
+  <!-- ヘッダーに「is-sticky」クラスを足すと スティッキー化 -->
+  <header class="is-sticky">
+    <div>公演 出欠フォーム</div>
+    <div class="ver" id="ver"></div>
+  </header>
+
+  <main>
+    <!-- 以降、あなたの既存HTMLのままでOK -->
 
   <!-- 友だち未追加アラート -->
   <div id="friendAlert" class="card warnBox" style="display:none;">
@@ -416,7 +511,7 @@
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.0.0";
+const FRONT_VERSION = "Front v2.1.0";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
