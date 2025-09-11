@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>公演 出欠フォーム</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <link rel="stylesheet"
+        href="https://unpkg.com/@picocss/pico@2/css/pico.classless.min.css">
+
   <style>
     :root{
       --c-primary:#0b74de; --c-bg:#fafafa; --c-border:#e5e5e5;
@@ -86,6 +89,21 @@
     input:disabled::placeholder {
       color: #bbb;  /* placeholderも薄く */
     }
+    /* ====== Pico適用後の軽い微調整（あなたのCSSの最後に追記） ====== */
+    /* カードに軽い影（Picoのフラットさを少し持ち上げ） */
+    .card {
+      box-shadow: 0 2px 10px rgba(0,0,0,.04);
+    }
+    
+    /* 余白・見出しの密度調整（モバイルで少し詰め気味に） */
+    main { padding: 16px 18px; }
+    .sectionTitle { font-size: 1.05rem; margin: 6px 0 10px; }
+    
+    /* ボタンを少し丸く＆高さを揃える（Picoの上から上書き） */
+    button { padding: 10px 14px; border-radius: 10px; }
+    
+    /* カードの見出しに少し太字を足す（雰囲気アップ） */
+    header { font-weight: 700; }
   </style>
 </head>
 <body>
@@ -115,7 +133,7 @@
     </div>
 
     <div class="card">
-      <div class="sectionTitle">現在配信中の公演</div>
+      <div class="sectionTitle">回答受付中の公演</div>
       <div id="eventsBox" class="muted">読み込み中… <span class="spinner"></span></div>
     </div>
 
@@ -375,7 +393,7 @@
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v1.2.0";
+const FRONT_VERSION = "Front v2.0.0";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
