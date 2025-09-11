@@ -40,29 +40,20 @@
     @keyframes spin{ to{ transform:rotate(360deg); } }
 
     label{ display:block; font-size:14px; margin:6px 0 4px; }
-    input[type="text"], input[type="date"], select, textarea{
+    input[type="text"], input[type="date"], input[type="time"], select, textarea{
       width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
     }
     .listEmpty{ color:#888; font-size:14px; }
 
-    /* NEW バッジ（既に入っていれば不要） */
-    .badge{
-      display:inline-block;
-      margin-left:6px;
-      padding:2px 6px;
-      font-size:12px;
-      color:#fff;
-      background:#e53935;
-      border-radius:999px;
-      vertical-align:middle;
-    }
-    
-    /* 小さめのピルと状態色 */
     .pill.sm { font-size:12px; padding:2px 8px; }
     .stat-ok  { background:#e8f8f3; border:1px solid #cdeee4; color:#0a7; }   /* 参加 */
     .stat-ng  { background:#fdeaea; border:1px solid #f6cccc; color:#c33; }   /* 欠席 */
     .stat-pd  { background:#fff7d6; border:1px solid #f3d27a; color:#7a5b00;} /* 未定 */
     .stat-na  { background:#f5f5f5; border:1px solid var(--c-border); color:#666;} /* 未回答 */
+
+    .adminGrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media (max-width:700px){ .adminGrid{ grid-template-columns:1fr; } }
+    .hint { font-size:12px; color:#777; }
   </style>
 </head>
 <body>
@@ -72,7 +63,7 @@
 </header>
 <main>
 
-  <!-- 友だち未追加アラート（任意） -->
+  <!-- 友だち未追加アラート -->
   <div id="friendAlert" class="card warnBox" style="display:none;">
     このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
   </div>
@@ -147,7 +138,10 @@
   <section id="view-schedules" data-view>
     <div class="row-space">
       <div class="sectionTitle">今後の予定</div>
-      <button id="btnBackFromSchedules" class="ghost">トップに戻る</button>
+      <div class="row" style="gap:8px;">
+        <button id="btnAdmin" class="ghost" style="display:none;">管理者：予定登録/編集</button>
+        <button id="btnBackFromSchedules" class="ghost">トップに戻る</button>
+      </div>
     </div>
 
     <div class="card">
@@ -182,25 +176,147 @@
     </div>
   </section>
 
+  <!-- ===== 予定登録（管理者） ===== -->
+  <section id="view-admin" data-view>
+    <div class="row-space">
+      <div class="sectionTitle">予定登録（管理者）</div>
+      <div class="row" style="gap:8px;">
+        <button id="btnAdminBack" class="ghost">今後の予定に戻る</button>
+        <button id="btnAdminReload" class="ghost">一覧を再取得</button>
+      </div>
+    </div>
+
+    <!-- 新規/編集フォーム -->
+    <div class="card">
+      <div class="row-space">
+        <div class="sectionTitle" id="adminFormTitle">新規登録</div>
+        <div class="small muted"><span id="adminEditingId" style="display:none;"></span></div>
+      </div>
+
+      <div class="adminGrid">
+        <div>
+          <label>タイトル *</label>
+          <input id="ad_title" type="text" placeholder="例：秋祭り演奏会">
+        </div>
+        <div>
+          <label>種別 *</label>
+          <select id="ad_type">
+            <option value="">（選択）</option>
+            <option value="発表">発表</option>
+            <option value="練習">練習</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div>
+          <label>公演日 *</label>
+          <input id="ad_ymd" type="date">
+        </div>
+        <div>
+          <label>時間（開始）</label>
+          <input id="ad_hm" type="time" placeholder="HH:mm">
+        </div>
+        <div>
+          <label>場所</label>
+          <input id="ad_place" type="text" placeholder="例：藤塚小体育館">
+        </div>
+        <div>
+          <label>集合時間（発表・その他のみ）</label>
+          <input id="ad_meetAt" type="time" placeholder="HH:mm">
+        </div>
+        <div>
+          <label>集合場所</label>
+          <input id="ad_meetPlace" type="text" placeholder="例：校門前">
+        </div>
+        <div>
+          <label>出欠対象（発表のみ）</label>
+          <select id="ad_attendTarget">
+            <option value="Y">Y</option>
+            <option value="N" selected>N</option>
+          </select>
+        </div>
+        <div>
+          <label>締切日</label>
+          <input id="ad_deadline" type="date">
+        </div>
+        <div>
+          <label>公開</label>
+          <select id="ad_publish">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+        <div>
+          <label>ステータス</label>
+          <select id="ad_status">
+            <option value="active" selected>active</option>
+            <option value="inactive">inactive</option>
+          </select>
+        </div>
+        <div>
+          <label>配信フラグ</label>
+          <select id="ad_flag">
+            <option value="N" selected>N</option>
+            <option value="Y">Y（初回配信対象）</option>
+            <option value="S">S（初回配信済）</option>
+            <option value="D">D（締切超過/締切停止）</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="hint" style="margin-top:6px;">
+        * 必須。IDは自動採番です。<br>
+        種別が「練習」の場合は集合時間は自動的に無効化（空）されます。<br>
+        種別が「発表」以外では「出欠対象」は自動で N 固定になります。
+      </div>
+
+      <div class="row right" style="margin-top:10px;">
+        <button id="btnAdminReset" class="ghost" type="button">新規モードに戻す</button>
+        <button id="btnAdminSubmit">新規登録</button>
+      </div>
+      <div id="adminFormLog" class="muted" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- 一覧 -->
+    <div class="card">
+      <div class="row" style="gap:12px;">
+        <div>
+          <label>一覧の表示期間（日数）</label>
+          <select id="ad_days">
+            <option value="30">30日</option>
+            <option value="60" selected>60日</option>
+            <option value="90">90日</option>
+          </select>
+        </div>
+        <div style="align-self:flex-end;">
+          <button id="btnAdminFetch" class="ghost">一覧を取得</button>
+        </div>
+      </div>
+      <div id="adminListBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
+    </div>
+  </section>
+
 </main>
 
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v0.8";
-const LIFF_ID = "2008020568-2jVl00Rn";
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzGAEJcYOiXy9y3AtfzHZ5Z4hbamA5kpK-jroZVB_S4NWQBDv3UMqyEkMJQP4f7DPKHZg/exec";
+const FRONT_VERSION = "Front v0.9-admin-min";
+const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw8DwdGANNinkbPOGYMAYg0gMeFK8dM21bZ64FAi_u2-3Ltl6-kUFBn2bbvb7K3O_d1pg/exec";     // ←差し替え
 
 /* ===== 状態 ===== */
 let state = {
   lineId: "",
   name: "",
+  isAdmin: false,
   members: [],       // [{lineId,inputName,performerName}]
   events:  [],       // [{eventId,date,time,place,deadline,initialAt,isNew}]
-  answers: {},       // { eventId: [{performerName,attend,comment,answeredAt,pendingDate(互換)}] }
-  schedules: [],     // 今後の予定の表示用
+  answers: {},       // { eventId: [...] }
+  schedules: [],     // 今後の予定
   submitting: false
 };
 let registerMode = "create"; // "create" | "edit"
+let adminMode = "create";    // "create" | "edit"（予定登録フォーム）
+let adminEditingId = "";     // 編集対象ID
 
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
@@ -208,6 +324,7 @@ function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classLi
 function logHome(t){ $("#homeLog").textContent = t||""; }
 function logForm(t){ $("#formLog").textContent = t||""; }
 function logReg(t){ $("#regLog").textContent = t||""; }
+function logAdmin(t){ $("#adminFormLog").textContent = t||""; }
 
 function z(n){ return String(n).padStart(2,"0"); }
 function ymdDow(d){
@@ -216,30 +333,31 @@ function ymdDow(d){
   return `${d.getFullYear()}/${z(d.getMonth()+1)}/${z(d.getDate())}（${yo}）`;
 }
 function hmFromTimeCell(v){
-  // GAS側は "Sat Dec 30 1899 HH:MM..." 形式のDate相当が来ることがある
   const s = String(v||"").trim();
   const tryDate = new Date(s);
   if (!isNaN(tryDate)) return `${z(tryDate.getHours())}:${z(tryDate.getMinutes())}`;
-  // "H:MM" / "HH:MM"
   const m = s.match(/^(\d{1,2}):(\d{2})$/); 
   if (m) return `${z(m[1])}:${m[2]}`;
   return "";
 }
 function parseDateLike(s){
-  // "Mon Sep 15 2025 ..." or "2025/09/15" など雑に対応
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
-function todayISO(){
-  const d = new Date();
-  return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
-}
 function esc(s){ return encodeURIComponent(String(s||"")); }
+function toYmdSlashFromDateInput(v){ // "yyyy-mm-dd" -> "yyyy/MM/dd"
+  if (!v) return "";
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[1]}/${m[2]}/${m[3]}` : "";
+}
+function toDateInputFromYmdSlash(v){ // "yyyy/MM/dd" -> "yyyy-mm-dd"
+  const m = String(v||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+}
 
-/* Google Calendar 追加URLを生成（開始・終了が必要） */
+/* Google Calendar 追加URL */
 const DFLT_MIN = { "発表":90, "練習":150, "その他":60 };
 function toDatesParam(ymdStr, hmStr, kind){
-  // ymdStr: "yyyy/MM/dd", hmStr: "HH:mm" or ""
   const m = String(ymdStr||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
   if (!m) return "";
   const H = hmStr ? Number(hmStr.split(":")[0]) : 0;
@@ -247,9 +365,7 @@ function toDatesParam(ymdStr, hmStr, kind){
   const st = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), H, M, 0);
   const mins = DFLT_MIN[kind] || 60;
   const ed = new Date(st.getTime() + mins*60000);
-  const fmt = (d)=>{
-    return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}T${z(d.getHours())}${z(d.getMinutes())}00`;
-  };
+  const fmt = (d)=>`${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}T${z(d.getHours())}${z(d.getMinutes())}00`;
   return `${fmt(st)}/${fmt(ed)}`;
 }
 function makeGoogleCalUrl(title, ymd, hm, place, kind, memo){
@@ -288,30 +404,75 @@ async function init(){
     state.name   = idt && idt.name ? idt.name : "";
     $("#hello").textContent = state.name ? `こんにちは、${state.name} さん` : "";
 
-    // ボタン
-    $("#btnReload").onclick      = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
-    $("#btnPrimary").onclick     = onPrimary;
-    $("#btnEditNames").onclick   = onEditNames;
-    $("#btnBackFromForm").onclick= ()=> show("#view-home");
-    $("#btnBackFromReg").onclick = ()=> show("#view-home");
-    $("#btnSubmit").onclick      = onSubmit;
-
-    $("#btnAddPerf").onclick     = ()=> addPerformerField("");
-    $("#btnRegister").onclick    = onRegister;
-
-    $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); renderSchedules(true); };
-    $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
-    $("#btnFetchSchedules").onclick    = ()=> renderSchedules(false);
-
+    bindHandlers();
     resetRegisterForm();
-    await refreshData();
 
+    // Admin 判定
+    try{
+      const j = await api(`?isAdmin=1&id=${esc(state.lineId)}`);
+      state.isAdmin = (j.status==="ok" && !!j.isAdmin);
+      $("#btnAdmin").style.display = state.isAdmin ? "" : "none";
+    }catch(_){ state.isAdmin = false; }
+
+    await refreshData();
   }catch(err){
     $("#eventsBox").innerHTML = `<span class="err">初期化に失敗しました: ${err.message||err}</span>`;
   }
 }
 
-/* ===== データ読み直し（高速化版：getAttendanceAll） ===== */
+/* ===== クリックバインド ===== */
+function bindHandlers(){
+  $("#btnReload").onclick      = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
+  $("#btnPrimary").onclick     = onPrimary;
+  $("#btnEditNames").onclick   = onEditNames;
+  $("#btnBackFromForm").onclick= ()=> show("#view-home");
+  $("#btnBackFromReg").onclick = ()=> show("#view-home");
+  $("#btnSubmit").onclick      = onSubmit;
+
+  $("#btnAddPerf").onclick     = ()=> addPerformerField("");
+  $("#btnRegister").onclick    = onRegister;
+
+  $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); renderSchedules(true); };
+  $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
+  $("#btnFetchSchedules").onclick    = ()=> renderSchedules(false);
+
+  // Admin
+  $("#btnAdmin").onclick = ()=>{
+    if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
+    show("#view-admin");
+    enterAdminCreateMode();
+    adminListFetch();
+  };
+  $("#btnAdminBack").onclick = ()=> show("#view-schedules");
+  $("#btnAdminReload").onclick = ()=> adminListFetch();
+  $("#btnAdminFetch").onclick = ()=> adminListFetch();
+  $("#btnAdminSubmit").onclick = ()=> adminSubmit();
+  $("#btnAdminReset").onclick = ()=> enterAdminCreateMode();
+
+  // 種別によるUI制御
+  $("#ad_type").addEventListener("change", adminTypeChangeAdapt);
+}
+function adminTypeChangeAdapt(){
+  const t = $("#ad_type").value;
+  const meetAt = $("#ad_meetAt");
+  const attend = $("#ad_attendTarget");
+  if (t === "練習"){
+    meetAt.value = "";
+    meetAt.disabled = true;
+    attend.value = "N"; // 練習は出欠対象外
+    attend.disabled = true;
+  } else if (t === "発表"){
+    meetAt.disabled = false;
+    attend.disabled = false;
+    // デフォルトYにしてもいいが現状のまま（ユーザーが選ぶ）
+  } else {
+    meetAt.disabled = false;
+    attend.value = "N";
+    attend.disabled = true;
+  }
+}
+
+/* ===== データ読み直し ===== */
 async function refreshData(){
   $("#eventsBox").innerHTML  = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
@@ -339,7 +500,7 @@ async function refreshData(){
 
 /* ===== HOME描画 ===== */
 function renderHome(){
-  // 現在配信中の公演（New バッジ・締切表示）
+  // 現在配信中の公演
   if (!state.events.length){
     $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
@@ -356,13 +517,13 @@ function renderHome(){
     }).join("");
   }
 
-  // ボタンの切り替え
+  // ボタン
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
   $("#btnEditNames").style.display = hasMembers ? "" : "none";
 
-  // あなたの登録状況（イベント別にサマリ）
+  // 登録状況
   if (!hasMembers){
     $("#answersBox").innerHTML = `
       <div>まだ「初回登録」が済んでいません。</div>
@@ -370,7 +531,7 @@ function renderHome(){
   } else {
     let html = "";
     for (const e of state.events){
-      const ans = state.answers[e.eventId] || []; // [{performerName,attend,comment,...}]
+      const ans = state.answers[e.eventId] || [];
       const perfs = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
       const map = {}; ans.forEach(r => { map[r.performerName] = r; });
 
@@ -404,17 +565,15 @@ function renderHome(){
   }
 }
 
-/* ===== メインボタンの動作 ===== */
+/* ===== メインボタン ===== */
 function onPrimary(){
   if (state.members.length === 0){
-    // 初回登録へ
     registerMode = "create";
     resetRegisterForm();
     $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
     $("#btnRegister").textContent = "登録する";
     show("#view-register");
   } else {
-    // 出欠フォームへ
     buildFormView();
     show("#view-form");
   }
@@ -427,9 +586,8 @@ function onEditNames(){
   show("#view-register");
 }
 
-/* ===== 出欠フォーム構築（ヘッダ簡易サマリ＋入力欄） ===== */
+/* ===== 出欠フォーム ===== */
 function buildFormView(){
-  // ヘッダ：イベント簡易サマリ（HOMEの「あなたの登録状況」と同等）
   if (!state.events.length){
     $("#formEventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
   } else {
@@ -459,7 +617,6 @@ function buildFormView(){
     $("#formEventsBox").innerHTML = headerHtml;
   }
 
-  // 入力欄：各イベント×演奏者
   const box = $("#formFields");
   box.innerHTML = "";
   if (!state.events.length) return;
@@ -504,7 +661,7 @@ function buildFormView(){
   }
 }
 
-/* ===== 出欠送信（submitBulk） ===== */
+/* ===== 出欠送信 ===== */
 async function onSubmit(){
   if (state.submitting) return;
   state.submitting = true;
@@ -537,13 +694,12 @@ async function onSubmit(){
 
     if (!payloads.length){ alert("送信する内容がありません（出欠の選択が未入力です）"); return; }
 
+    // まとめ送信
     const grouped = {};
     for (const p of payloads){
       if (!grouped[p.eventId]) grouped[p.eventId] = [];
       grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, comment:p.comment });
     }
-
-    // まとめ送信
     for (const [eventId, list] of Object.entries(grouped)){
       const url = `${API_ENDPOINT}?submitBulk=1&eventId=${esc(eventId)}&lineId=${esc(state.lineId)}&bulk=${esc(JSON.stringify(list))}`;
       const r = await fetch(url); const j = await r.json();
@@ -564,11 +720,11 @@ async function onSubmit(){
   }
 }
 
-/* ===== 初回登録ビュー ===== */
+/* ===== 初回登録 ===== */
 function resetRegisterForm(){
   $("#regInputName").value = state.name || "";
   $("#perfList").innerHTML = "";
-  addPerformerField(""); // 最低1行
+  addPerformerField("");
 }
 function buildRegisterFormFromMembers(){
   const inputName = (state.members[0]?.inputName || state.name || "");
@@ -659,14 +815,12 @@ async function renderSchedules(initial=false){
       return;
     }
 
-    // ICS購読リンク
     const feedUrl = `${API_ENDPOINT}?icsFeed=1`;
     let html = `<div class="small muted" style="margin-bottom:8px;">
       ・各予定から「Googleカレンダー」/「iOS(ICS)」に追加できます。購読（自動反映）は下のリンクから登録してください。
     </div>`;
 
     html += state.schedules.map(it=>{
-      // it: { id, date, time, title, place, kind, memo }
       const ymd = (it.date || "").replace(/（.）/,"").trim().slice(0,10); // "yyyy/MM/dd"
       const gcal = makeGoogleCalUrl(it.title, ymd, it.time||"", it.place, it.kind, it.memo||"");
       const ics  = `${API_ENDPOINT}?ics=1&id=${esc(it.id)}`;
@@ -708,6 +862,156 @@ function copyIcsFeed(){
   ipt.select();
   document.execCommand("copy");
   alert("購読URLをコピーしました");
+}
+
+/* ===== 予定登録（管理者） ===== */
+function enterAdminCreateMode(){
+  adminMode = "create";
+  adminEditingId = "";
+  $("#adminFormTitle").textContent = "新規登録";
+  $("#adminEditingId").style.display = "none";
+  $("#btnAdminSubmit").textContent = "新規登録";
+  $("#ad_title").value = "";
+  $("#ad_type").value = "";
+  $("#ad_ymd").value = "";
+  $("#ad_hm").value = "";
+  $("#ad_place").value = "";
+  $("#ad_meetAt").value = "";
+  $("#ad_meetPlace").value = "";
+  $("#ad_attendTarget").value = "N";
+  $("#ad_deadline").value = "";
+  $("#ad_publish").value = "Yes";
+  $("#ad_status").value = "active";
+  $("#ad_flag").value = "N";
+  adminTypeChangeAdapt();
+  logAdmin("");
+}
+function fillAdminFormFromItem(it){
+  // it from listSchedulesAdmin: {id,type,title,ymd,hm,place,meetAt,meetPlace,attendTarget,deadline,publish,status,flag,...}
+  adminMode = "edit";
+  adminEditingId = it.id || "";
+  $("#adminFormTitle").textContent = `編集：${adminEditingId}`;
+  $("#adminEditingId").style.display = "";
+  $("#adminEditingId").textContent = `ID: ${adminEditingId}`;
+  $("#btnAdminSubmit").textContent = "保存";
+
+  $("#ad_title").value = it.title || "";
+  $("#ad_type").value  = it.type || "";
+  $("#ad_ymd").value   = toDateInputFromYmdSlash(it.ymd || "");
+  $("#ad_hm").value    = it.hm || "";
+  $("#ad_place").value = it.place || "";
+  $("#ad_meetAt").value = it.meetAt || "";
+  $("#ad_meetPlace").value = it.meetPlace || "";
+  $("#ad_attendTarget").value = (it.attendTarget||"N");
+  $("#ad_deadline").value = toDateInputFromYmdSlash(it.deadline || "");
+  $("#ad_publish").value = it.publish || "Yes";
+  $("#ad_status").value  = it.status  || "active";
+  $("#ad_flag").value    = it.flag    || "N";
+
+  adminTypeChangeAdapt();
+  logAdmin("");
+}
+async function adminSubmit(){
+  try{
+    if (!state.isAdmin){ alert("管理者のみ利用できます"); return; }
+    logAdmin("");
+
+    const type  = $("#ad_type").value.trim();
+    const title = $("#ad_title").value.trim();
+    const ymdIn = $("#ad_ymd").value.trim();   // yyyy-mm-dd
+    const hm    = $("#ad_hm").value.trim();
+    const place = $("#ad_place").value.trim();
+    const meetAt= $("#ad_meetAt").value.trim();
+    const meetPl= $("#ad_meetPlace").value.trim();
+    const attT  = $("#ad_attendTarget").value.trim().toUpperCase();
+    const dlIn  = $("#ad_deadline").value.trim();
+    const pub   = $("#ad_publish").value.trim();
+    const st    = $("#ad_status").value.trim();
+    const flag  = $("#ad_flag").value.trim();
+
+    if (!title || !type || !ymdIn){ throw new Error("タイトル/種別/公演日は必須です"); }
+
+    // UI制御に従う（安全側）
+    let meetAtSend = meetAt, attSend = attT;
+    if (type==="練習"){ meetAtSend = ""; attSend = "N"; }
+    if (type!=="発表"){ attSend = "N"; }
+
+    const ymd = toYmdSlashFromDateInput(ymdIn); // yyyy/MM/dd
+    const dl  = dlIn ? toYmdSlashFromDateInput(dlIn) : "";
+
+    $("#btnAdminSubmit").disabled = true;
+    $("#btnAdminSubmit").textContent = (adminMode==="edit" ? "保存中…" : "登録中…");
+
+    let res;
+    if (adminMode === "create"){
+      const url = `?addSchedule=1&lineId=${esc(state.lineId)}`
+        + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
+        + (hm?`&hm=${esc(hm)}`:"")
+        + (place?`&place=${esc(place)}`:"")
+        + (meetAtSend?`&meetAt=${esc(meetAtSend)}`:"")
+        + (meetPl?`&meetPlace=${esc(meetPl)}`:"")
+        + `&attendTarget=${esc(attSend)}`
+        + (dl?`&deadline=${esc(dl)}`:"")
+        + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
+      res = await api(url);
+      if (res.status!=="ok") throw new Error(res.message||"登録に失敗しました");
+      alert(`登録しました（ID: ${res.inserted?.id||"(不明)"}）`);
+      enterAdminCreateMode();
+      await adminListFetch();
+    } else {
+      if (!adminEditingId){ throw new Error("編集対象IDが不正です"); }
+      // すべて送って上書き（GAS側は与えたキーのみ更新）
+      const url = `?updateSchedule=1&lineId=${esc(state.lineId)}&id=${esc(adminEditingId)}`
+        + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
+        + `&hm=${esc(hm)}&place=${esc(place)}&meetAt=${esc(meetAtSend)}&meetPlace=${esc(meetPl)}`
+        + `&attendTarget=${esc(attSend)}&deadline=${esc(dl)}`
+        + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
+      res = await api(url);
+      if (res.status!=="ok") throw new Error(res.message||"保存に失敗しました");
+      alert("保存しました");
+      await adminListFetch();
+    }
+  }catch(err){
+    logAdmin(err.message || String(err));
+  }finally{
+    $("#btnAdminSubmit").disabled = false;
+    $("#btnAdminSubmit").textContent = (adminMode==="edit" ? "保存" : "新規登録");
+  }
+}
+async function adminListFetch(){
+  try{
+    $("#adminListBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
+    const days = Number($("#ad_days").value || 60);
+    const r = await api(`?listSchedulesAdmin=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
+    if (r.status !== "ok" || !Array.isArray(r.schedules)){
+      $("#adminListBox").innerHTML = `<span class="err">取得に失敗しました</span>`;
+      return;
+    }
+    if (r.schedules.length === 0){
+      $("#adminListBox").innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+      return;
+    }
+    const html = r.schedules.map(it=>{
+      return `<div class="card">
+        <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
+        <div class="small">${it.type||""}：${it.title||""}</div>
+        <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"inactive"} / 配信:${it.flag||"N"}</div>
+        <div class="row" style="margin-top:8px;">
+          <button class="ghost" type="button" onclick='adminEdit(${JSON.stringify(it).replace(/"/g,"&quot;")})'>編集</button>
+        </div>
+      </div>`;
+    }).join("");
+    $("#adminListBox").innerHTML = html;
+  }catch(err){
+    $("#adminListBox").innerHTML = `<span class="err">エラー：${err.message||err}</span>`;
+  }
+}
+// 編集ボタンから
+function adminEdit(obj){
+  // obj は listSchedulesAdmin の1件
+  // JSON安全化のため &quot; を元に戻してパースされている
+  fillAdminFormFromItem(obj);
+  window.scrollTo({ top:0, behavior:"smooth" });
 }
 
 /* ===== 起動 ===== */
