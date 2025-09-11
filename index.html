@@ -66,6 +66,23 @@
       border-color: #eee !important;
       -webkit-text-fill-color: #999;  /* iOS/Safari対策 */
     }
+    /* 既存の input:disabled, select:disabled ... の直後 or CSSの一番最後に置いてください */
+    #ad_meetPlace:disabled {
+      background-color: #f7f7f7 !important;
+      color: #999 !important;
+      border-color: #eee !important;
+      -webkit-text-fill-color: #999 !important; /* Safari/iOS */
+    }
+    #ad_meetPlace:disabled::placeholder {
+      color: #bbb !important;
+    }
+    
+    /* Chrome/Safariのオートフィル対策（disabledでも色が残るのを上書き） */
+    #ad_meetPlace:-webkit-autofill:disabled {
+      -webkit-text-fill-color: #999 !important;
+      -webkit-box-shadow: 0 0 0px 1000px #f7f7f7 inset !important;
+      box-shadow: inset 0 0 0px 1000px #f7f7f7 !important;
+    }
     input:disabled::placeholder {
       color: #bbb;  /* placeholderも薄く */
     }
@@ -249,7 +266,7 @@
         </div>
         <div>
           <label>集合場所</label>
-          <input id="ad_meetPlace" type="text" placeholder="例：校門前">
+          <input id="ad_meetPlace" type="text" placeholder="例：藤塚小学校">
         </div>
         <div>
           <label>出欠対象（発表のみ）</label>
