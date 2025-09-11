@@ -301,7 +301,7 @@
 /* ===== 設定 ===== */
 const FRONT_VERSION = "Front v0.9-admin-min";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyiLtjB62xCu-wj37ar4aVjiuk1F-6cK_SH4sRR5I8R_izelZ3xIPt6Efx91540PuMfwQ/exec";     // ←差し替え
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycby1Vy95IuI4apPWGkCyt8u2e9bfescZ43MtaOvLnmtgO9xPWxzXoZglvmmJEK7SgivfNA/exec";     // ←差し替え
 
 /* ===== 状態 ===== */
 let state = {
@@ -678,14 +678,22 @@ function buildFormView(){
             <option value="欠席" ${attend==="欠席"?"selected":""}>欠席</option>
             <option value="未定" ${attend==="未定"?"selected":""}>未定</option>
           </select>
-
-          <label for="${idBase}_com">コメント（任意・100文字まで）</label>
-          <input type="text" id="${idBase}_com" value="${row.comment||""}" maxlength="100" placeholder="例：家族の都合で検討中 など">
         </div>
       `;
       card.insertAdjacentHTML("beforeend", html);
     });
-
+    // ★公演コメント（共通1枠）— 既存回答から最初の非空コメントを拾って初期値として入れる
+    let eventComment = "";
+    for (const r of current) {
+      if ((r.comment||"").trim()) { eventComment = r.comment.trim(); break; }
+    }
+    const comId = `e${e.eventId}_eventcom`;
+    card.insertAdjacentHTML("beforeend", `
+      <div class="line"></div>
+      <label for="${comId}">公演コメント（任意・100文字まで、代表して1行のみ保存）</label>
+      <input type="text" id="${comId}" value="${eventComment}" maxlength="100" placeholder="例：家族の予定調整中 など">
+    `);
+    
     box.appendChild(card);
   }
 }
@@ -703,21 +711,23 @@ async function onSubmit(){
 
     for (const e of state.events){
       const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
+      // 公演コメント（共通1枠）
+      const eventComEl = document.getElementById(`e${e.eventId}_eventcom`);
+      const eventComment = (eventComEl?.value || "").trim();
+      
       performers.forEach((name, idx)=>{
         const idBase = `e${e.eventId}_i${idx}`;
         const sel = document.getElementById(`${idBase}_att`);
         if (!sel) return;
         const attend = sel.value;
-
-        const comEl  = document.getElementById(`${idBase}_com`);
-        const comment = (comEl?.value || "").trim();
-
+        
         if (!attend) return; // 未選択は送信しない
 
         const key = `${e.eventId}||${name}`;
         if (seen.has(key)) return; seen.add(key);
 
-        payloads.push({ eventId:e.eventId, performerName:name, attend, comment });
+        // コメントはこの段階では入れず、後段で先頭1件にだけ付ける
+        payloads.push({ eventId:e.eventId, performerName:name, attend, _eventComment: eventComment });
       });
     }
 
@@ -730,6 +740,13 @@ async function onSubmit(){
       grouped[p.eventId].push({ performerName:p.performerName, attend:p.attend, comment:p.comment });
     }
     for (const [eventId, list] of Object.entries(grouped)){
+       // 先頭一件だけにコメントを入れる（それ以外は空）
+      const list = listRaw.map((it, idx) => ({
+        performerName: it.performerName,
+        attend: it.attend,
+        comment: (idx === 0) ? (it._eventComment || "") : ""
+      }));
+      
       const url = `${API_ENDPOINT}?submitBulk=1&eventId=${esc(eventId)}&lineId=${esc(state.lineId)}&bulk=${esc(JSON.stringify(list))}`;
       const r = await fetch(url); const j = await r.json();
       if (j.status !== "ok") throw new Error(`送信失敗（${eventId}）: ${j.message||"unknown"}`);
@@ -850,18 +867,10 @@ async function renderSchedules(initial=false){
     </div>`;
 
     html += state.schedules.map(it=>{
-      const ymd = (it.date || "").replace(/（.）/,"").trim().slice(0,10); // "yyyy/MM/dd"
-      const gcal = makeGoogleCalUrl(it.title, ymd, it.time||"", it.place, it.kind, it.memo||"");
-      const ics  = `${API_ENDPOINT}?ics=1&id=${esc(it.id)}`;
-
       return `<div class="card">
         <div><b>${it.date} ${it.time||""}</b> @ ${it.place||""}</div>
         <div class="small muted">${it.kind||""} ${it.title||""}</div>
         ${it.memo?`<div class="small">${it.memo}</div>`:""}
-        <div class="row" style="margin-top:8px;">
-          <button class="ghost" onclick="window.open('${gcal}','_blank')">Googleカレンダー</button>
-          <button class="ghost" onclick="window.open('${ics}','_blank')">iOS/ICS</button>
-        </div>
       </div>`;
     }).join("");
 
