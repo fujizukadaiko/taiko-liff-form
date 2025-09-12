@@ -45,28 +45,26 @@
         radial-gradient(900px 500px  at 80% 60%, rgba(127,106,165,.04), transparent 35%),
         var(--c-bg);
     }
-      /* 見出し（h1〜h3）は和風の明朝体のまま */
-      h1,h2,h3{
-        font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
-        letter-spacing: 0.03em;
-      }
-      
-      /* セクションタイトルはゴシック太字（視認性重視） */
-      .sectionTitle{
-        font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-      }
-      
-      /* ヘッダーのサイトタイトルだけ明朝体（強制適用） */
-      .siteTitle{
-        font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif !important;
-        font-weight: 600; /* ← 太すぎるなら 500 に */
-        letter-spacing: 0.03em;
-      }
-    
+    /* 見出しは和風の明朝体のまま */
+    h1,h2,h3{
+      font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+      letter-spacing: 0.03em;
+    }
+    /* セクションタイトルはゴシック太字（視認性重視） */
+    .sectionTitle{
+      font-family: "Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    /* ヘッダーのサイトタイトルだけ明朝体（強制適用） */
+    .siteTitle{
+      font-family: "Shippori Mincho","Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MS PMincho",serif !important;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
     header{
-      padding:14px 16px; font-size:18px; /*font-weight:700;←削除 */
+      padding:14px 16px; font-size:18px;
       background:#fff; border-bottom:1px solid var(--c-border);
       display:flex; justify-content:space-between; align-items:center;
     }
@@ -114,7 +112,7 @@
     /* warnBox（友だち未追加アラート用） */
     .warnBox{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
 
-    /* ---- a/button 共通の “見えるボタン” ---- */
+    /* ---- a/button 共通 “見えるボタン” ---- */
     a.btn, button.btn{
       display:inline-flex; align-items:center; justify-content:center;
       min-height:40px; padding:10px 14px; border-radius:12px;
@@ -131,26 +129,46 @@
     }
     button.btn:disabled, a.btn[aria-disabled="true"]{ opacity:.6; cursor:not-allowed; pointer-events:none; }
 
-    .btn-primary{ color:#fff; border-color:color-mix(in srgb, var(--c-primary-2), #000 6%); background-image:linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2)); }
-    .btn-primary:hover{ filter:brightness(1.06); }
-    .btn-primary:active{ filter:brightness(1.12); }
+    /* ── 色バリエーション（!important で白背景を確実に上書き） ── */
+    .btn-primary{
+      color:#fff !important;
+      border-color:color-mix(in srgb, var(--c-primary-2), #000 6%) !important;
+      background-image:linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2)) !important;
+      background-color:var(--c-primary) !important;
+    }
+    .btn-accent{
+      color:#0f1a0f !important;
+      border-color:color-mix(in srgb, var(--c-acc2-dark), #000 10%) !important;
+      background-image:linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark)) !important;
+      background-color:var(--c-acc2) !important;
+    }
+    .btn-ghost{
+      background:#fff !important; color:var(--c-text) !important; border-color:var(--c-border) !important;
+    }
+    .btn-outline{
+      background:#fff !important; color:var(--c-primary-2) !important; border-color:var(--c-primary-2) !important;
+    }
 
-    .btn-accent{ color:#0f1a0f; border-color:color-mix(in srgb, var(--c-acc2-dark), #000 10%); background-image:linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark)); }
-    .btn-accent:hover{ filter:brightness(1.05); }
-    .btn-accent:active{ filter:brightness(1.12); }
-
-    .btn-ghost{ background:#fff; color:var(--c-text); border-color:var(--c-border); }
-    .btn-ghost:hover{ background:#f9fafb; }
-    .btn-ghost:active{ filter:brightness(1.04); }
-
-    .btn-outline{ background:#fff; color:var(--c-primary-2); border-color:var(--c-primary-2); }
-    .btn-outline:hover{ background:#faf7ff; }
-    .btn-outline:active{ filter:brightness(1.06); }
+    .btn-primary:hover  { filter:brightness(1.06); }
+    .btn-primary:active { filter:brightness(1.12); }
+    .btn-accent:hover   { filter:brightness(1.05); }
+    .btn-accent:active  { filter:brightness(1.12); }
+    .btn-ghost:hover    { background:#f9fafb !important; }
+    .btn-ghost:active   { filter:brightness(1.04); }
+    .btn-outline:hover  { background:#faf7ff !important; }
+    .btn-outline:active { filter:brightness(1.06); }
 
     .btn-sm{ padding:8px 12px; min-height:36px; font-size:14px; border-radius:10px; }
     .btn-lg{ padding:12px 16px; min-height:44px; font-size:16px; border-radius:14px; }
     .btn > .icon{ display:inline-block; margin-right:.4em; line-height:0; }
-    .btnRow{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
+
+    /* トップのボタン行：スマホ＝縦積み、600px以上＝3列 */
+    .btnRow{ display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; margin:8px 0; }
+    .btnRow .btn{ flex:1 1 100%; }
+    @media (min-width:600px){
+      .btnRow{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+      .btnRow .btn{ width:100%; }
+    }
   </style>
 
   <!-- Tailwind の上乗せ（@apply） -->
@@ -177,13 +195,12 @@
       .stat-pd { @apply bg-amber-50   border border-amber-200   text-amber-700; }
       .stat-na { @apply bg-slate-50   border border-slate-200   text-slate-500; }
 
-      /* button 要素（.btn ではなくても見栄えする） */
-      button { @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold text-white shadow-md transition; }
+      /* button（タグ）にデフォ装飾は付けない。色は .btn-* で確定させる */
+      button { @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold shadow-md transition; }
       button:hover { @apply brightness-105; transform: translateY(-0.5px); }
       button:active{ transform: translateY(0); }
       button:disabled { @apply opacity-60 cursor-not-allowed; }
       button.ghost { @apply text-slate-800 bg-white border border-[color:var(--c-border)] shadow-sm hover:bg-slate-50; }
-      button.warn  { @apply text-slate-900; background-image: linear-gradient(to bottom right, #ffd36b, #ffb703); }
 
       .spinner { border-top-color: rgb(79 70 229); }
     }
@@ -195,7 +212,7 @@
 
 <body>
   <header class="is-sticky">
-    <div>出欠入力と予定確認</div>
+    <div class="siteTitle">出欠入力と予定確認</div>
     <div class="ver" id="ver"></div>
   </header>
 
@@ -219,6 +236,13 @@
         <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
       </div>
 
+      <!-- ★ トップ操作ボタン（上部に配置） -->
+      <div class="btnRow" aria-label="主操作">
+        <button id="btnPrimary"   class="btn btn-primary btn-lg" data-view-target="view-form">出欠入力</button>
+        <button id="btnSchedules" class="btn btn-outline btn-lg" data-view-target="view-schedules">予定</button>
+        <button id="btnEditNames" class="btn btn-ghost   btn-lg" data-view-target="view-register" style="display:none;">氏名編集</button>
+      </div>
+
       <!-- 回答受付中の公演 -->
       <div class="card">
         <div class="sectionTitle">回答受付中の公演</div>
@@ -231,15 +255,8 @@
         <div id="answersBox" class="muted">会員情報照会中… <span class="spinner"></span></div>
       </div>
 
-      <!-- 下部操作列 -->
-      <div class="row" style="margin-top:6px; gap:8px; flex-wrap:wrap;">
-        <button id="btnPrimary"    class="btn btn-primary btn-lg btn-block" data-view-target="view-form">出欠を入力 / 変更する</button>
-        <button id="btnEditNames"  class="btn btn-ghost   btn-lg"           data-view-target="view-register" style="display:none;">氏名を編集する</button>
-        <button id="btnSchedules"  class="btn btn-outline btn-lg"           data-view-target="view-schedules">今後の予定を見る</button>
-        <button id="btnReload"     class="btn btn-ghost   btn-lg" type="button">再読み込み</button>
-      </div>
       <div id="homeLog" class="muted" style="margin-top:8px;"></div>
-    </section><!-- ← ここで HOME を閉じるのがポイント！ -->
+    </section><!-- HOME end -->
 
     <!-- ===== フォーム（出欠） ===== -->
     <section id="view-form" data-view>
@@ -448,13 +465,13 @@
         });
       });
 
-      // 再読み込み
+      // 再読み込み（要素がなければ無視）
       document.getElementById('btnReload')?.addEventListener('click', () => location.reload());
     });
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.3.7";
+const FRONT_VERSION = "Front v2.3.8";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
