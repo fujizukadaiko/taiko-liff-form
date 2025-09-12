@@ -671,7 +671,7 @@
 </html>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.4.8";
+const FRONT_VERSION = "Front v2.4.9";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
@@ -874,6 +874,52 @@ async function refreshData(){
   }
 
   renderHome();
+  // ================= HomeEventsUI へのブリッジ（★追加） =================
+  try {
+    // 1) 受付中の公演を HomeEventsUI 形式へ整形
+    const openList = (state.events || []).map(e => ({
+      id      : e.eventId,                                      // 必須
+      ymd     : ymdDow(parseYmdStrict(e.date)) || (e.date||""), // "YYYY/MM/DD (曜)" を優先
+      hm      : hmFromTimeCell(e.time || ""),                   // "HH:mm" に整形
+      place   : e.place || "",
+      deadline: e.deadline || "",
+      isNew   : !!e.isNew
+    }));
+
+    // 2) あなた（家族）の回答をフラット配列へ整形
+    //    state.answers は {eventId: [ {performerName, attend, ...}, ... ] } の想定
+    const myFamilyAnswers = [];
+    for (const ev of (state.events || [])) {
+      const arr = state.answers[ev.eventId] || [];
+      for (const r of arr) {
+        myFamilyAnswers.push({
+          eventId: ev.eventId,
+          name   : r.performerName || r.name || "",
+          answer : (r.attend || r.answer || "").trim() || "未回答"
+        });
+      }
+    }
+
+    // 3) 描画（renderHomeFromRaw があれば即時、無ければフォールバック）
+    if (window.renderHomeFromRaw) {
+      window.renderHomeFromRaw(openList, myFamilyAnswers);
+    } else {
+      // フォールバック：グローバル経由で HomeEventsUI に通知
+      window.__HOME_EVENTS__ = openList;
+      const map = {};
+      for (const a of myFamilyAnswers) {
+        if (!map[a.eventId]) map[a.eventId] = [];
+        map[a.eventId].push({ name: a.name, answer: a.answer });
+      }
+      window.__HOME_ANSWERS__ = map;
+      window.dispatchEvent(new CustomEvent('home:data', {
+        detail: { events: openList, myAnswersMap: map }
+      }));
+    }
+  } catch (e) {
+    console.error("HomeEventsUI bridge error:", e);
+  }
+  // ================= HomeEventsUI へのブリッジ（★追加ここまで） =================
 }
 
 /* ===== HOME描画 ===== */
