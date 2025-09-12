@@ -5,89 +5,49 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>公演 出欠フォーム</title>
 
-  <!-- =========================================================
-    1) Google Fonts：CSSより前に置く（必須）
-       和の雰囲気：本文=ゴシック（Noto Sans JP）
-                 見出し/セクション=明朝（Shippori Mincho）
-       ※ FOUCを抑えるため preconnect を追加
-  ========================================================== -->
+  <!-- Google Fonts（本文=ゴシック / 見出し=明朝） -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Shippori+Mincho:wght@500;700&display=swap"
-    rel="stylesheet"
-  >
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
 
-  <!-- =========================================================
-    2) Tailwind CDN（preflightは無効化）
-       ※ tailwind.config は CDN 読み込み「前」に書くのが正解
-  ========================================================== -->
+  <!-- Tailwind（preflight無効） -->
   <script>
     window.tailwind = window.tailwind || {};
     tailwind.config = {
-      corePlugins: { preflight: false }, // 既存CSSを壊さない
+      corePlugins: { preflight: false },
       theme: {
         extend: {
-          colors: {
-            primary: '#7f6aa5', // 藤の主色（任意でTailwindクラスとしても使える）
-          },
-          boxShadow: {
-            card: '0 2px 10px rgba(0,0,0,0.04)'
-          }
+          colors: { primary: '#7f6aa5' },
+          boxShadow: { card: '0 2px 10px rgba(0,0,0,0.04)' }
         }
       }
     };
   </script>
   <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
 
-  <!-- =========================================================
-    3) 既存のベースCSS（変数やレイアウトの基本）
-       ※ :root は「和風（白藤系）」のパレットを採用
-       ※ ここでは Tailwind の @apply は使わない（通常のCSS）
-  ========================================================== -->
+  <!-- ===== Base CSS ===== -->
   <style>
     :root{
-      /* 白藤系の基調色 */
-      --c-bg:        #f7f5fa;  /* 背景（ごく淡い藤） */
-      --c-panel:     #ffffff;  /* カード背景 */
-      --c-border:    #e8e2f0;  /* 枠線（藤みのある薄グレー） */
-
-      /* テキストとアクセント */
-      --c-text:      #202022;
-      --c-muted:     #6b6b6b;
-      --c-primary:   #7f6aa5;  /* 主色（藤） */
-      --c-primary-2: #6d5a93;  /* 影・強調（濃い藤） */
-      --c-accent:    #a678b0;  /* バッジ等の差し色 */
-
-      /* アクセント（若草・若緑） */
-      --c-acc1:      #d2e5b1;  /* 明るい若草（淡い） */
-      --c-acc2:      #9ce78f;  /* 若緑（本色） */
-      --c-acc2-dark: #6aa96a;  /* 濃いめの緑（影やグラデ用） */
-
-      /* 成功/警告/エラー（必要なら和色に寄せ替え可） */
-      --c-ok:  #0a7;
-      --c-err: #c33;
+      --c-bg:#f7f5fa; --c-panel:#fff; --c-border:#e8e2f0;
+      --c-text:#202022; --c-muted:#6b6b6b;
+      --c-primary:#7f6aa5; --c-primary-2:#6d5a93; --c-accent:#a678b0;
+      --c-acc1:#d2e5b1; --c-acc2:#9ce78f; --c-acc2-dark:#6aa96a;
+      --c-ok:#0a7; --c-err:#c33;
     }
-
-    /* フォント：本文はゴシック、見出しは明朝 */
     body{
-      margin:0;
-      background: var(--c-bg);
-      color: var(--c-text);
-      font-family: "Noto Sans JP", system-ui, -apple-system, Segoe UI, "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
-      letter-spacing: 0.02em;
-      /* 和紙っぽい淡い背景（任意） */
+      margin:0; color:var(--c-text);
+      font-family:"Noto Sans JP",system-ui,-apple-system,Segoe UI,"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
+      letter-spacing:.02em;
       background:
         radial-gradient(1200px 600px at 20% 10%, rgba(127,106,165,.05), transparent 40%),
-        radial-gradient(900px  500px at 80% 60%, rgba(127,106,165,.04), transparent 35%),
+        radial-gradient(900px 500px  at 80% 60%, rgba(127,106,165,.04), transparent 35%),
         var(--c-bg);
     }
     h1,h2,h3,.sectionTitle{
-      font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
-      letter-spacing: 0.03em;
+      font-family:"Shippori Mincho","Yu Mincho","Hiragino Mincho ProN","MS PMincho",serif;
+      letter-spacing:.03em;
     }
 
-    /* 既存スタイル（必要最小限に整理） */
     header{
       padding:14px 16px; font-size:18px; font-weight:700;
       background:#fff; border-bottom:1px solid var(--c-border);
@@ -95,6 +55,7 @@
     }
     main{ padding:14px 16px; }
     .ver{ font-size:12px; color:#888; font-weight:500; }
+
     .card{ background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; margin:10px 0; }
     .muted{ color:var(--c-muted); font-size:13px; }
     .row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
@@ -106,7 +67,7 @@
     [data-view]{ display:none; }
     [data-view].show{ display:block; }
 
-    .spinner{ width:18px; height:18px; border:2px solid #ddd; border-top-color: var(--c-primary); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; vertical-align:middle; }
+    .spinner{ width:18px; height:18px; border:2px solid #ddd; border-top-color:var(--c-primary); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; vertical-align:middle; }
     @keyframes spin{ to{ transform:rotate(360deg); } }
 
     label{ display:block; font-size:14px; margin:6px 0 4px; }
@@ -116,570 +77,367 @@
     .listEmpty{ color:#888; font-size:14px; }
 
     .pill{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
-    .pill.sm { font-size:12px; padding:2px 8px; }
+    .pill.sm{ font-size:12px; padding:2px 8px; }
 
-    .stat-ok  { background:#e8f8f3; border:1px solid #cdeee4; color:#0a7; }   /* 参加 */
-    .stat-ng  { background:#fdeaea; border:1px solid #f6cccc; color:#c33; }   /* 欠席 */
-    .stat-pd  { background:#fff7d6; border:1px solid #f3d27a; color:#7a5b00;} /* 未定 */
-    .stat-na  { background:#f5f5f5; border:1px solid var(--c-border); color:#666;} /* 未回答 */
+    .stat-ok{ background:#e8f8f3; border:1px solid #cdeee4; color:#0a7; }
+    .stat-ng{ background:#fdeaea; border:1px solid #f6cccc; color:#c33; }
+    .stat-pd{ background:#fff7d6; border:1px solid #f3d27a; color:#7a5b00; }
+    .stat-na{ background:#f5f5f5; border:1px solid var(--c-border); color:#666; }
 
-    .adminGrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .adminGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     @media (max-width:700px){ .adminGrid{ grid-template-columns:1fr; } }
-    .hint { font-size:12px; color:#777; }
+    .hint{ font-size:12px; color:#777; }
 
-    .tag { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--c-border); background:#f7f7f7; color:#444; }
-    .tag.open   { background:#e8f8f3; border-color:#cdeee4; color:#0a7; }
-    .tag.closed { background:#fdeaea; border-color:#f6cccc; color:#c33; }
+    .tag{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--c-border); background:#f7f7f7; color:#444; }
+    .tag.open{ background:#e8f8f3; border-color:#cdeee4; color:#0a7; }
+    .tag.closed{ background:#fdeaea; border-color:#f6cccc; color:#c33; }
 
-    /* 入力不可の見た目（既存） */
-    input:disabled, select:disabled, textarea:disabled {
-      background-color: #f7f7f7 !important;
-      color: #999 !important;
-      border-color: #eee !important;
-      -webkit-text-fill-color: #999;
+    header.is-sticky{ position:sticky; top:0; backdrop-filter:blur(6px); background:rgba(255,255,255,.9); z-index:50; }
+
+    /* warnBox（友だち未追加アラート用） */
+    .warnBox{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
+
+    /* ---- a/button 共通の “見えるボタン” ---- */
+    a.btn, button.btn{
+      display:inline-flex; align-items:center; justify-content:center;
+      min-height:40px; padding:10px 14px; border-radius:12px;
+      border:1px solid var(--c-border); background:#fff; color:var(--c-text);
+      text-decoration:none; font-size:15px; font-weight:600; letter-spacing:.01em; line-height:1;
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
+      transition:transform .08s ease, filter .12s ease, box-shadow .12s ease;
+      cursor:pointer;
     }
-    #ad_meetPlace:disabled { background-color:#f7f7f7 !important; color:#999 !important; border-color:#eee !important; -webkit-text-fill-color:#999 !important; }
-    #ad_meetPlace:disabled::placeholder { color:#bbb !important; }
-    #ad_meetPlace:-webkit-autofill:disabled {
-      -webkit-text-fill-color: #999 !important;
-      -webkit-box-shadow: 0 0 0px 1000px #f7f7f7 inset !important;
-      box-shadow: inset 0 0 0px 1000px #f7f7f7 !important;
+    a.btn:hover, button.btn:hover{ filter:brightness(1.02); transform:translateY(-0.5px); }
+    a.btn:active, button.btn:active{ filter:brightness(1.06); transform:translateY(0); }
+    a.btn:focus-visible, button.btn:focus-visible{
+      outline:none; box-shadow:0 2px 8px rgba(0,0,0,.06), 0 0 0 3px color-mix(in srgb, var(--c-primary), transparent 75%);
     }
-    input:disabled::placeholder { color: #bbb; }
+    button.btn:disabled, a.btn[aria-disabled="true"]{ opacity:.6; cursor:not-allowed; pointer-events:none; }
 
-    /* ヘッダーのスティッキー（※HTML内に直接書いていたものを正しい場所へ移動） */
-    header.is-sticky {
-      position: sticky;
-      top: 0;
-      backdrop-filter: blur(6px);
-      background: rgba(255,255,255,0.9);
-      z-index: 50;
-    }
+    .btn-primary{ color:#fff; border-color:color-mix(in srgb, var(--c-primary-2), #000 6%); background-image:linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2)); }
+    .btn-primary:hover{ filter:brightness(1.06); }
+    .btn-primary:active{ filter:brightness(1.12); }
 
-    /* =========================================================
-       Button（a と button 共通）
-       - a.btn / button.btn に適用
-       - 既存の見た目は維持しつつ“ボタン感”を足すだけ
-       - 色は白藤×若草×藤のパレットに統一
-    ========================================================= */
-    a.btn, button.btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+    .btn-accent{ color:#0f1a0f; border-color:color-mix(in srgb, var(--c-acc2-dark), #000 10%); background-image:linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark)); }
+    .btn-accent:hover{ filter:brightness(1.05); }
+    .btn-accent:active{ filter:brightness(1.12); }
 
-      min-height: 40px;
-      padding: 10px 14px;
-      border-radius: 12px;
+    .btn-ghost{ background:#fff; color:var(--c-text); border-color:var(--c-border); }
+    .btn-ghost:hover{ background:#f9fafb; }
+    .btn-ghost:active{ filter:brightness(1.04); }
 
-      border: 1px solid var(--c-border);
-      background: #fff;                  /* 既定は白背景 */
-      color: var(--c-text);
-      text-decoration: none;             /* a の下線を消す */
+    .btn-outline{ background:#fff; color:var(--c-primary-2); border-color:var(--c-primary-2); }
+    .btn-outline:hover{ background:#faf7ff; }
+    .btn-outline:active{ filter:brightness(1.06); }
 
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: .01em;
-      line-height: 1;
-
-      box-shadow: 0 2px 8px rgba(0,0,0,.06);
-      transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
-      cursor: pointer;
-    }
-    a.btn:hover, button.btn:hover {
-      filter: brightness(1.02);
-      transform: translateY(-0.5px);
-    }
-    a.btn:active, button.btn:active {
-      filter: brightness(1.06);
-      transform: translateY(0);
-    }
-    a.btn:focus-visible, button.btn:focus-visible {
-      outline: none;
-      box-shadow:
-        0 2px 8px rgba(0,0,0,.06),
-        0 0 0 3px color-mix(in srgb, var(--c-primary), transparent 75%);
-    }
-    button.btn:disabled,
-    a.btn[aria-disabled="true"] {
-      opacity: .6;
-      cursor: not-allowed;
-      pointer-events: none;
-    }
-
-    /* バリエーション */
-    .btn-primary {
-      color: #fff;
-      border-color: color-mix(in srgb, var(--c-primary-2), #000 6%);
-      background-image: linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2));
-    }
-    .btn-primary:hover  { filter: brightness(1.06); }
-    .btn-primary:active { filter: brightness(1.12); }
-
-    .btn-accent {
-      color: #0f1a0f;
-      border-color: color-mix(in srgb, var(--c-acc2-dark), #000 10%);
-      background-image: linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark));
-    }
-    .btn-accent:hover  { filter: brightness(1.05); }
-    .btn-accent:active { filter: brightness(1.12); }
-
-    .btn-ghost {
-      background: #fff;
-      color: var(--c-text);
-      border-color: var(--c-border);
-    }
-    .btn-ghost:hover  { background: #f9fafb; }
-    .btn-ghost:active { filter: brightness(1.04); }
-
-    .btn-outline {
-      background: #fff;
-      color: var(--c-primary-2);
-      border-color: var(--c-primary-2);
-    }
-    .btn-outline:hover  { background: #faf7ff; }
-    .btn-outline:active { filter: brightness(1.06); }
-
-    /* サイズ */
-    .btn-sm { padding: 8px 12px; min-height: 36px; font-size: 14px; border-radius: 10px; }
-    .btn-lg { padding: 12px 16px; min-height: 44px; font-size: 16px; border-radius: 14px; }
-
-    /* アイコン付き（先頭アイコンとの間隔） */
-    .btn > .icon { display:inline-block; margin-right: .4em; line-height:0; }
-
-    /* 横並びボタン置き場（任意） */
-    .btnRow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
+    .btn-sm{ padding:8px 12px; min-height:36px; font-size:14px; border-radius:10px; }
+    .btn-lg{ padding:12px 16px; min-height:44px; font-size:16px; border-radius:14px; }
+    .btn > .icon{ display:inline-block; margin-right:.4em; line-height:0; }
+    .btnRow{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0; }
   </style>
 
-  <!-- =========================================================
-    4) Tailwind の @apply で既存クラスを“和風リッチ”に
-       ※ 必ず CDN の後に置く
-  ========================================================== -->
+  <!-- Tailwind の上乗せ（@apply） -->
   <script type="text/tailwindcss">
     @layer components {
-      /* ヘッダー：さりげない下線＆余白（ベースCSSに上乗せ） */
       header { @apply border-b border-[color:var(--c-border)] px-4 py-3 flex items-center justify-between; }
-
-      /* カード：淡い影と柔らかいボーダー（和紙の板感） */
       .card { @apply rounded-xl border bg-[color:var(--c-panel)] p-4 shadow-card border-[color:var(--c-border)]; }
-
-      /* セクションタイトル：明朝＋下部に藤のグラデ棒 */
       .sectionTitle { @apply font-bold text-[17px] text-[color:var(--c-text)]; }
-      .sectionTitle::after{
-        content:""; display:block; height:3px; width:72px; margin-top:6px; border-radius:999px;
-        background: linear-gradient(90deg, var(--c-primary) 0%, #c9b8e6 100%);
-      }
-
-      /* 区切り線を淡く */
+      .sectionTitle::after{ content:""; display:block; height:3px; width:72px; margin-top:6px; border-radius:999px;
+                            background:linear-gradient(90deg, var(--c-primary) 0%, #c9b8e6 100%); }
       .line { @apply h-px my-3 bg-[color:var(--c-border)]; }
-
-      /* 入力UI：境界＆フォーカスを藤色に */
       input[type="text"], input[type="date"], input[type="time"], select, textarea {
-        @apply rounded-lg border px-3 py-2 bg-white text-[15px]
-               border-[color:var(--c-border)]
+        @apply rounded-lg border px-3 py-2 bg-white text-[15px] border-[color:var(--c-border)]
                focus:outline-none focus:ring-2 focus:ring-[color:var(--c-primary)]/25;
       }
-
-      /* ピル/バッジ/タグを藤寄せに */
-      .pill { @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm
-                     bg-slate-50 border-[color:var(--c-border)] text-slate-700; }
+      .pill { @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm bg-slate-50 border-[color:var(--c-border)] text-slate-700; }
       .pill.sm { @apply text-xs px-2 py-0.5; }
       .badge { @apply ml-2 inline-block rounded-full px-2 py-0.5 text-xs text-white; @apply bg-[color:var(--c-accent)]; }
-
-      .tag { @apply inline-block rounded-full px-2 py-0.5 text-xs border
-                   bg-slate-50 border-[color:var(--c-border)] text-slate-600; }
+      .tag { @apply inline-block rounded-full px-2 py-0.5 text-xs border bg-slate-50 border-[color:var(--c-border)] text-slate-600; }
       .tag.open   { @apply bg-emerald-50 border-emerald-200 text-emerald-600; }
       .tag.closed { @apply bg-rose-50    border-rose-200    text-rose-600; }
-
-      /* 出欠ステータスの色味は控えめトーンで */
       .stat-ok { @apply bg-emerald-50 border border-emerald-200 text-emerald-700; }
       .stat-ng { @apply bg-rose-50    border border-rose-200    text-rose-700; }
       .stat-pd { @apply bg-amber-50   border border-amber-200   text-amber-700; }
       .stat-na { @apply bg-slate-50   border border-slate-200   text-slate-500; }
 
-      /* ボタン：はっきり“ボタン感”を出す（button要素のみ。aは .btn を使用） */
-      button {
-        @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold text-white shadow-md transition;
-        background-image: linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2));
-      }
+      /* button 要素（.btn ではなくても見栄えする） */
+      button { @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold text-white shadow-md transition; }
       button:hover { @apply brightness-105; transform: translateY(-0.5px); }
       button:active{ transform: translateY(0); }
       button:disabled { @apply opacity-60 cursor-not-allowed; }
-
-      /* ゴーストボタン：白藤の余白感 */
       button.ghost { @apply text-slate-800 bg-white border border-[color:var(--c-border)] shadow-sm hover:bg-slate-50; }
-
-      /* 警告ボタン（やや和の黄） */
       button.warn  { @apply text-slate-900; background-image: linear-gradient(to bottom right, #ffd36b, #ffb703); }
 
-      /* スピナーの色を藤に寄せる（border-top-colorは個別指定） */
-      .spinner { border-top-color: rgb(79 70 229); } /* indigo-600相当 */
+      .spinner { border-top-color: rgb(79 70 229); }
     }
   </script>
 
-  <!-- =========================================================
-    5) LIFF SDK（ここでもOK／重いようなら </body> 直前へ）
-  ========================================================== -->
+  <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 
 <body>
-  <!-- ヘッダーに「is-sticky」クラスを足すと スティッキー化 -->
   <header class="is-sticky">
     <div>公演 出欠フォーム</div>
     <div class="ver" id="ver"></div>
   </header>
 
   <main>
-    <!-- 以降、あなたの既存HTMLのままでOK -->
-
-  <!-- 友だち未追加アラート -->
-  <div id="friendAlert" class="card warnBox" style="display:none;">
-    このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
-  </div>
-
-  <!-- ===== HOME ===== -->
-  <section id="view-home" data-view class="show">
-    <div id="hello" class="muted"></div>
-
-  <!-- 管理メニュー（管理者のみ表示） -->
-  <div id="adminMenu" class="card" style="display:none;">
-    <div class="sectionTitle">管理用</div>
-    <div class="row" style="gap:8px;">
-      <!-- 予定登録/編集（view-admin を開く） -->
-      <button id="btnAdminMenuSchedules"
-              class="btn btn-accent btn-sm"
-              data-view-target="view-admin">
-        予定登録/編集
-      </button>
-  
-      <!-- 出欠結果一覧（view-admin-report を開く） -->
-      <button id="btnAdminMenuReport"
-              class="btn btn-primary btn-sm"
-              data-view-target="view-admin-report">
-        出欠結果一覧
-      </button>
-    </div>
-    <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
-  </div>
-  
-  <!-- 下部操作列 -->
-  <div class="row" style="margin-top:6px; gap:8px; flex-wrap:wrap;">
-    <button id="btnPrimary"
-            class="btn btn-primary btn-lg btn-block"
-            data-view-target="view-form">
-      出欠を入力 / 変更する
-    </button>
-  
-    <button id="btnEditNames"
-            class="btn btn-ghost btn-lg"
-            data-view-target="view-register"
-            style="display:none;">
-      氏名を編集する
-    </button>
-  
-    <button id="btnSchedules"
-            class="btn btn-outline btn-lg"
-            data-view-target="view-schedules">
-      今後の予定を見る
-    </button>
-  
-    <button id="btnReload" class="btn btn-ghost btn-lg" type="button">
-      再読み込み
-    </button>
-  </div>
-  <div id="homeLog" class="muted" style="margin-top:8px;"></div>
-    
-  <!-- ===== フォーム（出欠） ===== -->
-  <section id="view-form" data-view>
-    <div class="row-space">
-      <div class="sectionTitle">出欠入力フォーム</div>
-      <button id="btnBackFromForm" class="ghost">トップに戻る</button>
+    <!-- 友だち未追加アラート -->
+    <div id="friendAlert" class="card warnBox" style="display:none;">
+      このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
     </div>
 
-    <div id="formEventsBox" class="card muted">公演読み込み中… <span class="spinner"></span></div>
-    <div id="formFields"></div>
+    <!-- ===== HOME ===== -->
+    <section id="view-home" data-view class="show">
+      <div id="hello" class="muted"></div>
 
-    <div class="line"></div>
-    <div class="row right">
-      <button id="btnSubmit">送信する</button>
-    </div>
-    <div id="formLog" class="muted" style="margin-top:8px;"></div>
-  </section>
+      <!-- 管理メニュー（管理者のみ表示） -->
+      <div id="adminMenu" class="card" style="display:none;">
+        <div class="sectionTitle">管理用</div>
+        <div class="row" style="gap:8px;">
+          <button id="btnAdminMenuSchedules" class="btn btn-accent btn-sm" data-view-target="view-admin">予定登録/編集</button>
+          <button id="btnAdminMenuReport"    class="btn btn-primary btn-sm" data-view-target="view-admin-report">出欠結果一覧</button>
+        </div>
+        <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
+      </div>
 
-  <!-- ===== 初回登録/氏名編集 ===== -->
-  <section id="view-register" data-view>
-    <div class="row-space">
-      <div class="sectionTitle" id="regTitle">初回登録（入力者 & 演奏者）</div>
-      <button id="btnBackFromReg" class="ghost">トップに戻る</button>
-    </div>
+      <!-- 回答受付中の公演 -->
+      <div class="card">
+        <div class="sectionTitle">回答受付中の公演</div>
+        <div id="eventsBox" class="muted">読み込み中… <span class="spinner"></span></div>
+      </div>
 
-    <div class="card">
-      <label for="regInputName">入力者氏名（あなたの名前）</label>
-      <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
+      <!-- あなたの登録状況 -->
+      <div class="card">
+        <div class="sectionTitle">あなたの登録状況</div>
+        <div id="answersBox" class="muted">会員情報照会中… <span class="spinner"></span></div>
+      </div>
+
+      <!-- 下部操作列 -->
+      <div class="row" style="margin-top:6px; gap:8px; flex-wrap:wrap;">
+        <button id="btnPrimary"    class="btn btn-primary btn-lg btn-block" data-view-target="view-form">出欠を入力 / 変更する</button>
+        <button id="btnEditNames"  class="btn btn-ghost   btn-lg"           data-view-target="view-register" style="display:none;">氏名を編集する</button>
+        <button id="btnSchedules"  class="btn btn-outline btn-lg"           data-view-target="view-schedules">今後の予定を見る</button>
+        <button id="btnReload"     class="btn btn-ghost   btn-lg" type="button">再読み込み</button>
+      </div>
+      <div id="homeLog" class="muted" style="margin-top:8px;"></div>
+    </section><!-- ← ここで HOME を閉じるのがポイント！ -->
+
+    <!-- ===== フォーム（出欠） ===== -->
+    <section id="view-form" data-view>
+      <div class="row-space">
+        <div class="sectionTitle">出欠入力フォーム</div>
+        <button id="btnBackFromForm" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
+      </div>
+
+      <div id="formEventsBox" class="card muted">公演読み込み中… <span class="spinner"></span></div>
+      <div id="formFields"></div>
 
       <div class="line"></div>
+      <div class="row right">
+        <button id="btnSubmit" class="btn btn-primary">送信する</button>
+      </div>
+      <div id="formLog" class="muted" style="margin-top:8px;"></div>
+    </section>
+
+    <!-- ===== 初回登録/氏名編集 ===== -->
+    <section id="view-register" data-view>
       <div class="row-space">
-        <div class="sectionTitle" style="margin:0;">演奏者（家族も追加可）</div>
-        <button id="btnAddPerf" class="ghost" type="button">＋ 演奏者を追加</button>
+        <div class="sectionTitle" id="regTitle">初回登録（入力者 & 演奏者）</div>
+        <button id="btnBackFromReg" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
       </div>
-      <div id="perfList"></div>
-      <div class="small muted">※ あなた自身が演奏する場合は、演奏者としてあなたの名前も追加してください。</div>
-    </div>
 
-    <div class="row right">
-      <button id="btnRegister">登録する</button>
-    </div>
-    <div id="regLog" class="muted" style="margin-top:8px;"></div>
-  </section>
+      <div class="card">
+        <label for="regInputName">入力者氏名（あなたの名前）</label>
+        <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
 
-  <!-- ===== 今後の予定 ===== -->
-  <section id="view-schedules" data-view>
-    <div class="row-space">
-      <div class="sectionTitle">今後の予定</div>
-      <div class="row" style="gap:8px;">
-        <button id="btnBackFromSchedules" class="ghost">トップに戻る</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="row" style="gap:12px;">
-        <div>
-          <label for="selDays">表示期間（日数）</label>
-          <select id="selDays">
-            <option value="30">30日</option>
-            <option value="60" selected>60日</option>
-            <option value="90">90日</option>
-          </select>
+        <div class="line"></div>
+        <div class="row-space">
+          <div class="sectionTitle" style="margin:0;">演奏者（家族も追加可）</div>
+          <button id="btnAddPerf" class="btn btn-ghost btn-sm" type="button">＋ 演奏者を追加</button>
         </div>
-        <div>
-          <label for="selKind">種別フィルタ</label>
-          <select id="selKind">
-            <option value="">（すべて）</option>
-            <option value="発表">発表</option>
-            <option value="練習">練習</option>
-            <option value="その他">その他</option>
-          </select>
-        </div>
-        <div style="align-self:flex-end;">
-          <button id="btnFetchSchedules" class="ghost">再取得</button>
-        </div>
+        <div id="perfList"></div>
+        <div class="small muted">※ あなた自身が演奏する場合は、演奏者としてあなたの名前も追加してください。</div>
       </div>
-      <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
-    </div>
 
-    <div class="small muted">
-      ※ 予定はシート「Schedules（公開=Yes, ステータス=active）」から表示されます。<br>
-      ※ 過去日と期間外の予定は自動的に表示から除外されます。
-    </div>
-  </section>
-
-  <!-- ===== 予定登録（管理者） ===== -->
-  <section id="view-admin" data-view>
-    <div class="row-space">
-      <div class="sectionTitle">予定登録（管理者）</div>
-      <div class="row" style="gap:8px;">
-        <button id="btnAdminBack" class="ghost">トップに戻る</button>
-        <button id="btnAdminReload" class="ghost">一覧を再取得</button>
+      <div class="row right">
+        <button id="btnRegister" class="btn btn-primary">登録する</button>
       </div>
-    </div>
+      <div id="regLog" class="muted" style="margin-top:8px;"></div>
+    </section>
 
-    <!-- 新規/編集フォーム -->
-    <div class="card">
+    <!-- ===== 今後の予定 ===== -->
+    <section id="view-schedules" data-view>
       <div class="row-space">
-        <div class="sectionTitle" id="adminFormTitle">新規登録</div>
-        <div class="small muted"><span id="adminEditingId" style="display:none;"></span></div>
-      </div>
-
-      <div class="adminGrid">
-        <div>
-          <label>タイトル *</label>
-          <input id="ad_title" type="text" placeholder="例：秋祭り演奏会">
-        </div>
-        <div>
-          <label>種別 *</label>
-          <select id="ad_type">
-            <option value="">（選択）</option>
-            <option value="発表">発表</option>
-            <option value="練習">練習</option>
-            <option value="その他">その他</option>
-          </select>
-        </div>
-        <div>
-          <label>日付 *</label>
-          <input id="ad_ymd" type="date">
-        </div>
-        <div>
-          <label>時間（開始）</label>
-          <input id="ad_hm" type="time" placeholder="HH:mm">
-        </div>
-        <div>
-          <label>場所</label>
-          <input id="ad_place" type="text" placeholder="例：藤塚小体育館">
-        </div>
-        <div>
-          <label>集合時間（発表・その他のみ）</label>
-          <input id="ad_meetAt" type="time" placeholder="HH:mm">
-        </div>
-        <div>
-          <label>集合場所</label>
-          <input id="ad_meetPlace" type="text" placeholder="例：藤塚小学校">
-        </div>
-        <div>
-          <label>出欠対象（発表のみ）</label>
-          <select id="ad_attendTarget">
-            <option value="Y">Y</option>
-            <option value="N" selected>N</option>
-          </select>
-        </div>
-        <div>
-          <label>締切日</label>
-          <input id="ad_deadline" type="date">
-        </div>
-        <div>
-          <label>公開</label>
-          <select id="ad_publish">
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
-        </div>
-        <div>
-          <label>ステータス</label>
-          <select id="ad_status">
-            <option value="active" selected>active</option>
-            <option value="archived">archived</option>
-          </select>
-        </div>
-        <div>
-          <label>配信フラグ（必須：発表のみ）</label>
-          <select id="ad_flag">
-            <!-- 動的に選択肢を差し替えます -->
-          </select>
+        <div class="sectionTitle">今後の予定</div>
+        <div class="row" style="gap:8px;">
+          <button id="btnBackFromSchedules" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
         </div>
       </div>
 
-      <div class="hint" style="margin-top:6px;">
-        * 必須。IDは自動採番です。<br>
-        種別が「練習」の場合は集合時間/集合場所/締切日/配信フラグは無効化（サーバ側でも保護）。<br>
-        種別が「発表」以外では「出欠対象」は自動で N 固定になります。<br>
-        「発表」の配信フラグは <b>新規登録時は Y/N のみ</b>、<b>編集時は Y/S/D/N</b> が選択可能です。
-      </div>
-
-      <div class="row right" style="margin-top:10px;">
-        <button id="btnAdminReset" class="ghost" type="button">新規モードに戻す</button>
-        <button id="btnAdminSubmit">新規登録</button>
-      </div>
-      <div id="adminFormLog" class="muted" style="margin-top:8px;"></div>
-    </div>
-
-    <!-- 一覧 -->
-    <div class="card">
-      <div class="row" style="gap:12px;">
-        <div>
-          <label>一覧の表示期間（日数）</label>
-          <select id="ad_days">
-            <option value="30">30日</option>
-            <option value="60" selected>60日</option>
-            <option value="90">90日</option>
-          </select>
+      <div class="card">
+        <div class="row" style="gap:12px;">
+          <div>
+            <label for="selDays">表示期間（日数）</label>
+            <select id="selDays">
+              <option value="30">30日</option>
+              <option value="60" selected>60日</option>
+              <option value="90">90日</option>
+            </select>
+          </div>
+          <div>
+            <label for="selKind">種別フィルタ</label>
+            <select id="selKind">
+              <option value="">（すべて）</option>
+              <option value="発表">発表</option>
+              <option value="練習">練習</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          <div style="align-self:flex-end;">
+            <button id="btnFetchSchedules" class="btn btn-ghost btn-sm">再取得</button>
+          </div>
         </div>
-        <div style="align-self:flex-end;">
-          <button id="btnAdminFetch" class="ghost">一覧を取得</button>
+        <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
+      </div>
+
+      <div class="small muted">
+        ※ 予定はシート「Schedules（公開=Yes, ステータス=active）」から表示されます。<br>
+        ※ 過去日と期間外の予定は自動的に表示から除外されます。
+      </div>
+    </section>
+
+    <!-- ===== 予定登録（管理者） ===== -->
+    <section id="view-admin" data-view>
+      <div class="row-space">
+        <div class="sectionTitle">予定登録（管理者）</div>
+        <div class="row" style="gap:8px;">
+          <button id="btnAdminBack"   class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
+          <button id="btnAdminReload" class="btn btn-ghost btn-sm">一覧を再取得</button>
         </div>
       </div>
-      <div id="adminListBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
-    </div>
-  </section>
 
-  <!-- ===== 出欠結果一覧（管理者） ===== -->
-<section id="view-admin-report" data-view>
-  <div class="row-space">
-    <div class="sectionTitle">出欠結果一覧（管理者）</div>
-    <div class="row" style="gap:8px;">
-      <button id="btnReportBack" class="ghost">トップに戻る</button>
-      <button id="btnReportReload" class="ghost">再取得</button>
-    </div>
-  </div>
+      <div class="card">
+        <div class="row-space">
+          <div class="sectionTitle" id="adminFormTitle">新規登録</div>
+          <div class="small muted"><span id="adminEditingId" style="display:none;"></span></div>
+        </div>
 
-  <div class="card">
-    <div class="row" style="gap:12px;">
-      <div style="min-width:260px; flex:1;">
-        <label for="repEvent">公演を選択</label>
-        <select id="repEvent">
-          <option value="">（選択してください）</option>
-          <!-- JSで公演一覧を流し込み -->
-        </select>
+        <div class="adminGrid">
+          <div><label>タイトル *</label><input id="ad_title" type="text" placeholder="例：秋祭り演奏会"></div>
+          <div><label>種別 *</label>
+            <select id="ad_type"><option value="">（選択）</option><option value="発表">発表</option><option value="練習">練習</option><option value="その他">その他</option></select>
+          </div>
+          <div><label>日付 *</label><input id="ad_ymd" type="date"></div>
+          <div><label>時間（開始）</label><input id="ad_hm" type="time" placeholder="HH:mm"></div>
+          <div><label>場所</label><input id="ad_place" type="text" placeholder="例：藤塚小体育館"></div>
+          <div><label>集合時間（発表・その他のみ）</label><input id="ad_meetAt" type="time" placeholder="HH:mm"></div>
+          <div><label>集合場所</label><input id="ad_meetPlace" type="text" placeholder="例：藤塚小学校"></div>
+          <div><label>出欠対象（発表のみ）</label>
+            <select id="ad_attendTarget"><option value="Y">Y</option><option value="N" selected>N</option></select>
+          </div>
+          <div><label>締切日</label><input id="ad_deadline" type="date"></div>
+          <div><label>公開</label>
+            <select id="ad_publish"><option value="Yes">Yes</option><option value="No">No</option></select>
+          </div>
+          <div><label>ステータス</label>
+            <select id="ad_status"><option value="active" selected>active</option><option value="archived">archived</option></select>
+          </div>
+          <div><label>配信フラグ（必須：発表のみ）</label>
+            <select id="ad_flag"><!-- 動的に選択肢 --></select>
+          </div>
+        </div>
+
+        <div class="hint" style="margin-top:6px;">
+          * 必須。IDは自動採番です。<br>
+          種別が「練習」の場合は集合時間/集合場所/締切日/配信フラグは無効化（サーバ側でも保護）。<br>
+          種別が「発表」以外では「出欠対象」は自動で N 固定になります。<br>
+          「発表」の配信フラグは <b>新規登録時は Y/N のみ</b>、<b>編集時は Y/S/D/N</b> が選択可能です。
+        </div>
+
+        <div class="row right" style="margin-top:10px;">
+          <button id="btnAdminReset"  class="btn btn-ghost btn-sm" type="button">新規モードに戻す</button>
+          <button id="btnAdminSubmit" class="btn btn-primary">新規登録</button>
+        </div>
+        <div id="adminFormLog" class="muted" style="margin-top:8px;"></div>
       </div>
-      <div>
-        <label for="repAttend">出欠フィルタ</label>
-        <select id="repAttend">
-          <option value="">（すべて）</option>
-          <option value="参加">参加</option>
-          <option value="欠席">欠席</option>
-          <option value="未定">未定</option>
-        </select>
+
+      <div class="card">
+        <div class="row" style="gap:12px;">
+          <div>
+            <label>一覧の表示期間（日数）</label>
+            <select id="ad_days"><option value="30">30日</option><option value="60" selected>60日</option><option value="90">90日</option></select>
+          </div>
+          <div style="align-self:flex-end;">
+            <button id="btnAdminFetch" class="btn btn-ghost btn-sm">一覧を取得</button>
+          </div>
+        </div>
+        <div id="adminListBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
       </div>
-    </div>
-    <div class="small muted" style="margin-top:6px;">
-      ※ 対象は「公開=Yes」かつ配信フラグが Y/S/D の予定のみ
-    </div>
-  </div>
+    </section>
 
-  <div id="repBox" class="muted">公演を選択してください</div>
-</section>
+    <!-- ===== 出欠結果一覧（管理者） ===== -->
+    <section id="view-admin-report" data-view>
+      <div class="row-space">
+        <div class="sectionTitle">出欠結果一覧（管理者）</div>
+        <div class="row" style="gap:8px;">
+          <button id="btnReportBack"   class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
+          <button id="btnReportReload" class="btn btn-ghost btn-sm">再取得</button>
+        </div>
+      </div>
 
-</main>
-<script>
-  // ===== 共通：ビュー切替（同一ページ内） =====
-  function showView(id) {
-    const views = document.querySelectorAll('[data-view]');
-    views.forEach(v => v.classList.toggle('show', v.id === id));
-    window.scrollTo({ top: 0, behavior: 'instant' });
-  }
+      <div class="card">
+        <div class="row" style="gap:12px;">
+          <div style="min-width:260px; flex:1;">
+            <label for="repEvent">公演を選択</label>
+            <select id="repEvent"><option value="">（選択してください）</option></select>
+          </div>
+          <div>
+            <label for="repAttend">出欠フィルタ</label>
+            <select id="repAttend">
+              <option value="">（すべて）</option>
+              <option value="参加">参加</option>
+              <option value="欠席">欠席</option>
+              <option value="未定">未定</option>
+            </select>
+          </div>
+        </div>
+        <div class="small muted" style="margin-top:6px;">
+          ※ 対象は「公開=Yes」かつ配信フラグが Y/S/D の予定のみ
+        </div>
+      </div>
 
-  document.addEventListener('DOMContentLoaded', () => {
-    // 1) data-view-target で SPA 切替
-    document.querySelectorAll('[data-view-target]').forEach(el => {
-      el.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        const target = el.getAttribute('data-view-target');
-        if (target) showView(target);
+      <div id="repBox" class="muted">公演を選択してください</div>
+    </section>
+  </main>
+
+  <script>
+    // ===== 同一ページ内のビュー切替 =====
+    function showView(id){
+      document.querySelectorAll('[data-view]').forEach(v => {
+        v.classList.toggle('show', v.id === id);
       });
-    });
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
 
-    // 2) data-href で外部/別ページへ遷移
-    document.querySelectorAll('[data-href]').forEach(el => {
-      el.addEventListener('click', (ev) => {
-        // data-view-target があれば SPA を優先
-        if (el.hasAttribute('data-view-target')) return;
-
-        ev.preventDefault();
-        const url = el.getAttribute('data-href');
-        if (!url) return;
-
-        const openNew = el.hasAttribute('data-newtab');
-        // LIFF 内で外部ブラウザを開く（推奨）
-        if (openNew && window.liff && typeof liff.openWindow === 'function') {
-          liff.openWindow({ url, external: true });
-          return;
-        }
-        // 通常の遷移
-        if (openNew) {
-          window.open(url, '_blank', 'noopener');
-        } else {
-          location.href = url;
-        }
+    document.addEventListener('DOMContentLoaded', () => {
+      // SPA切替
+      document.querySelectorAll('[data-view-target]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          const target = el.getAttribute('data-view-target');
+          if (target) showView(target);
+        });
       });
-    });
 
-    // 3) 再読み込み
-    document.getElementById('btnReload')?.addEventListener('click', () => {
-      location.reload();
+      // 再読み込み
+      document.getElementById('btnReload')?.addEventListener('click', () => location.reload());
     });
-  });
-</script>
+  </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.3.4";
+const FRONT_VERSION = "Front v2.3.5";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
