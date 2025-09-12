@@ -159,6 +159,28 @@
       .btnRow{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
       .btnRow .btn{ width:100%; }
     }
+
+    /* ===== イベント密レイアウト ===== */
+    .eventList { margin-top: 6px; }
+    .eventRow {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      background:#fff; border:1px solid var(--c-border); border-radius:12px;
+      padding:10px 12px; margin:8px 0;
+    }
+    .eventMeta { min-width: 0; }
+    .eventTitle { font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .eventSub   { font-size:12px; color:var(--c-muted); }
+
+    .eventRight { display:flex; align-items:center; gap:8px; margin-left:8px; }
+
+    /* コンパクト切替 */
+    .eventList.compact .eventRow   { padding:8px 10px; border-radius:10px; margin:6px 0; }
+    .eventList.compact .eventTitle { font-size:14px; }
+    .eventList.compact .eventSub   { font-size:11px; }
+
+    /* 詳細（折りたたみ） */
+    .eventDetail { display:none; padding:6px 6px 0 6px; }
+    .eventRow.open + .eventDetail { display:block; }
   </style>
 
   <!-- Tailwind の上乗せ（@apply） -->
@@ -219,59 +241,43 @@
       <div id="adminMenu" class="card" style="display:none;">
         <div class="sectionTitle">管理用</div>
         <div class="row" style="gap:8px;">
-          <!-- 予定登録/編集：Outlineに統一 -->
-          <button id="btnAdminMenuSchedules"
-                  class="btn btn-outline btn-sm"
-                  data-view-target="view-admin">
-            予定登録/編集
-          </button>
-      
-          <!-- 出欠結果一覧：Outlineに統一 -->
-          <button id="btnAdminMenuReport"
-                  class="btn btn-outline btn-sm"
-                  data-view-target="view-admin-report">
-            出欠結果一覧
-          </button>
+          <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm" data-view-target="view-admin">予定登録/編集</button>
+          <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm" data-view-target="view-admin-report">出欠結果一覧</button>
         </div>
         <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
       </div>
 
-      <!-- ★ トップ操作ボタン（上部に配置） -->
+      <!-- ★ トップ操作ボタン -->
       <div class="btnRow" aria-label="主操作">
-        <!-- 出欠入力：Primary（現状維持） -->
-        <button id="btnPrimary"
-                class="btn btn-primary btn-lg"
-                data-view-target="view-form">
-          出欠を入力 / 変更する
-        </button>
-      
-        <!-- 予定 → 今後の予定（文言だけ戻す、デザインはOutlineのまま） -->
-        <button id="btnSchedules"
-                class="btn btn-outline btn-lg"
-                data-view-target="view-schedules">
-          今後の予定
-        </button>
-      
-        <!-- 氏名編集 → 登録氏名編集（文言変更、デザインをOutlineに統一） -->
-        <button id="btnEditNames"
-                class="btn btn-outline btn-lg"
-                data-view-target="view-register"
-                style="display:none;">
-          登録氏名編集
-        </button>
+        <button id="btnPrimary"   class="btn btn-primary btn-lg" data-view-target="view-form">出欠を入力 / 変更する</button>
+        <button id="btnSchedules" class="btn btn-outline btn-lg" data-view-target="view-schedules">今後の予定</button>
+        <button id="btnEditNames" class="btn btn-outline btn-lg" data-view-target="view-register" style="display:none;">登録氏名編集</button>
       </div>
 
-      <!-- 互換性維持のためのダミー（既存JSが参照する #btnReload） -->
+      <!-- 互換性維持のためのダミー -->
       <button id="btnReload" type="button" style="display:none;"></button>
 
-      <!-- 回答受付中の公演 -->
+      <!-- 回答受付中の公演（密リスト＋バッジ） -->
       <div class="card">
-        <div class="sectionTitle">回答受付中の公演</div>
-        <div id="eventsBox" class="muted">読み込み中… <span class="spinner"></span></div>
+        <div class="row-space">
+          <div class="sectionTitle">回答受付中の公演</div>
+          <div class="row" style="gap:12px;">
+            <label class="small" style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" id="chkCompact" checked> コンパクト表示
+            </label>
+            <label class="small" style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" id="chkOnlyUnanswered"> 未回答のみ表示
+            </label>
+          </div>
+        </div>
+        <div id="eventsBox">
+          <div class="muted">読み込み中… <span class="spinner"></span></div>
+          <div id="eventsList" class="eventList compact"></div>
+        </div>
       </div>
 
-      <!-- あなたの登録状況 -->
-      <div class="card">
+      <!-- あなたの登録状況（フォームで見られるためトップでは非表示） -->
+      <div class="card" style="display:none;">
         <div class="sectionTitle">あなたの登録状況</div>
         <div id="answersBox" class="muted">会員情報照会中… <span class="spinner"></span></div>
       </div>
@@ -489,10 +495,136 @@
       // 互換用：btnReload（見せないけど存在はさせる）
       document.getElementById('btnReload')?.addEventListener('click', () => location.reload());
     });
+
+    /* =========================================================
+       回答受付中の公演：密リスト + 要約バッジ + 詳細開閉
+       使い方：
+         HomeEventsUI.mount({ events, myAnswersMap });
+         // 互換：window.renderEventsDense = HomeEventsUI.mount;
+       期待するデータ形：
+         events: [{ id, ymd, hm, place, deadline, isNew }, ...]
+         myAnswersMap: { [eventId]: [{ member|name, answer } ...] }
+       answer の想定：'参加' | '欠席' | '未定' | '未回答' | ''（未回答扱い）
+    ========================================================= */
+    (function(){
+      const S = {
+        events: [],
+        ansMap: {},
+        compact: true,
+        onlyUn: false,
+      };
+
+      const E = {
+        list : () => document.getElementById('eventsList'),
+        card : () => document.getElementById('eventsBox'),
+        chkCompact: () => document.getElementById('chkCompact'),
+        chkOnlyUn : () => document.getElementById('chkOnlyUnanswered'),
+      };
+
+      function ansClass(v){
+        if (!v || v === '未回答') return 'stat-na';
+        if (v === '未定')        return 'stat-pd';
+        if (v === '参加')        return 'stat-ok';
+        if (v === '欠席')        return 'stat-ng';
+        return 'stat-na';
+      }
+
+      function summarize(list){
+        if (!list || !list.length) return { label:'未回答', cls:'stat-na' };
+        let hasUn=false, hasUnd=false;
+        for (const a of list){
+          const v = (a?.answer || '').trim();
+          if (!v || v === '未回答') hasUn = true;
+          else if (v === '未定')    hasUnd = true;
+        }
+        if (hasUn)  return { label:'一部未回答', cls:'stat-pd' };
+        if (hasUnd) return { label:'未定あり',   cls:'stat-pd' };
+        return { label:'回答済', cls:'stat-ok' };
+      }
+
+      function rowHtml(ev, sum){
+        const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge">NEW</span>' : '';
+        const time     = ev.hm ? ` ${ev.hm}` : '';
+        const place    = ev.place || ev.venue || '';
+        const deadline = ev.deadline || ev.limit || ev.deadlineYmd || '';
+        const dateStr  = ev.ymd || ev.date || '';
+
+        return `
+          <div class="eventRow" data-evt="${ev.id}">
+            <div class="eventMeta">
+              <div class="eventTitle">${dateStr}${time} @ ${place} ${newBadge}</div>
+              <div class="eventSub">（締切：${deadline || '—'}）</div>
+            </div>
+            <div class="eventRight"><span class="pill sm ${sum.cls}">${sum.label}</span></div>
+          </div>
+          <div class="eventDetail" data-detail="${ev.id}"></div>
+        `;
+      }
+
+      function render(){
+        const listEl = E.list();
+        if (!listEl) return;
+        listEl.classList.toggle('compact', S.compact);
+
+        const rows = [];
+        for (const ev of S.events){
+          const sum = summarize(S.ansMap[ev.id]);
+          if (S.onlyUn && !(sum.label === '未回答' || sum.label === '一部未回答')) continue;
+          rows.push(rowHtml(ev, sum));
+        }
+        listEl.innerHTML = rows.length ? rows.join('') : '<div class="muted">該当する公演はありません</div>';
+
+        // 行タップで詳細表示（家族別のチップ）
+        listEl.querySelectorAll('.eventRow').forEach(row => {
+          row.addEventListener('click', () => {
+            const id  = row.getAttribute('data-evt');
+            const det = listEl.querySelector(`.eventDetail[data-detail="${id}"]`);
+            if (!det) return;
+
+            if (det.dataset.loaded !== '1'){
+              const arr = S.ansMap[id] || [];
+              det.innerHTML = `
+                <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
+                  ${arr.map(m => {
+                    const name  = m?.member || m?.name || '';
+                    const v     = m?.answer || '未回答';
+                    const cls   = ansClass(v);
+                    return `<span class="pill sm ${cls}" title="${v}">${name}</span>`;
+                  }).join('')}
+                </div>
+              `;
+              det.dataset.loaded = '1';
+            }
+            row.classList.toggle('open');
+            det.style.display = (det.style.display === 'block') ? 'none' : 'block';
+          });
+        });
+      }
+
+      // コントロール
+      E.chkCompact()?.addEventListener('change', e => { S.compact = !!e.target.checked; render(); });
+      E.chkOnlyUn()?.addEventListener('change', e => { S.onlyUn  = !!e.target.checked; render(); });
+
+      // 公開API
+      const api = {
+        mount({events, myAnswersMap}){
+          S.events = Array.isArray(events) ? events : [];
+          S.ansMap = myAnswersMap || {};
+          // トップの「あなたの登録状況」カードは非表示に済み
+          render();
+        },
+        setEvents(e){ S.events = e || []; render(); },
+        setAnswers(a){ S.ansMap = a || {}; render(); },
+        render
+      };
+      window.HomeEventsUI = api;
+      window.renderEventsDense = api.mount; // 互換エイリアス
+    })();
   </script>
+</html>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.4.0";
+const FRONT_VERSION = "Front v2.4.1";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
