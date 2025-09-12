@@ -87,8 +87,8 @@
     }
     .listEmpty{ color:#888; font-size:14px; }
 
-    .pill{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
-    .pill.sm{ font-size:12px; padding:2px 8px; }
+    .pill{ display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
+    .pill.sm{ font-size:11px; padding:2px 6px; }
 
     .stat-ok{ background:#e8f8f3; border:1px solid #cdeee4; color:#0a7; }
     .stat-ng{ background:#fdeaea; border:1px solid #f6cccc; color:#c33; }
@@ -116,38 +116,13 @@
       transition:transform .08s ease, filter .12s ease, box-shadow .12s ease;
       cursor:pointer;
     }
-    a.btn:hover, button.btn:hover{ filter:brightness(1.02); transform:translateY(-0.5px); }
-    a.btn:active, button.btn:active{ filter:brightness(1.06); transform:translateY(0); }
-    a.btn:focus-visible, button.btn:focus-visible{
-      outline:none; box-shadow:0 2px 8px rgba(0,0,0,.06), 0 0 0 3px color-mix(in srgb, var(--c-primary), transparent 75%);
-    }
-    button.btn:disabled, a.btn[aria-disabled="true"]{ opacity:.6; cursor:not-allowed; pointer-events:none; }
-
-    /* 色バリエーション */
     .btn-primary{
       color:#fff !important;
       border-color:color-mix(in srgb, var(--c-primary-2), #000 6%) !important;
       background-image:linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2)) !important;
       background-color:var(--c-primary) !important;
     }
-    .btn-accent{
-      color:#0f1a0f !important;
-      border-color:color-mix(in srgb, var(--c-acc2-dark), #000 10%) !important;
-      background-image:linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark)) !important;
-      background-color:var(--c-acc2) !important;
-    }
-    .btn-ghost{ background:#fff !important; color:var(--c-text) !important; border-color:var(--c-border) !important; }
     .btn-outline{ background:#fff !important; color:var(--c-primary-2) !important; border-color:var(--c-primary-2) !important; }
-
-    .btn-primary:hover  { filter:brightness(1.06); }
-    .btn-primary:active { filter:brightness(1.12); }
-    .btn-accent:hover   { filter:brightness(1.05); }
-    .btn-accent:active  { filter:brightness(1.12); }
-    .btn-ghost:hover    { background:#f9fafb !important; }
-    .btn-ghost:active   { filter:brightness(1.04); }
-    .btn-outline:hover  { background:#faf7ff !important; }
-    .btn-outline:active { filter:brightness(1.06); }
-
     .btn-sm{ padding:8px 12px; min-height:36px; font-size:14px; border-radius:10px; }
     .btn-lg{ padding:12px 16px; min-height:44px; font-size:16px; border-radius:14px; }
     .btnRow{ display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; margin:8px 0; }
@@ -157,21 +132,23 @@
       .btnRow .btn{ width:100%; }
     }
 
-    /* ===== イベント密レイアウト ===== */
-    .eventList { margin-top: 6px; }
+    /* ===== イベント密レイアウト（より小さめ） ===== */
+    .evList { margin-top: 4px; }
     .eventRow {
       display:flex; align-items:center; justify-content:space-between; gap:10px;
       background:#fff; border:1px solid var(--c-border); border-radius:12px;
-      padding:10px 12px; margin:8px 0;
+      padding:8px 10px; margin:6px 0;
     }
     .eventMeta { min-width: 0; }
-    .eventTitle { font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .eventSub   { font-size:12px; color:var(--c-muted); }
-    .eventRight { display:flex; align-items:center; gap:8px; margin-left:8px; }
+    .eventTitle { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .eventSub   { font-size:11px; color:var(--c-muted); }
+    .eventRight { display:flex; align-items:center; gap:6px; margin-left:8px; }
 
-    .eventList.compact .eventRow   { padding:8px 10px; border-radius:10px; margin:6px 0; }
-    .eventList.compact .eventTitle { font-size:14px; }
-    .eventList.compact .eventSub   { font-size:11px; }
+    /* 締切バッジ */
+    .dl-badge { font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid var(--c-border); background:#f7f7fb; color:#555; }
+    .dl-soon  { background:#fff4ce; border-color:#f1d28a; color:#7a5b00; } /* 2日以内 */
+    .dl-today { background:#ffe3b3; border-color:#ffc766; color:#804a00; } /* 当日 */
+    .dl-late  { background:#ffe1e1; border-color:#f6b5b5; color:#a12222; } /* 期限超過 */
 
     .eventDetail { display:none; padding:6px 6px 0 6px; }
     .eventRow.open + .eventDetail { display:block; }
@@ -190,8 +167,8 @@
         @apply rounded-lg border px-3 py-2 bg-white text-[15px] border-[color:var(--c-border)]
                focus:outline-none focus:ring-2 focus:ring-[color:var(--c-primary)]/25;
       }
-      .pill { @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm bg-slate-50 border-[color:var(--c-border)] text-slate-700; }
-      .pill.sm { @apply text-xs px-2 py-0.5; }
+      .pill { @apply inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs bg-slate-50 border-[color:var(--c-border)] text-slate-700; }
+      .pill.sm { @apply text-[11px] px-2 py-0.5; }
       .badge { @apply ml-2 inline-block rounded-full px-2 py-0.5 text-xs text-white; @apply bg-[color:var(--c-accent)]; }
       .tag { @apply inline-block rounded-full px-2 py-0.5 text-xs border bg-slate-50 border-[color:var(--c-border)] text-slate-600; }
       .tag.open   { @apply bg-emerald-50 border-emerald-200 text-emerald-600; }
@@ -200,13 +177,6 @@
       .stat-ng { @apply bg-rose-50    border border-rose-200    text-rose-700; }
       .stat-pd { @apply bg-amber-50   border border-amber-200   text-amber-700; }
       .stat-na { @apply bg-slate-50   border border-slate-200   text-slate-500; }
-
-      button { @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold shadow-md transition; }
-      button:hover { @apply brightness-105; transform: translateY(-0.5px); }
-      button:active{ transform: translateY(0); }
-      button:disabled { @apply opacity-60 cursor-not-allowed; }
-      button.ghost { @apply text-slate-800 bg-white border border-[color:var(--c-border)] shadow-sm hover:bg-slate-50; }
-
       .spinner { border-top-color: rgb(79 70 229); }
     }
   </script>
@@ -255,29 +225,17 @@
       <div class="card">
         <div class="row-space">
           <div class="sectionTitle">回答受付中の公演</div>
-          <!-- フィルタ（1セットだけ） -->
-          <div id="homeFilters" class="row" style="gap:12px; align-items:center; margin:6px 0 4px;">
-            <label class="pill sm">
-              <input type="checkbox" id="homeCompact" checked>
-              コンパクト表示
-            </label>
-            <label class="pill sm">
-              <input type="checkbox" id="homeOnlyNA">
-              未回答のみ表示
-            </label>
-          </div>
+          <label class="pill sm" style="margin-left:auto;">
+            <input type="checkbox" id="homeOnlyNA" checked>
+            未回答のみ表示
+          </label>
         </div>
 
-        <!-- ← HomeEventsUI がこの中を書き換えます -->
-        <div id="eventsBox">
-          <!-- ★★★ これが無いと ver3 は描画できません ★★★ -->
-          <div id="eventsList" class="eventList compact">
-            <div class="muted">読み込み中… <span class="spinner"></span></div>
-          </div>
-        </div>
+        <!-- HomeEventsUI がここを書き換え -->
+        <div id="eventsBox"><div class="muted">読み込み中… <span class="spinner"></span></div></div>
       </div>
 
-      <!-- あなたの登録状況：トップでは隠す（フォームで見られるため） -->
+      <!-- あなたの登録状況（トップでは非表示） -->
       <div class="card" style="display:none;">
         <div class="sectionTitle">あなたの登録状況</div>
         <div id="answersBox" class="muted">会員情報照会中… <span class="spinner"></span></div>
@@ -494,36 +452,43 @@
     });
   </script>
 
-  <!-- ===== HomeEventsUI（密リスト＋バッジ＋詳細開閉） ===== -->
+  <!-- ===== HomeEventsUI（v4：未回答初期ON / 昇順ソート / 期限色分け / コンパクト廃止） ===== -->
   <script>
   (function(){
-    // 二重取り込み防止
-    if (window.HomeEventsUI && window.HomeEventsUI.__v === 3) return;
+    if (window.HomeEventsUI && window.HomeEventsUI.__v === 4) return;
 
-    const S = { events:[], ansMap:{}, compact:true, onlyNA:false };
+    const S = { events:[], ansMap:{}, onlyNA:true }; // ← 初期ON
 
     const E = {
-      list: () => document.getElementById('eventsList'),
       box : () => document.getElementById('eventsBox'),
-      ckC : () => document.getElementById('homeCompact'),
       ckN : () => document.getElementById('homeOnlyNA'),
     };
 
-    function ensureListEl(){
-      // eventsList が無ければ、eventsBox 内に自動生成する
-      let listEl = E.list();
-      if (!listEl){
-        const box = E.box();
-        if (!box) return null;
-        const div = document.createElement('div');
-        div.id = 'eventsList';
-        div.className = 'eventList compact';
-        div.innerHTML = '<div class="muted">読み込み中… <span class="spinner"></span></div>';
-        box.innerHTML = ''; // 念のためクリア
-        box.appendChild(div);
-        listEl = div;
-      }
-      return listEl;
+    // ymd 文字列から Date を作る（例：2025/09/21 (日) → 2025-09-21）
+    function parseYmd(s){
+      if (!s) return null;
+      const m = String(s).match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
+      if (!m) return null;
+      const d = new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+      if (isNaN(d.getTime())) return null;
+      d.setHours(0,0,0,0);
+      return d;
+    }
+    // 期限（deadline）を Date に
+    function parseDeadline(s){
+      return parseYmd(s);
+    }
+    // 期限バッジの生成
+    function deadlineBadge(deadlineStr){
+      const d = parseDeadline(deadlineStr);
+      if (!d) return `<span class="dl-badge">締切：—</span>`;
+      const today = new Date(); today.setHours(0,0,0,0);
+      const diff = Math.floor((d - today)/86400000); // 日差
+      let cls = 'dl-badge', label = `締切：${deadlineStr}`;
+      if (diff < 0) cls += ' dl-late';
+      else if (diff === 0) cls += ' dl-today';
+      else if (diff <= 2) cls += ' dl-soon';
+      return `<span class="${cls}">${label}</span>`;
     }
 
     function ansClass(v){
@@ -534,53 +499,66 @@
       return 'stat-na';
     }
     function summarize(list){
-      if (!list || !list.length) return { label:'未回答', cls:'stat-na' };
+      if (!list || !list.length) return { label:'未回答', cls:'stat-na', key:'na' };
       let hasUn=false, hasUnd=false;
       for (const a of list){
         const v = (a?.answer || '').trim();
         if (!v || v === '未回答') hasUn = true;
         else if (v === '未定')    hasUnd = true;
       }
-      if (hasUn)  return { label:'一部未回答', cls:'stat-pd' };
-      if (hasUnd) return { label:'未定あり',   cls:'stat-pd' };
-      return { label:'回答済', cls:'stat-ok' };
+      if (hasUn)  return { label:'一部未回答', cls:'stat-pd', key:'partial' };
+      if (hasUnd) return { label:'未定あり',   cls:'stat-pd', key:'pending' };
+      return { label:'回答済', cls:'stat-ok', key:'done' };
     }
+
     function rowHtml(ev, sum){
-      const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge">NEW</span>' : '';
+      const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge" style="background:#b197e3;">NEW</span>' : '';
       const time     = ev.hm ? ` ${ev.hm}` : '';
       const place    = ev.place || ev.venue || '';
-      const deadline = ev.deadline || ev.limit || ev.deadlineYmd || '';
       const dateStr  = ev.ymd || ev.date || '';
+      const deadline = ev.deadline || ev.limit || ev.deadlineYmd || '';
+
       return `
         <div class="eventRow" data-evt="${ev.id}">
           <div class="eventMeta">
             <div class="eventTitle">${dateStr}${time} @ ${place} ${newBadge}</div>
-            <div class="eventSub">（締切：${deadline || '—'}）</div>
+            <div class="eventSub"></div>
           </div>
-          <div class="eventRight"><span class="pill sm ${sum.cls}">${sum.label}</span></div>
+          <div class="eventRight">
+            ${deadlineBadge(deadline)}
+            <span class="pill sm ${sum.cls}">${sum.label}</span>
+          </div>
         </div>
         <div class="eventDetail" data-detail="${ev.id}"></div>
       `;
     }
-    function render(){
-      const listEl = ensureListEl();
-      if (!listEl) return;
 
-      listEl.classList.toggle('compact', S.compact);
+    function render(){
+      const box = E.box();
+      if (!box) return;
+
+      // 昇順ソート（ymd）
+      const list = (S.events || []).slice().sort((a,b) => {
+        const da = parseYmd(a.ymd || a.date) || new Date(8640000000000000);
+        const db = parseYmd(b.ymd || b.date) || new Date(8640000000000000);
+        return da - db;
+      });
 
       const rows = [];
-      for (const ev of S.events){
+      for (const ev of list){
         const sum = summarize(S.ansMap[ev.id]);
-        if (S.onlyNA && !(sum.label === '未回答' || sum.label === '一部未回答')) continue;
+        if (S.onlyNA && !(sum.key === 'na' || sum.key === 'partial')) continue;
         rows.push(rowHtml(ev, sum));
       }
-      listEl.innerHTML = rows.length ? rows.join('') : '<div class="muted">該当する公演はありません</div>';
+      box.innerHTML = rows.length ? `<div class="evList">${rows.join('')}</div>` : '<div class="listEmpty">該当する公演はありません</div>';
 
-      // 行クリックで詳細（家族別チップ）をLazy描画
-      listEl.querySelectorAll('.eventRow').forEach(row => {
-        row.addEventListener('click', () => {
+      // 詳細（家族チップ）はクリック時に描画
+      box.querySelectorAll('.eventRow').forEach(row => {
+        row.addEventListener('click', (e) => {
+          // 締切/ステータスバッジを押しただけなら開閉しない
+          if (e.target.closest('.dl-badge') || e.target.closest('.pill')) return;
           const id  = row.getAttribute('data-evt');
-          const det = listEl.querySelector(`.eventDetail[data-detail="${id}"]`);
+          const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
           if (!det) return;
           if (det.dataset.loaded !== '1'){
             const arr = S.ansMap[id] || [];
@@ -592,8 +570,7 @@
                   const cls   = ansClass(v);
                   return `<span class="pill sm ${cls}" title="${v}">${name}</span>`;
                 }).join('')}
-              </div>
-            `;
+              </div>`;
             det.dataset.loaded = '1';
           }
           row.classList.toggle('open');
@@ -602,25 +579,28 @@
       });
     }
 
-    // コントロールの結線
+    // チェックボックス（未回答のみ表示）
     document.addEventListener('DOMContentLoaded', () => {
-      const c = E.ckC(); const n = E.ckN();
-      if (c){ S.compact = !!c.checked; c.addEventListener('change', () => { S.compact = !!c.checked; render(); }); }
-      if (n){ S.onlyNA  = !!n.checked; n.addEventListener('change', () => { S.onlyNA  = !!n.checked; render(); }); }
+      const n = E.ckN();
+      if (n){
+        n.checked = true;                // 初期ON
+        S.onlyNA  = true;
+        n.addEventListener('change', () => { S.onlyNA = !!n.checked; render(); });
+      }
     });
 
     // 公開API
     window.HomeEventsUI = {
-      __v: 3,
+      __v: 4,
       mount({events = [], myAnswersMap = {}} = {}){
         S.events = Array.isArray(events) ? events : [];
         S.ansMap = myAnswersMap || {};
-        // 初期チェック状態の再取得
-        const c = E.ckC(), n = E.ckN();
-        if (c) S.compact = !!c.checked;
-        if (n) S.onlyNA  = !!n.checked;
+        const n = E.ckN(); if (n) S.onlyNA = !!n.checked; // UIと同期
         render();
-      }
+      },
+      setEvents(e){ S.events = e || []; render(); },
+      setAnswers(a){ S.ansMap = a || {}; render(); },
+      render
     };
   })();
   </script>
@@ -628,7 +608,7 @@
 </html>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.4.5";
+const FRONT_VERSION = "Front v2.4.6";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
