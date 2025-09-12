@@ -261,6 +261,20 @@
       <div class="card">
         <div class="row-space">
           <div class="sectionTitle">回答受付中の公演</div>
+          
+      <div id="homeFilters" class="row" style="gap:12px; align-items:center; margin:6px 0 4px;">
+        <label class="pill sm">
+          <input type="checkbox" id="homeCompact" checked>
+          コンパクト表示
+        </label>
+        <label class="pill sm">
+          <input type="checkbox" id="homeOnlyNA">
+          未回答のみ表示
+        </label>
+      </div>
+    
+      <div id="eventsBox" class="muted">読み込み中… <span class="spinner"></span></div>
+    </div>
           <div class="row" style="gap:12px;">
             <label class="small" style="display:flex;align-items:center;gap:6px;">
               <input type="checkbox" id="chkCompact" checked> コンパクト表示
@@ -472,7 +486,129 @@
       <div id="repBox" class="muted">公演を選択してください</div>
     </section>
   </main>
-
+  <script>
+  /* =========================================================
+     HomeEventsUI — 受付中リストの密表示 + バッジ + 詳細開閉
+     使い方：
+       HomeEventsUI.mount({ events, myAnswersMap });
+     依存：
+       #eventsBox, #homeCompact, #homeOnlyNA が存在すること
+  ========================================================= */
+  (function(){
+    // 既に存在すれば上書きせず return
+    if (window.HomeEventsUI && window.HomeEventsUI.__v === 2) return;
+  
+    const STATE = {
+      compact: true,
+      onlyNA:  false,
+      events: [],
+      map: {}
+    };
+  
+    function computeStatus(arr){
+      if (!arr || arr.length === 0) return { key:'na', label:'未回答', className:'closed' };
+      // 未回答(空文字/null) が含まれる or 値が「未回答」
+      const hasBlank = arr.some(a => !a || !a.answer || a.answer === '未回答');
+      if (hasBlank) return { key:'partial', label:'一部未回答', className:'closed' };
+      // 未定が含まれる
+      const hasPending = arr.some(a => a.answer === '未定');
+      if (hasPending) return { key:'pending', label:'未定あり', className:'open' };
+      return { key:'done', label:'回答済', className:'open' };
+    }
+    function pillClass(ans){
+      if (ans === '参加') return 'stat-ok';
+      if (ans === '欠席') return 'stat-ng';
+      if (ans === '未定') return 'stat-pd';
+      if (!ans || ans === '未回答') return 'stat-na';
+      return 'stat-na';
+    }
+    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+  
+    function rowHTML(ev, answers){
+      const st = computeStatus(answers);
+      const chips = answers && answers.length
+        ? answers.map(a=>`<span class="pill sm ${pillClass(a.answer)}">${esc(a.name)}：${esc(a.answer || '未回答')}</span>`).join(' ')
+        : `<span class="small muted">まだ回答はありません</span>`;
+  
+      const rightBadge = `<span class="tag ${st.className}">${st.label}</span>`;
+      const newBadge   = ev.isNew ? `<span class="badge" style="background:#b197e3;">NEW</span>` : '';
+  
+      return `
+        <div class="evItem" data-ev-id="${esc(ev.id)}" style="padding:8px 0; border-bottom:1px solid var(--c-border);">
+          <div class="row-space" style="gap:6px;">
+            <div>
+              <div style="font-weight:600">
+                ${esc(ev.ymd || '')}${ev.hm ? ` ${esc(ev.hm)}` : ''} @ ${esc(ev.place || '')} ${newBadge}
+              </div>
+              ${ev.deadline ? `<div class="small muted">締切：${esc(ev.deadline)}</div>` : ''}
+            </div>
+            ${rightBadge}
+          </div>
+          <div class="evDetail" style="display:${STATE.compact ? 'none' : 'block'}; margin-top:6px;">${chips}</div>
+        </div>
+      `;
+    }
+  
+    function render(){
+      const box = document.getElementById('eventsBox');
+      if (!box) return;
+  
+      // フィルタ（未回答のみ）
+      const list = STATE.onlyNA
+        ? STATE.events.filter(ev => {
+            const st = computeStatus(STATE.map[ev.id] || []);
+            return (st.key === 'na' || st.key === 'partial');
+          })
+        : STATE.events.slice();
+  
+      if (!list.length){
+        box.innerHTML = '<div class="listEmpty">現在、条件に合う公演はありません</div>';
+        return;
+      }
+  
+      box.innerHTML = `<div class="evList">${list.map(ev => rowHTML(ev, STATE.map[ev.id] || [])).join('')}</div>`;
+  
+      // 行クリックで詳細開閉（バッジクリックは除外）
+      box.querySelectorAll('.evItem').forEach(item => {
+        const detail = item.querySelector('.evDetail');
+        item.addEventListener('click', e => {
+          if (e.target.closest('.tag')) return;
+          if (!detail) return;
+          detail.style.display = (detail.style.display === 'none') ? 'block' : 'none';
+        });
+      });
+    }
+  
+    window.HomeEventsUI = {
+      __v: 2,
+      // データセット＋初回描画
+      mount({ events = [], myAnswersMap = {} } = {}){
+        STATE.events = events;
+        STATE.map    = myAnswersMap;
+        // チェック状態と同期（初回のみ）
+        const ckC = document.getElementById('homeCompact');
+        const ckN = document.getElementById('homeOnlyNA');
+        if (ckC) STATE.compact = !!ckC.checked;
+        if (ckN) STATE.onlyNA  = !!ckN.checked;
+        render();
+      },
+      // チェック切替時に呼ぶ
+      setOptions({ compact, onlyNA } = {}){
+        if (typeof compact === 'boolean') STATE.compact = compact;
+        if (typeof onlyNA  === 'boolean') STATE.onlyNA  = onlyNA;
+        render();
+      }
+    };
+  
+    // チェックボックスのイベント結線（存在すれば）
+    document.addEventListener('DOMContentLoaded', () => {
+      const ckC = document.getElementById('homeCompact');
+      const ckN = document.getElementById('homeOnlyNA');
+      if (ckC) ckC.addEventListener('change', () => HomeEventsUI.setOptions({ compact: ckC.checked, onlyNA: ckN?.checked }));
+      if (ckN) ckN.addEventListener('change', () => HomeEventsUI.setOptions({ compact: ckC?.checked, onlyNA: ckN.checked }));
+    });
+  })();
+  </script>
   <script>
     // ===== 同一ページ内のビュー切替 =====
     function showView(id){
@@ -624,7 +760,7 @@
 </html>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.4.1";
+const FRONT_VERSION = "Front v2.4.2";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
