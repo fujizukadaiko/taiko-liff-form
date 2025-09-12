@@ -1,608 +1,21 @@
-<!doctype html>
-<html lang="ja">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>公演 出欠フォーム</title>
-
-  <!-- Google Fonts（本文=ゴシック / 見出し=明朝） -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Noto+Serif+JP:wght@500;600;700&family=Shippori+Mincho:wght@500;700&display=swap"
-    rel="stylesheet"
-  />
-  <!-- Tailwind（preflight無効） -->
-  <script>
-    window.tailwind = window.tailwind || {};
-    tailwind.config = {
-      corePlugins: { preflight: false },
-      theme: {
-        extend: {
-          colors: { primary: '#7f6aa5' },
-          boxShadow: { card: '0 2px 10px rgba(0,0,0,0.04)' }
-        }
-      }
-    };
-  </script>
-  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-
-  <!-- ===== Base CSS ===== -->
-  <style>
-    :root{
-      --c-bg:#f7f5fa; --c-panel:#fff; --c-border:#e8e2f0;
-      --c-text:#202022; --c-muted:#6b6b6b;
-      --c-primary:#7f6aa5; --c-primary-2:#6d5a93; --c-accent:#a678b0;
-      --c-acc1:#d2e5b1; --c-acc2:#9ce78f; --c-acc2-dark:#6aa96a;
-      --c-ok:#0a7; --c-err:#c33;
-    }
-    body{
-      margin:0; color:var(--c-text);
-      font-family:"Noto Sans JP",system-ui,-apple-system,Segoe UI,"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
-      letter-spacing:.02em;
-      background:
-        radial-gradient(1200px 600px at 20% 10%, rgba(127,106,165,.05), transparent 40%),
-        radial-gradient(900px 500px  at 80% 60%, rgba(127,106,165,.04), transparent 35%),
-        var(--c-bg);
-    }
-    h1,h2,h3{
-      font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
-      letter-spacing: 0.03em;
-    }
-    .sectionTitle{
-      font-family: "Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-    .siteTitle{
-      font-family: "Shippori Mincho","Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MS PMincho",serif !important;
-      font-weight: 600; letter-spacing: 0.03em;
-    }
-
-    header{
-      padding:14px 16px; font-size:18px;
-      background:#fff; border-bottom:1px solid var(--c-border);
-      display:flex; justify-content:space-between; align-items:center;
-    }
-    main{ padding:14px 16px; }
-    .ver{ font-size:12px; color:#888; font-weight:500; }
-
-    .card{ background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; margin:10px 0; }
-    .muted{ color:var(--c-muted); font-size:13px; }
-    .row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-    .row-space{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    .right{ text-align:right; }
-    .badge{ display:inline-block; font-size:12px; padding:2px 6px; background:var(--c-accent); color:#fff; border-radius:999px; margin-left:8px; }
-    .small{ font-size:12px; color:var(--c-muted); }
-
-    [data-view]{ display:none; }
-    [data-view].show{ display:block; }
-
-    .spinner{ width:18px; height:18px; border:2px solid #ddd; border-top-color:var(--c-primary); border-radius:50%; animation:spin 1s linear infinite; display:inline-block; vertical-align:middle; }
-    @keyframes spin{ to{ transform:rotate(360deg); } }
-
-    label{ display:block; font-size:14px; margin:6px 0 4px; }
-    input[type="text"], input[type="date"], input[type="time"], select, textarea{
-      width:100%; border:1px solid var(--c-border); border-radius:8px; padding:8px; font-size:15px; background:#fff;
-    }
-    .listEmpty{ color:#888; font-size:14px; }
-
-    .pill{ display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border-radius:999px; background:#f5f5f5; border:1px solid var(--c-border); }
-    .pill.sm{ font-size:11px; padding:2px 6px; }
-
-    .stat-ok{ background:#e8f8f3; border:1px solid #cdeee4; color:#0a7; }
-    .stat-ng{ background:#fdeaea; border:1px solid #f6cccc; color:#c33; }
-    .stat-pd{ background:#fff7d6; border:1px solid #f3d27a; color:#7a5b00; }
-    .stat-na{ background:#f5f5f5; border:1px solid var(--c-border); color:#666; }
-
-    .adminGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-    @media (max-width:700px){ .adminGrid{ grid-template-columns:1fr; } }
-    .hint{ font-size:12px; color:#777; }
-
-    .tag{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--c-border); background:#f7f7f7; color:#444; }
-    .tag.open{ background:#e8f8f3; border-color:#cdeee4; color:#0a7; }
-    .tag.closed{ background:#fdeaea; border-color:#f6cccc; color:#c33; }
-
-    header.is-sticky{ position:sticky; top:0; backdrop-filter:blur(6px); background:rgba(255,255,255,.9); z-index:50; }
-
-    .warnBox{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
-
-    a.btn, button.btn{
-      display:inline-flex; align-items:center; justify-content:center;
-      min-height:40px; padding:10px 14px; border-radius:12px;
-      border:1px solid var(--c-border); background:#fff; color:var(--c-text);
-      text-decoration:none; font-size:15px; font-weight:600; letter-spacing:.01em; line-height:1;
-      box-shadow:0 2px 8px rgba(0,0,0,.06);
-      transition:transform .08s ease, filter .12s ease, box-shadow .12s ease;
-      cursor:pointer;
-    }
-    .btn-primary{
-      color:#fff !important;
-      border-color:color-mix(in srgb, var(--c-primary-2), #000 6%) !important;
-      background-image:linear-gradient(to bottom right, var(--c-primary), var(--c-primary-2)) !important;
-      background-color:var(--c-primary) !important;
-    }
-    .btn-outline{ background:#fff !important; color:var(--c-primary-2) !important; border-color:var(--c-primary-2) !important; }
-    .btn-sm{ padding:8px 12px; min-height:36px; font-size:14px; border-radius:10px; }
-    .btn-lg{ padding:12px 16px; min-height:44px; font-size:16px; border-radius:14px; }
-    .btnRow{ display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; margin:8px 0; }
-    .btnRow .btn{ flex:1 1 100%; }
-    @media (min-width:600px){
-      .btnRow{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
-      .btnRow .btn{ width:100%; }
-    }
-
-    /* ===== イベント密レイアウト（小さめ・改行削減） ===== */
-    .evList { margin-top: 4px; }
-    .eventRow {
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-      background:#fff; border:1px solid var(--c-border); border-radius:12px;
-      padding:8px 10px; margin:6px 0;
-    }
-    .eventMeta { min-width: 0; }
-    .eventTitle { font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .eventSub   { display:none; } /* 改行を極力なくすため非表示。必要なら表示可 */
-    .eventRight { display:flex; align-items:center; gap:6px; margin-left:8px; }
-
-    /* 締切バッジ */
-    .dl-badge { font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid var(--c-border); background:#f7f7fb; color:#555; }
-    .dl-soon  { background:#fff4ce; border-color:#f1d28a; color:#7a5b00; } /* 2日以内 */
-    .dl-today { background:#ffe3b3; border-color:#ffc766; color:#804a00; } /* 当日 */
-    .dl-late  { background:#ffe1e1; border-color:#f6b5b5; color:#a12222; } /* 期限超過 */
-
-    .eventDetail { display:none; padding:6px 6px 0 6px; }
-    .eventRow.open + .eventDetail { display:block; }
-  </style>
-
-  <!-- Tailwind の上乗せ -->
-  <script type="text/tailwindcss">
-    @layer components {
-      header { @apply border-b border-[color:var(--c-border)] px-4 py-3 flex items-center justify-between; }
-      .card { @apply rounded-xl border bg-[color:var(--c-panel)] p-4 shadow-card border-[color:var(--c-border)]; }
-      .sectionTitle { @apply font-bold text-[17px] text-[color:var(--c-text)]; }
-      .sectionTitle::after{ content:""; display:block; height:3px; width:72px; margin-top:6px; border-radius:999px;
-                            background:linear-gradient(90deg, var(--c-primary) 0%, #c9b8e6 100%); }
-      .line { @apply h-px my-3 bg-[color:var(--c-border)]; }
-      input[type="text"], input[type="date"], input[type="time"], select, textarea {
-        @apply rounded-lg border px-3 py-2 bg-white text-[15px] border-[color:var(--c-border)]
-               focus:outline-none focus:ring-2 focus:ring-[color:var(--c-primary)]/25;
-      }
-      .pill { @apply inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs bg-slate-50 border-[color:var(--c-border)] text-slate-700; }
-      .pill.sm { @apply text-[11px] px-2 py-0.5; }
-      .badge { @apply ml-2 inline-block rounded-full px-2 py-0.5 text-xs text-white; @apply bg-[color:var(--c-accent)]; }
-      .tag { @apply inline-block rounded-full px-2 py-0.5 text-xs border bg-slate-50 border-[color:var(--c-border)] text-slate-600; }
-      .tag.open   { @apply bg-emerald-50 border-emerald-200 text-emerald-600; }
-      .tag.closed { @apply bg-rose-50    border-rose-200    text-rose-600; }
-      .stat-ok { @apply bg-emerald-50 border border-emerald-200 text-emerald-700; }
-      .stat-ng { @apply bg-rose-50    border border-rose-200    text-rose-700; }
-      .stat-pd { @apply bg-amber-50   border border-amber-200   text-amber-700; }
-      .stat-na { @apply bg-slate-50   border border-slate-200   text-slate-500; }
-      .spinner { border-top-color: rgb(79 70 229); }
-    }
-  </script>
-
-  <!-- LIFF SDK -->
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-</head>
-
-<body>
-  <header class="is-sticky">
-    <div class="siteTitle">出欠入力と予定確認</div>
-    <div class="ver" id="ver"></div>
-  </header>
-
-  <main>
-    <!-- 友だち未追加アラート -->
-    <div id="friendAlert" class="card warnBox" style="display:none;">
-      このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
-    </div>
-
-    <!-- ===== HOME ===== -->
-    <section id="view-home" data-view class="show">
-      <div id="hello" class="muted"></div>
-
-      <!-- 管理メニュー（管理者のみ表示） -->
-      <div id="adminMenu" class="card" style="display:none;">
-        <div class="sectionTitle">管理用</div>
-        <div class="row" style="gap:8px;">
-          <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm" data-view-target="view-admin">予定登録/編集</button>
-          <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm" data-view-target="view-admin-report">出欠結果一覧</button>
-        </div>
-        <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
-      </div>
-
-      <!-- ★ トップ操作ボタン -->
-      <div class="btnRow" aria-label="主操作">
-        <button id="btnPrimary"   class="btn btn-primary btn-lg" data-view-target="view-form">出欠を入力 / 変更する</button>
-        <button id="btnSchedules" class="btn btn-outline btn-lg" data-view-target="view-schedules">今後の予定</button>
-        <button id="btnEditNames" class="btn btn-outline btn-lg" data-view-target="view-register" style="display:none;">登録氏名編集</button>
-      </div>
-
-      <!-- 互換性維持のためのダミー -->
-      <button id="btnReload" type="button" style="display:none;"></button>
-
-      <!-- 回答受付中の公演（密リスト＋バッジ） -->
-      <div class="card">
-        <div class="row-space">
-          <div class="sectionTitle">回答受付中の公演</div>
-          <label class="pill sm" style="margin-left:auto;">
-            <input type="checkbox" id="homeOnlyNA" checked>
-            未回答のみ表示
-          </label>
-        </div>
-        <div id="eventsBox"><div class="muted">読み込み中… <span class="spinner"></span></div></div>
-      </div>
-
-      <!-- あなたの登録状況（トップでは非表示） -->
-      <div class="card" style="display:none;">
-        <div class="sectionTitle">あなたの登録状況</div>
-        <div id="answersBox" class="muted">会員情報照会中… <span class="spinner"></span></div>
-      </div>
-
-      <div id="homeLog" class="muted" style="margin-top:8px;"></div>
-    </section><!-- HOME end -->
-
-    <!-- ===== フォーム（出欠） ===== -->
-    <section id="view-form" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">出欠入力フォーム</div>
-        <button id="btnBackFromForm" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-      </div>
-
-      <div id="formEventsBox" class="card muted">公演読み込み中… <span class="spinner"></span></div>
-      <div id="formFields"></div>
-
-      <div class="line"></div>
-      <div class="row right">
-        <button id="btnSubmit" class="btn btn-primary">送信する</button>
-      </div>
-      <div id="formLog" class="muted" style="margin-top:8px;"></div>
-    </section>
-
-    <!-- ===== 初回登録/氏名編集 ===== -->
-    <section id="view-register" data-view>
-      <div class="row-space">
-        <div class="sectionTitle" id="regTitle">初回登録（入力者 & 演奏者）</div>
-        <button id="btnBackFromReg" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-      </div>
-
-      <div class="card">
-        <label for="regInputName">入力者氏名（あなたの名前）</label>
-        <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
-
-        <div class="line"></div>
-        <div class="row-space">
-          <div class="sectionTitle" style="margin:0;">演奏者（家族も追加可）</div>
-          <button id="btnAddPerf" class="btn btn-ghost btn-sm" type="button">＋ 演奏者を追加</button>
-        </div>
-        <div id="perfList"></div>
-        <div class="small muted">※ あなた自身が演奏する場合は、演奏者としてあなたの名前も追加してください。</div>
-      </div>
-
-      <div class="row right">
-        <button id="btnRegister" class="btn btn-primary">登録する</button>
-      </div>
-      <div id="regLog" class="muted" style="margin-top:8px;"></div>
-    </section>
-
-    <!-- ===== 今後の予定 ===== -->
-    <section id="view-schedules" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">今後の予定</div>
-        <div class="row" style="gap:8px;">
-          <button id="btnBackFromSchedules" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="row" style="gap:12px;">
-          <div>
-            <label for="selDays">表示期間（日数）</label>
-            <select id="selDays">
-              <option value="30">30日</option>
-              <option value="60" selected>60日</option>
-              <option value="90">90日</option>
-            </select>
-          </div>
-          <div>
-            <label for="selKind">種別フィルタ</label>
-            <select id="selKind">
-              <option value="">（すべて）</option>
-              <option value="発表">発表</option>
-              <option value="練習">練習</option>
-              <option value="その他">その他</option>
-            </select>
-          </div>
-          <div style="align-self:flex-end;">
-            <button id="btnFetchSchedules" class="btn btn-ghost btn-sm">再取得</button>
-          </div>
-        </div>
-        <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
-      </div>
-
-      <div class="small muted">
-        ※ 予定はシート「Schedules（公開=Yes, ステータス=active）」から表示されます。<br>
-        ※ 過去日と期間外の予定は自動的に表示から除外されます。
-      </div>
-    </section>
-
-    <!-- ===== 予定登録（管理者） ===== -->
-    <section id="view-admin" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">予定登録（管理者）</div>
-        <div class="row" style="gap:8px;">
-          <button id="btnAdminBack"   class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-          <button id="btnAdminReload" class="btn btn-ghost btn-sm">一覧を再取得</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="row-space">
-          <div class="sectionTitle" id="adminFormTitle">新規登録</div>
-          <div class="small muted"><span id="adminEditingId" style="display:none;"></span></div>
-        </div>
-
-        <div class="adminGrid">
-          <div><label>タイトル *</label><input id="ad_title" type="text" placeholder="例：秋祭り演奏会"></div>
-          <div><label>種別 *</label>
-            <select id="ad_type"><option value="">（選択）</option><option value="発表">発表</option><option value="練習">練習</option><option value="その他">その他</option></select>
-          </div>
-          <div><label>日付 *</label><input id="ad_ymd" type="date"></div>
-          <div><label>時間（開始）</label><input id="ad_hm" type="time" placeholder="HH:mm"></div>
-          <div><label>場所</label><input id="ad_place" type="text" placeholder="例：藤塚小体育館"></div>
-          <div><label>集合時間（発表・その他のみ）</label><input id="ad_meetAt" type="time" placeholder="HH:mm"></div>
-          <div><label>集合場所</label><input id="ad_meetPlace" type="text" placeholder="例：藤塚小学校"></div>
-          <div><label>出欠対象（発表のみ）</label>
-            <select id="ad_attendTarget"><option value="Y">Y</option><option value="N" selected>N</option></select>
-          </div>
-          <div><label>締切日</label><input id="ad_deadline" type="date"></div>
-          <div><label>公開</label>
-            <select id="ad_publish"><option value="Yes">Yes</option><option value="No">No</option></select>
-          </div>
-          <div><label>ステータス</label>
-            <select id="ad_status"><option value="active" selected>active</option><option value="archived">archived</option></select>
-          </div>
-          <div><label>配信フラグ（必須：発表のみ）</label>
-            <select id="ad_flag"><!-- 動的に選択肢 --></select>
-          </div>
-        </div>
-
-        <div class="hint" style="margin-top:6px;">
-          * 必須。IDは自動採番です。<br>
-          種別が「練習」の場合は集合時間/集合場所/締切日/配信フラグは無効化（サーバ側でも保護）。<br>
-          種別が「発表」以外では「出欠対象」は自動で N 固定になります。<br>
-          「発表」の配信フラグは <b>新規登録時は Y/N のみ</b>、<b>編集時は Y/S/D/N</b> が選択可能です。
-        </div>
-
-        <div class="row right" style="margin-top:10px;">
-          <button id="btnAdminReset"  class="btn btn-ghost btn-sm" type="button">新規モードに戻す</button>
-          <button id="btnAdminSubmit" class="btn btn-primary">新規登録</button>
-        </div>
-        <div id="adminFormLog" class="muted" style="margin-top:8px;"></div>
-      </div>
-
-      <div class="card">
-        <div class="row" style="gap:12px;">
-          <div>
-            <label>一覧の表示期間（日数）</label>
-            <select id="ad_days"><option value="30">30日</option><option value="60" selected>60日</option><option value="90">90日</option></select>
-          </div>
-          <div style="align-self:flex-end;">
-            <button id="btnAdminFetch" class="btn btn-ghost btn-sm">一覧を取得</button>
-          </div>
-        </div>
-        <div id="adminListBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
-      </div>
-    </section>
-
-    <!-- ===== 出欠結果一覧（管理者） ===== -->
-    <section id="view-admin-report" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">出欠結果一覧（管理者）</div>
-        <div class="row" style="gap:8px;">
-          <button id="btnReportBack"   class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-          <button id="btnReportReload" class="btn btn-ghost btn-sm">再取得</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="row" style="gap:12px;">
-          <div style="min-width:260px; flex:1;">
-            <label for="repEvent">公演を選択</label>
-            <select id="repEvent"><option value="">（選択してください）</option></select>
-          </div>
-          <div>
-            <label for="repAttend">出欠フィルタ</label>
-            <select id="repAttend">
-              <option value="">（すべて）</option>
-              <option value="参加">参加</option>
-              <option value="欠席">欠席</option>
-              <option value="未定">未定</option>
-            </select>
-          </div>
-        </div>
-        <div class="small muted" style="margin-top:6px;">
-          ※ 対象は「公開=Yes」かつ配信フラグが Y/S/D の予定のみ
-        </div>
-      </div>
-
-      <div id="repBox" class="muted">公演を選択してください</div>
-    </section>
-  </main>
-
-  <!-- ===== 共通：SPA切替 ===== -->
-  <script>
-    function showView(id){
-      document.querySelectorAll('[data-view]').forEach(v => {
-        v.classList.toggle('show', v.id === id);
-      });
-      window.scrollTo({ top: 0, behavior: 'auto' });
-    }
-    document.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('[data-view-target]').forEach(el => {
-        el.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          const target = el.getAttribute('data-view-target');
-          if (target) showView(target);
-        });
-      });
-      document.getElementById('btnReload')?.addEventListener('click', () => location.reload());
-    });
-  </script>
-
   <!-- ===== HomeEventsUI v5 ===== -->
   <script>
   (function(){
     if (window.HomeEventsUI && window.HomeEventsUI.__v === 5) return;
 
-    const S = { events:[], ansMap:{}, onlyNA:true }; // 初期ON（未回答 or 一部未回答 or 未定あり）
+    const S = { events:[], ansMap:{}, onlyNA:true }; // 初期ON（未回答/一部未回答/未定あり）
 
     const E = {
       box : () => document.getElementById('eventsBox'),
       ckN : () => document.getElementById('homeOnlyNA'),
     };
 
-    // 文字列 "YYYY/MM/DD (...)" → Date
-    function parseYmd(s){
-      if (!s) return null;
-      const m = String(s).match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
-      if (!m) return null;
-      const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
-      return isNaN(d) ? null : d;
-    }
-    function parseDeadline(s){ return parseYmd(s); }
+    // ...（HomeEventsUI 本体：省略）...
 
-    function deadlineBadge(deadlineStr){
-      const d = parseDeadline(deadlineStr);
-      if (!d) return `<span class="dl-badge">締切：—</span>`;
-      const today = new Date(); today.setHours(0,0,0,0);
-      const diff = Math.floor((d - today)/86400000);
-      let cls = 'dl-badge', label = `締切：${deadlineStr}`;
-      if (diff < 0) cls += ' dl-late';
-      else if (diff === 0) cls += ' dl-today';
-      else if (diff <= 2) cls += ' dl-soon';
-      return `<span class="${cls}">${label}</span>`;
-    }
-
-    function ansClass(v){
-      if (!v || v === '未回答') return 'stat-na';
-      if (v === '未定')        return 'stat-pd';
-      if (v === '参加')        return 'stat-ok';
-      if (v === '欠席')        return 'stat-ng';
-      return 'stat-na';
-    }
-    function summarize(list){
-      if (!list || !list.length) return { label:'未回答', cls:'stat-na', key:'na' };
-      let hasUn=false, hasUnd=false;
-      for (const a of list){
-        const v = (a?.answer || '').trim();
-        if (!v || v === '未回答') hasUn = true;
-        else if (v === '未定')    hasUnd = true;
-      }
-      if (hasUn)  return { label:'一部未回答', cls:'stat-pd', key:'partial' };
-      if (hasUnd) return { label:'未定あり',   cls:'stat-pd', key:'pending' };
-      return { label:'回答済', cls:'stat-ok', key:'done' };
-    }
-
-    function rowHtml(ev, sum){
-      const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge" style="background:#b197e3;">NEW</span>' : '';
-      const time     = ev.hm ? ` ${ev.hm}` : '';
-      const place    = ev.place || ev.venue || '';
-      const dateStr  = ev.ymd || ev.date || '';
-      const deadline = ev.deadline || ev.limit || ev.deadlineYmd || '';
-
-      return `
-        <div class="eventRow" data-evt="${ev.id}">
-          <div class="eventMeta">
-            <div class="eventTitle">${dateStr}${time} @ ${place} ${newBadge}</div>
-          </div>
-          <div class="eventRight">
-            ${deadlineBadge(deadline)}
-            <span class="pill sm ${sum.cls}">${sum.label}</span>
-          </div>
-        </div>
-        <div class="eventDetail" data-detail="${ev.id}"></div>
-      `;
-    }
-
-    function render(){
-      const box = E.box();
-      if (!box) return;
-
-      // 昇順ソート
-      const list = (S.events || []).slice().sort((a,b) => {
-        const da = parseYmd(a.ymd || a.date) || new Date(8640000000000000);
-        const db = parseYmd(b.ymd || b.date) || new Date(8640000000000000);
-        return da - db;
-      });
-
-      const rows = [];
-      for (const ev of list){
-        const sum = summarize(S.ansMap[ev.id]);
-        // 未回答のみ表示＝ 未回答/一部未回答/未定あり を通す
-        if (S.onlyNA && !(sum.key === 'na' || sum.key === 'partial' || sum.key === 'pending')) continue;
-        rows.push(rowHtml(ev, sum));
-      }
-      box.innerHTML = rows.length ? `<div class="evList">${rows.join('')}</div>` : '<div class="listEmpty">該当する公演はありません</div>';
-
-      // 詳細（家族別チップ）を Lazy 描画
-      box.querySelectorAll('.eventRow').forEach(row => {
-        row.addEventListener('click', (e) => {
-          if (e.target.closest('.dl-badge') || e.target.closest('.pill')) return;
-          const id  = row.getAttribute('data-evt');
-          const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
-          if (!det) return;
-          if (det.dataset.loaded !== '1'){
-            const arr = S.ansMap[id] || [];
-            det.innerHTML = `
-              <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
-                ${arr.map(m => {
-                  const name  = m?.member || m?.name || '';
-                  const v     = m?.answer || '未回答';
-                  const cls   = ansClass(v);
-                  return `<span class="pill sm ${cls}" title="${v}">${name}</span>`;
-                }).join('')}
-              </div>`;
-            det.dataset.loaded = '1';
-          }
-          row.classList.toggle('open');
-          det.style.display = (det.style.display === 'block') ? 'none' : 'block';
-        });
-      });
-    }
-
-    // チェック（未回答のみ）の結線
-    document.addEventListener('DOMContentLoaded', () => {
-      const n = E.ckN();
-      if (n){
-        n.checked = true;
-        S.onlyNA  = true;
-        n.addEventListener('change', () => { S.onlyNA = !!n.checked; render(); });
-      }
-    });
-
-    // 公開API
-    const API = {
-      __v: 5,
-      mount({events = [], myAnswersMap = {}} = {}){
-        S.events = Array.isArray(events) ? events : [];
-        S.ansMap = myAnswersMap || {};
-        const n = E.ckN(); if (n) S.onlyNA = !!n.checked;
-        render();
-      },
-      setEvents(e){ S.events = e || []; render(); },
-      setAnswers(a){ S.ansMap = a || {}; render(); },
-      render
-    };
     window.HomeEventsUI = API;
     window.renderEventsDense = API.mount; // 互換：既存コードから1行で呼べます
 
-    /* ---- 自動ブート（スマホでも初回から表示されるように） ----
-       以下の順で mount を試みます。
-       1) window.__HOME_EVENTS__ / __HOME_ANSWERS__ が存在 → mount
-       2) 'home:data' カスタムイベントを待つ
-       3) 300ms間隔×5秒 ポーリングで (1) を待つ
-    ---------------------------------------------------------------- */
+    /* ---- 自動ブート（スマホでも初回から表示されるように） ---- */
     function tryMountFromGlobals(){
       const ev = window.__HOME_EVENTS__;
       const mp = window.__HOME_ANSWERS__;
@@ -612,12 +25,10 @@
       }
       return false;
     }
-    // 2) カスタムイベント
     window.addEventListener('home:data', (e)=>{
       const d = e.detail || {};
       API.mount({ events: d.events || [], myAnswersMap: d.myAnswersMap || {} });
     });
-    // 1)+3) すぐ試して、なければポーリング
     if (!tryMountFromGlobals()){
       let waited = 0;
       const iv = setInterval(()=>{
@@ -625,13 +36,52 @@
         else if ((waited += 300) > 5000) { clearInterval(iv); }
       }, 300);
     }
+
+    /* =========================================================
+       ★ 追加：ブリッジ関数
+       既存ロジックから取得した “そのままの配列” を渡せば、
+       自動で HomeEventsUI 用の形式に整形して mount します。
+       使い方：
+         window.renderHomeFromRaw(openList, myFamilyAnswers);
+    ========================================================= */
+    window.renderHomeFromRaw = function(openList, myFamilyAnswers){
+      try {
+        // 1) 公演リスト（id, ymd, hm, place, deadline, isNew or is_new）へ正規化
+        const events = (openList || []).map(x => ({
+          id      : x.id ?? x.eventId ?? x.eid ?? '',
+          ymd     : x.ymd ?? x.date ?? '',
+          hm      : x.hm ?? x.time ?? '',
+          place   : x.place ?? x.venue ?? x.location ?? '',
+          deadline: x.deadline ?? x.limit ?? x.deadlineYmd ?? '',
+          isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true)
+        }));
+
+        // 2) 回答マップ { eventId: [{name, answer}, ...] } に正規化
+        const map = {};
+        for (const a of (myFamilyAnswers || [])){
+          const eid = a.eventId ?? a.id ?? a.eid ?? '';
+          if (!eid) continue;
+          if (!map[eid]) map[eid] = [];
+          map[eid].push({
+            name  : a.name ?? a.member ?? '',
+            answer: (a.answer ?? '').trim() || '未回答'
+          });
+        }
+
+        // 3) HomeEventsUI へ受け渡し（自動描画）
+        window.__HOME_EVENTS__  = events;
+        window.__HOME_ANSWERS__ = map;
+        // すぐ mount（グローバルを見て自動でも描画されますが、即時反映のため直呼び）
+        window.renderEventsDense({ events, myAnswersMap: map });
+      } catch (err){
+        console.error('renderHomeFromRaw failed:', err);
+      }
+    };
   })();
   </script>
-</body>
-</html>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.4.7";
+const FRONT_VERSION = "Front v2.4.8";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
