@@ -169,12 +169,10 @@
     .eventSub   { font-size:12px; color:var(--c-muted); }
     .eventRight { display:flex; align-items:center; gap:8px; margin-left:8px; }
 
-    /* コンパクト切替 */
     .eventList.compact .eventRow   { padding:8px 10px; border-radius:10px; margin:6px 0; }
     .eventList.compact .eventTitle { font-size:14px; }
     .eventList.compact .eventSub   { font-size:11px; }
 
-    /* 詳細（折りたたみ） */
     .eventDetail { display:none; padding:6px 6px 0 6px; }
     .eventRow.open + .eventDetail { display:block; }
   </style>
@@ -253,29 +251,31 @@
       <!-- 互換性維持のためのダミー -->
       <button id="btnReload" type="button" style="display:none;"></button>
 
-  <!-- 回答受付中の公演（密リスト＋バッジ） -->
-  <div class="card">
-    <div class="row-space">
-      <div class="sectionTitle">回答受付中の公演</div>
-  
-      <!-- フィルタ（1セットだけ） -->
-      <div id="homeFilters" class="row" style="gap:12px; align-items:center; margin:6px 0 4px;">
-        <label class="pill sm">
-          <input type="checkbox" id="homeCompact" checked>
-          コンパクト表示
-        </label>
-        <label class="pill sm">
-          <input type="checkbox" id="homeOnlyNA">
-          未回答のみ表示
-        </label>
+      <!-- 回答受付中の公演（密リスト＋バッジ） -->
+      <div class="card">
+        <div class="row-space">
+          <div class="sectionTitle">回答受付中の公演</div>
+          <!-- フィルタ（1セットだけ） -->
+          <div id="homeFilters" class="row" style="gap:12px; align-items:center; margin:6px 0 4px;">
+            <label class="pill sm">
+              <input type="checkbox" id="homeCompact" checked>
+              コンパクト表示
+            </label>
+            <label class="pill sm">
+              <input type="checkbox" id="homeOnlyNA">
+              未回答のみ表示
+            </label>
+          </div>
+        </div>
+
+        <!-- ← HomeEventsUI がこの中を書き換えます -->
+        <div id="eventsBox">
+          <!-- ★★★ これが無いと ver3 は描画できません ★★★ -->
+          <div id="eventsList" class="eventList compact">
+            <div class="muted">読み込み中… <span class="spinner"></span></div>
+          </div>
+        </div>
       </div>
-    </div>
-  
-    <!-- ← HomeEventsUI がこの中を書き換えます -->
-    <div id="eventsBox">
-      <div class="muted">読み込み中… <span class="spinner"></span></div>
-    </div>
-  </div>
 
       <!-- あなたの登録状況：トップでは隠す（フォームで見られるため） -->
       <div class="card" style="display:none;">
@@ -509,6 +509,23 @@
       ckN : () => document.getElementById('homeOnlyNA'),
     };
 
+    function ensureListEl(){
+      // eventsList が無ければ、eventsBox 内に自動生成する
+      let listEl = E.list();
+      if (!listEl){
+        const box = E.box();
+        if (!box) return null;
+        const div = document.createElement('div');
+        div.id = 'eventsList';
+        div.className = 'eventList compact';
+        div.innerHTML = '<div class="muted">読み込み中… <span class="spinner"></span></div>';
+        box.innerHTML = ''; // 念のためクリア
+        box.appendChild(div);
+        listEl = div;
+      }
+      return listEl;
+    }
+
     function ansClass(v){
       if (!v || v === '未回答') return 'stat-na';
       if (v === '未定')        return 'stat-pd';
@@ -546,8 +563,9 @@
       `;
     }
     function render(){
-      const listEl = E.list();
+      const listEl = ensureListEl();
       if (!listEl) return;
+
       listEl.classList.toggle('compact', S.compact);
 
       const rows = [];
@@ -610,7 +628,7 @@
 </html>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.4.4";
+const FRONT_VERSION = "Front v2.4.5";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
