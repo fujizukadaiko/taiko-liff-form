@@ -345,60 +345,44 @@
   <div id="adminMenu" class="card" style="display:none;">
     <div class="sectionTitle">管理用</div>
     <div class="row" style="gap:8px;">
-      <!-- 若草グラデで目立たせる / 別タブで開く -->
+      <!-- 予定登録/編集（view-admin を開く） -->
       <button id="btnAdminMenuSchedules"
               class="btn btn-accent btn-sm"
-              data-href="https://example.com/admin/schedules.html"
-              data-newtab="1">
+              data-view-target="view-admin">
         予定登録/編集
       </button>
   
-      <!-- 藤グラデ（Primary） / 別タブで開く -->
+      <!-- 出欠結果一覧（view-admin-report を開く） -->
       <button id="btnAdminMenuReport"
               class="btn btn-primary btn-sm"
-              data-href="https://example.com/admin/report.html"
-              data-newtab="1">
+              data-view-target="view-admin-report">
         出欠結果一覧
       </button>
     </div>
     <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
   </div>
   
-  <div class="card">
-    <div class="sectionTitle">回答受付中の公演</div>
-    <div id="eventsBox" class="muted">読み込み中… <span class="spinner"></span></div>
-  </div>
-  
-  <div class="card">
-    <div class="sectionTitle">あなたの登録状況</div>
-    <div id="answersBox" class="muted">会員情報照会中… <span class="spinner"></span></div>
-  </div>
-  
-  <!-- 画面下部の操作列（色付き＋サイズ感） -->
+  <!-- 下部操作列 -->
   <div class="row" style="margin-top:6px; gap:8px; flex-wrap:wrap;">
-    <!-- メイン操作：藤グラデで強調（大きめ・横幅可） -->
     <button id="btnPrimary"
             class="btn btn-primary btn-lg btn-block"
-            data-href="./attendance.html">
+            data-view-target="view-form">
       出欠を入力 / 変更する
     </button>
   
-    <!-- 編集は軽めのゴースト（必要時のみ表示） -->
     <button id="btnEditNames"
             class="btn btn-ghost btn-lg"
-            data-href="./names.html"
+            data-view-target="view-register"
             style="display:none;">
       氏名を編集する
     </button>
   
-    <!-- 一覧はアウトラインで副次アクション感 -->
     <button id="btnSchedules"
             class="btn btn-outline btn-lg"
-            data-href="./schedules.html">
+            data-view-target="view-schedules">
       今後の予定を見る
     </button>
   
-    <!-- 再読み込みはJSで実行 -->
     <button id="btnReload" class="btn btn-ghost btn-lg" type="button">
       再読み込み
     </button>
@@ -645,22 +629,49 @@
 
 </main>
 <script>
-  // data-href を持つ要素を“リンク化”する共通ハンドラ
+  // ===== 共通：ビュー切替（同一ページ内） =====
+  function showView(id) {
+    const views = document.querySelectorAll('[data-view]');
+    views.forEach(v => v.classList.toggle('show', v.id === id));
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    // 1) data-view-target で SPA 切替
+    document.querySelectorAll('[data-view-target]').forEach(el => {
+      el.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const target = el.getAttribute('data-view-target');
+        if (target) showView(target);
+      });
+    });
+
+    // 2) data-href で外部/別ページへ遷移
     document.querySelectorAll('[data-href]').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (ev) => {
+        // data-view-target があれば SPA を優先
+        if (el.hasAttribute('data-view-target')) return;
+
+        ev.preventDefault();
         const url = el.getAttribute('data-href');
         if (!url) return;
-        if (el.hasAttribute('data-newtab')) {
+
+        const openNew = el.hasAttribute('data-newtab');
+        // LIFF 内で外部ブラウザを開く（推奨）
+        if (openNew && window.liff && typeof liff.openWindow === 'function') {
+          liff.openWindow({ url, external: true });
+          return;
+        }
+        // 通常の遷移
+        if (openNew) {
           window.open(url, '_blank', 'noopener');
         } else {
-          // LIFF内でも通常遷移OK（SPAで切替したい場合はここで差し替え）
           location.href = url;
         }
       });
     });
 
-    // 再読み込みボタン
+    // 3) 再読み込み
     document.getElementById('btnReload')?.addEventListener('click', () => {
       location.reload();
     });
@@ -668,7 +679,7 @@
 </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.3.3";
+const FRONT_VERSION = "Front v2.3.4";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
