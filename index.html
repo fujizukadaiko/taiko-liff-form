@@ -219,17 +219,46 @@
       <div id="adminMenu" class="card" style="display:none;">
         <div class="sectionTitle">管理用</div>
         <div class="row" style="gap:8px;">
-          <button id="btnAdminMenuSchedules" class="btn btn-accent btn-sm" data-view-target="view-admin">予定登録/編集</button>
-          <button id="btnAdminMenuReport"    class="btn btn-primary btn-sm" data-view-target="view-admin-report">出欠結果一覧</button>
+          <!-- 予定登録/編集：Outlineに統一 -->
+          <button id="btnAdminMenuSchedules"
+                  class="btn btn-outline btn-sm"
+                  data-view-target="view-admin">
+            予定登録/編集
+          </button>
+      
+          <!-- 出欠結果一覧：Outlineに統一 -->
+          <button id="btnAdminMenuReport"
+                  class="btn btn-outline btn-sm"
+                  data-view-target="view-admin-report">
+            出欠結果一覧
+          </button>
         </div>
         <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
       </div>
 
       <!-- ★ トップ操作ボタン（上部に配置） -->
       <div class="btnRow" aria-label="主操作">
-        <button id="btnPrimary"   class="btn btn-primary btn-lg" data-view-target="view-form">出欠入力</button>
-        <button id="btnSchedules" class="btn btn-outline btn-lg" data-view-target="view-schedules">予定</button>
-        <button id="btnEditNames" class="btn btn-ghost   btn-lg" data-view-target="view-register" style="display:none;">氏名編集</button>
+        <!-- 出欠入力：Primary（現状維持） -->
+        <button id="btnPrimary"
+                class="btn btn-primary btn-lg"
+                data-view-target="view-form">
+          出欠を入力 / 変更する
+        </button>
+      
+        <!-- 予定 → 今後の予定（文言だけ戻す、デザインはOutlineのまま） -->
+        <button id="btnSchedules"
+                class="btn btn-outline btn-lg"
+                data-view-target="view-schedules">
+          今後の予定
+        </button>
+      
+        <!-- 氏名編集 → 登録氏名編集（文言変更、デザインをOutlineに統一） -->
+        <button id="btnEditNames"
+                class="btn btn-outline btn-lg"
+                data-view-target="view-register"
+                style="display:none;">
+          登録氏名編集
+        </button>
       </div>
 
       <!-- 互換性維持のためのダミー（既存JSが参照する #btnReload） -->
@@ -463,7 +492,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.3.9";
+const FRONT_VERSION = "Front v2.4.0";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
