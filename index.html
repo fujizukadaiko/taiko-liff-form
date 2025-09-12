@@ -45,22 +45,18 @@
         radial-gradient(900px 500px  at 80% 60%, rgba(127,106,165,.04), transparent 35%),
         var(--c-bg);
     }
-    /* 見出しは和風の明朝体のまま */
     h1,h2,h3{
       font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
       letter-spacing: 0.03em;
     }
-    /* セクションタイトルはゴシック太字（視認性重視） */
     .sectionTitle{
       font-family: "Noto Sans JP","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
       font-weight: 700;
       letter-spacing: 0.02em;
     }
-    /* ヘッダーのサイトタイトルだけ明朝体（強制適用） */
     .siteTitle{
       font-family: "Shippori Mincho","Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MS PMincho",serif !important;
-      font-weight: 600;
-      letter-spacing: 0.03em;
+      font-weight: 600; letter-spacing: 0.03em;
     }
 
     header{
@@ -109,10 +105,8 @@
 
     header.is-sticky{ position:sticky; top:0; backdrop-filter:blur(6px); background:rgba(255,255,255,.9); z-index:50; }
 
-    /* warnBox（友だち未追加アラート用） */
     .warnBox{ background:#fff7d6; border:1px solid #f3d27a; padding:10px; border-radius:10px; color:#7a5b00; }
 
-    /* ---- a/button 共通 “見えるボタン” ---- */
     a.btn, button.btn{
       display:inline-flex; align-items:center; justify-content:center;
       min-height:40px; padding:10px 14px; border-radius:12px;
@@ -129,7 +123,7 @@
     }
     button.btn:disabled, a.btn[aria-disabled="true"]{ opacity:.6; cursor:not-allowed; pointer-events:none; }
 
-    /* ── 色バリエーション（!important で白背景を確実に上書き） ── */
+    /* 色バリエーション（!importantで白背景を確実に上書き） */
     .btn-primary{
       color:#fff !important;
       border-color:color-mix(in srgb, var(--c-primary-2), #000 6%) !important;
@@ -142,12 +136,8 @@
       background-image:linear-gradient(to bottom right, var(--c-acc2), var(--c-acc2-dark)) !important;
       background-color:var(--c-acc2) !important;
     }
-    .btn-ghost{
-      background:#fff !important; color:var(--c-text) !important; border-color:var(--c-border) !important;
-    }
-    .btn-outline{
-      background:#fff !important; color:var(--c-primary-2) !important; border-color:var(--c-primary-2) !important;
-    }
+    .btn-ghost{ background:#fff !important; color:var(--c-text) !important; border-color:var(--c-border) !important; }
+    .btn-outline{ background:#fff !important; color:var(--c-primary-2) !important; border-color:var(--c-primary-2) !important; }
 
     .btn-primary:hover  { filter:brightness(1.06); }
     .btn-primary:active { filter:brightness(1.12); }
@@ -162,7 +152,7 @@
     .btn-lg{ padding:12px 16px; min-height:44px; font-size:16px; border-radius:14px; }
     .btn > .icon{ display:inline-block; margin-right:.4em; line-height:0; }
 
-    /* トップのボタン行：スマホ＝縦積み、600px以上＝3列 */
+    /* トップのボタン行：スマホ=縦積み / 600px以上=3列 */
     .btnRow{ display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; margin:8px 0; }
     .btnRow .btn{ flex:1 1 100%; }
     @media (min-width:600px){
@@ -195,7 +185,6 @@
       .stat-pd { @apply bg-amber-50   border border-amber-200   text-amber-700; }
       .stat-na { @apply bg-slate-50   border border-slate-200   text-slate-500; }
 
-      /* button（タグ）にデフォ装飾は付けない。色は .btn-* で確定させる */
       button { @apply inline-flex items-center justify-center rounded-xl px-5 py-3 text-[15px] font-semibold shadow-md transition; }
       button:hover { @apply brightness-105; transform: translateY(-0.5px); }
       button:active{ transform: translateY(0); }
@@ -242,6 +231,9 @@
         <button id="btnSchedules" class="btn btn-outline btn-lg" data-view-target="view-schedules">予定</button>
         <button id="btnEditNames" class="btn btn-ghost   btn-lg" data-view-target="view-register" style="display:none;">氏名編集</button>
       </div>
+
+      <!-- 互換性維持のためのダミー（既存JSが参照する #btnReload） -->
+      <button id="btnReload" type="button" style="display:none;"></button>
 
       <!-- 回答受付中の公演 -->
       <div class="card">
@@ -465,13 +457,13 @@
         });
       });
 
-      // 再読み込み（要素がなければ無視）
+      // 互換用：btnReload（見せないけど存在はさせる）
       document.getElementById('btnReload')?.addEventListener('click', () => location.reload());
     });
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.3.8";
+const FRONT_VERSION = "Front v2.3.9";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
