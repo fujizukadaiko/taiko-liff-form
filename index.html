@@ -8,7 +8,7 @@
   <!-- Google Fonts（本文=ゴシック / 見出し=明朝） -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-   <link
+  <link
     href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Noto+Serif+JP:wght@500;600;700&family=Shippori+Mincho:wght@500;700&display=swap"
     rel="stylesheet"
   />
@@ -123,7 +123,7 @@
     }
     button.btn:disabled, a.btn[aria-disabled="true"]{ opacity:.6; cursor:not-allowed; pointer-events:none; }
 
-    /* 色バリエーション（!importantで白背景を確実に上書き） */
+    /* 色バリエーション */
     .btn-primary{
       color:#fff !important;
       border-color:color-mix(in srgb, var(--c-primary-2), #000 6%) !important;
@@ -150,9 +150,6 @@
 
     .btn-sm{ padding:8px 12px; min-height:36px; font-size:14px; border-radius:10px; }
     .btn-lg{ padding:12px 16px; min-height:44px; font-size:16px; border-radius:14px; }
-    .btn > .icon{ display:inline-block; margin-right:.4em; line-height:0; }
-
-    /* トップのボタン行：スマホ=縦積み / 600px以上=3列 */
     .btnRow{ display:flex; flex-wrap:wrap; gap:8px; align-items:stretch; margin:8px 0; }
     .btnRow .btn{ flex:1 1 100%; }
     @media (min-width:600px){
@@ -170,7 +167,6 @@
     .eventMeta { min-width: 0; }
     .eventTitle { font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .eventSub   { font-size:12px; color:var(--c-muted); }
-
     .eventRight { display:flex; align-items:center; gap:8px; margin-left:8px; }
 
     /* コンパクト切替 */
@@ -259,38 +255,28 @@
 
       <!-- 回答受付中の公演（密リスト＋バッジ） -->
       <div class="card">
-        <div class="row-space">
-          <div class="sectionTitle">回答受付中の公演</div>
-          
-      <div id="homeFilters" class="row" style="gap:12px; align-items:center; margin:6px 0 4px;">
-        <label class="pill sm">
-          <input type="checkbox" id="homeCompact" checked>
-          コンパクト表示
-        </label>
-        <label class="pill sm">
-          <input type="checkbox" id="homeOnlyNA">
-          未回答のみ表示
-        </label>
-      </div>
-    
-      <div id="eventsBox" class="muted">読み込み中… <span class="spinner"></span></div>
-    </div>
-          <div class="row" style="gap:12px;">
-            <label class="small" style="display:flex;align-items:center;gap:6px;">
-              <input type="checkbox" id="chkCompact" checked> コンパクト表示
-            </label>
-            <label class="small" style="display:flex;align-items:center;gap:6px;">
-              <input type="checkbox" id="chkOnlyUnanswered"> 未回答のみ表示
-            </label>
-          </div>
+        <div class="sectionTitle">回答受付中の公演</div>
+
+        <!-- ✅ フィルタ（IDをこの2つに統一） -->
+        <div id="homeFilters" class="row" style="gap:12px; align-items:center; margin:6px 0 4px;">
+          <label class="pill sm">
+            <input type="checkbox" id="homeCompact" checked>
+            コンパクト表示
+          </label>
+          <label class="pill sm">
+            <input type="checkbox" id="homeOnlyNA">
+            未回答のみ表示
+          </label>
         </div>
+
+        <!-- ✅ コンテナは1つだけ -->
         <div id="eventsBox">
           <div class="muted">読み込み中… <span class="spinner"></span></div>
           <div id="eventsList" class="eventList compact"></div>
         </div>
       </div>
 
-      <!-- あなたの登録状況（フォームで見られるためトップでは非表示） -->
+      <!-- あなたの登録状況：トップでは隠す（フォームで見られるため） -->
       <div class="card" style="display:none;">
         <div class="sectionTitle">あなたの登録状況</div>
         <div id="answersBox" class="muted">会員情報照会中… <span class="spinner"></span></div>
@@ -486,140 +472,16 @@
       <div id="repBox" class="muted">公演を選択してください</div>
     </section>
   </main>
+
+  <!-- ===== 共通：SPA切替 ===== -->
   <script>
-  /* =========================================================
-     HomeEventsUI — 受付中リストの密表示 + バッジ + 詳細開閉
-     使い方：
-       HomeEventsUI.mount({ events, myAnswersMap });
-     依存：
-       #eventsBox, #homeCompact, #homeOnlyNA が存在すること
-  ========================================================= */
-  (function(){
-    // 既に存在すれば上書きせず return
-    if (window.HomeEventsUI && window.HomeEventsUI.__v === 2) return;
-  
-    const STATE = {
-      compact: true,
-      onlyNA:  false,
-      events: [],
-      map: {}
-    };
-  
-    function computeStatus(arr){
-      if (!arr || arr.length === 0) return { key:'na', label:'未回答', className:'closed' };
-      // 未回答(空文字/null) が含まれる or 値が「未回答」
-      const hasBlank = arr.some(a => !a || !a.answer || a.answer === '未回答');
-      if (hasBlank) return { key:'partial', label:'一部未回答', className:'closed' };
-      // 未定が含まれる
-      const hasPending = arr.some(a => a.answer === '未定');
-      if (hasPending) return { key:'pending', label:'未定あり', className:'open' };
-      return { key:'done', label:'回答済', className:'open' };
-    }
-    function pillClass(ans){
-      if (ans === '参加') return 'stat-ok';
-      if (ans === '欠席') return 'stat-ng';
-      if (ans === '未定') return 'stat-pd';
-      if (!ans || ans === '未回答') return 'stat-na';
-      return 'stat-na';
-    }
-    function esc(s){ return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-  
-    function rowHTML(ev, answers){
-      const st = computeStatus(answers);
-      const chips = answers && answers.length
-        ? answers.map(a=>`<span class="pill sm ${pillClass(a.answer)}">${esc(a.name)}：${esc(a.answer || '未回答')}</span>`).join(' ')
-        : `<span class="small muted">まだ回答はありません</span>`;
-  
-      const rightBadge = `<span class="tag ${st.className}">${st.label}</span>`;
-      const newBadge   = ev.isNew ? `<span class="badge" style="background:#b197e3;">NEW</span>` : '';
-  
-      return `
-        <div class="evItem" data-ev-id="${esc(ev.id)}" style="padding:8px 0; border-bottom:1px solid var(--c-border);">
-          <div class="row-space" style="gap:6px;">
-            <div>
-              <div style="font-weight:600">
-                ${esc(ev.ymd || '')}${ev.hm ? ` ${esc(ev.hm)}` : ''} @ ${esc(ev.place || '')} ${newBadge}
-              </div>
-              ${ev.deadline ? `<div class="small muted">締切：${esc(ev.deadline)}</div>` : ''}
-            </div>
-            ${rightBadge}
-          </div>
-          <div class="evDetail" style="display:${STATE.compact ? 'none' : 'block'}; margin-top:6px;">${chips}</div>
-        </div>
-      `;
-    }
-  
-    function render(){
-      const box = document.getElementById('eventsBox');
-      if (!box) return;
-  
-      // フィルタ（未回答のみ）
-      const list = STATE.onlyNA
-        ? STATE.events.filter(ev => {
-            const st = computeStatus(STATE.map[ev.id] || []);
-            return (st.key === 'na' || st.key === 'partial');
-          })
-        : STATE.events.slice();
-  
-      if (!list.length){
-        box.innerHTML = '<div class="listEmpty">現在、条件に合う公演はありません</div>';
-        return;
-      }
-  
-      box.innerHTML = `<div class="evList">${list.map(ev => rowHTML(ev, STATE.map[ev.id] || [])).join('')}</div>`;
-  
-      // 行クリックで詳細開閉（バッジクリックは除外）
-      box.querySelectorAll('.evItem').forEach(item => {
-        const detail = item.querySelector('.evDetail');
-        item.addEventListener('click', e => {
-          if (e.target.closest('.tag')) return;
-          if (!detail) return;
-          detail.style.display = (detail.style.display === 'none') ? 'block' : 'none';
-        });
-      });
-    }
-  
-    window.HomeEventsUI = {
-      __v: 2,
-      // データセット＋初回描画
-      mount({ events = [], myAnswersMap = {} } = {}){
-        STATE.events = events;
-        STATE.map    = myAnswersMap;
-        // チェック状態と同期（初回のみ）
-        const ckC = document.getElementById('homeCompact');
-        const ckN = document.getElementById('homeOnlyNA');
-        if (ckC) STATE.compact = !!ckC.checked;
-        if (ckN) STATE.onlyNA  = !!ckN.checked;
-        render();
-      },
-      // チェック切替時に呼ぶ
-      setOptions({ compact, onlyNA } = {}){
-        if (typeof compact === 'boolean') STATE.compact = compact;
-        if (typeof onlyNA  === 'boolean') STATE.onlyNA  = onlyNA;
-        render();
-      }
-    };
-  
-    // チェックボックスのイベント結線（存在すれば）
-    document.addEventListener('DOMContentLoaded', () => {
-      const ckC = document.getElementById('homeCompact');
-      const ckN = document.getElementById('homeOnlyNA');
-      if (ckC) ckC.addEventListener('change', () => HomeEventsUI.setOptions({ compact: ckC.checked, onlyNA: ckN?.checked }));
-      if (ckN) ckN.addEventListener('change', () => HomeEventsUI.setOptions({ compact: ckC?.checked, onlyNA: ckN.checked }));
-    });
-  })();
-  </script>
-  <script>
-    // ===== 同一ページ内のビュー切替 =====
     function showView(id){
       document.querySelectorAll('[data-view]').forEach(v => {
         v.classList.toggle('show', v.id === id);
       });
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
-
     document.addEventListener('DOMContentLoaded', () => {
-      // SPA切替
       document.querySelectorAll('[data-view-target]').forEach(el => {
         el.addEventListener('click', (ev) => {
           ev.preventDefault();
@@ -627,140 +489,127 @@
           if (target) showView(target);
         });
       });
-
-      // 互換用：btnReload（見せないけど存在はさせる）
       document.getElementById('btnReload')?.addEventListener('click', () => location.reload());
     });
-
-    /* =========================================================
-       回答受付中の公演：密リスト + 要約バッジ + 詳細開閉
-       使い方：
-         HomeEventsUI.mount({ events, myAnswersMap });
-         // 互換：window.renderEventsDense = HomeEventsUI.mount;
-       期待するデータ形：
-         events: [{ id, ymd, hm, place, deadline, isNew }, ...]
-         myAnswersMap: { [eventId]: [{ member|name, answer } ...] }
-       answer の想定：'参加' | '欠席' | '未定' | '未回答' | ''（未回答扱い）
-    ========================================================= */
-    (function(){
-      const S = {
-        events: [],
-        ansMap: {},
-        compact: true,
-        onlyUn: false,
-      };
-
-      const E = {
-        list : () => document.getElementById('eventsList'),
-        card : () => document.getElementById('eventsBox'),
-        chkCompact: () => document.getElementById('chkCompact'),
-        chkOnlyUn : () => document.getElementById('chkOnlyUnanswered'),
-      };
-
-      function ansClass(v){
-        if (!v || v === '未回答') return 'stat-na';
-        if (v === '未定')        return 'stat-pd';
-        if (v === '参加')        return 'stat-ok';
-        if (v === '欠席')        return 'stat-ng';
-        return 'stat-na';
-      }
-
-      function summarize(list){
-        if (!list || !list.length) return { label:'未回答', cls:'stat-na' };
-        let hasUn=false, hasUnd=false;
-        for (const a of list){
-          const v = (a?.answer || '').trim();
-          if (!v || v === '未回答') hasUn = true;
-          else if (v === '未定')    hasUnd = true;
-        }
-        if (hasUn)  return { label:'一部未回答', cls:'stat-pd' };
-        if (hasUnd) return { label:'未定あり',   cls:'stat-pd' };
-        return { label:'回答済', cls:'stat-ok' };
-      }
-
-      function rowHtml(ev, sum){
-        const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge">NEW</span>' : '';
-        const time     = ev.hm ? ` ${ev.hm}` : '';
-        const place    = ev.place || ev.venue || '';
-        const deadline = ev.deadline || ev.limit || ev.deadlineYmd || '';
-        const dateStr  = ev.ymd || ev.date || '';
-
-        return `
-          <div class="eventRow" data-evt="${ev.id}">
-            <div class="eventMeta">
-              <div class="eventTitle">${dateStr}${time} @ ${place} ${newBadge}</div>
-              <div class="eventSub">（締切：${deadline || '—'}）</div>
-            </div>
-            <div class="eventRight"><span class="pill sm ${sum.cls}">${sum.label}</span></div>
-          </div>
-          <div class="eventDetail" data-detail="${ev.id}"></div>
-        `;
-      }
-
-      function render(){
-        const listEl = E.list();
-        if (!listEl) return;
-        listEl.classList.toggle('compact', S.compact);
-
-        const rows = [];
-        for (const ev of S.events){
-          const sum = summarize(S.ansMap[ev.id]);
-          if (S.onlyUn && !(sum.label === '未回答' || sum.label === '一部未回答')) continue;
-          rows.push(rowHtml(ev, sum));
-        }
-        listEl.innerHTML = rows.length ? rows.join('') : '<div class="muted">該当する公演はありません</div>';
-
-        // 行タップで詳細表示（家族別のチップ）
-        listEl.querySelectorAll('.eventRow').forEach(row => {
-          row.addEventListener('click', () => {
-            const id  = row.getAttribute('data-evt');
-            const det = listEl.querySelector(`.eventDetail[data-detail="${id}"]`);
-            if (!det) return;
-
-            if (det.dataset.loaded !== '1'){
-              const arr = S.ansMap[id] || [];
-              det.innerHTML = `
-                <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
-                  ${arr.map(m => {
-                    const name  = m?.member || m?.name || '';
-                    const v     = m?.answer || '未回答';
-                    const cls   = ansClass(v);
-                    return `<span class="pill sm ${cls}" title="${v}">${name}</span>`;
-                  }).join('')}
-                </div>
-              `;
-              det.dataset.loaded = '1';
-            }
-            row.classList.toggle('open');
-            det.style.display = (det.style.display === 'block') ? 'none' : 'block';
-          });
-        });
-      }
-
-      // コントロール
-      E.chkCompact()?.addEventListener('change', e => { S.compact = !!e.target.checked; render(); });
-      E.chkOnlyUn()?.addEventListener('change', e => { S.onlyUn  = !!e.target.checked; render(); });
-
-      // 公開API
-      const api = {
-        mount({events, myAnswersMap}){
-          S.events = Array.isArray(events) ? events : [];
-          S.ansMap = myAnswersMap || {};
-          // トップの「あなたの登録状況」カードは非表示に済み
-          render();
-        },
-        setEvents(e){ S.events = e || []; render(); },
-        setAnswers(a){ S.ansMap = a || {}; render(); },
-        render
-      };
-      window.HomeEventsUI = api;
-      window.renderEventsDense = api.mount; // 互換エイリアス
-    })();
   </script>
+
+  <!-- ===== HomeEventsUI（密リスト＋バッジ＋詳細開閉） ===== -->
+  <script>
+  (function(){
+    // 二重取り込み防止
+    if (window.HomeEventsUI && window.HomeEventsUI.__v === 3) return;
+
+    const S = { events:[], ansMap:{}, compact:true, onlyNA:false };
+
+    const E = {
+      list: () => document.getElementById('eventsList'),
+      box : () => document.getElementById('eventsBox'),
+      ckC : () => document.getElementById('homeCompact'),
+      ckN : () => document.getElementById('homeOnlyNA'),
+    };
+
+    function ansClass(v){
+      if (!v || v === '未回答') return 'stat-na';
+      if (v === '未定')        return 'stat-pd';
+      if (v === '参加')        return 'stat-ok';
+      if (v === '欠席')        return 'stat-ng';
+      return 'stat-na';
+    }
+    function summarize(list){
+      if (!list || !list.length) return { label:'未回答', cls:'stat-na' };
+      let hasUn=false, hasUnd=false;
+      for (const a of list){
+        const v = (a?.answer || '').trim();
+        if (!v || v === '未回答') hasUn = true;
+        else if (v === '未定')    hasUnd = true;
+      }
+      if (hasUn)  return { label:'一部未回答', cls:'stat-pd' };
+      if (hasUnd) return { label:'未定あり',   cls:'stat-pd' };
+      return { label:'回答済', cls:'stat-ok' };
+    }
+    function rowHtml(ev, sum){
+      const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge">NEW</span>' : '';
+      const time     = ev.hm ? ` ${ev.hm}` : '';
+      const place    = ev.place || ev.venue || '';
+      const deadline = ev.deadline || ev.limit || ev.deadlineYmd || '';
+      const dateStr  = ev.ymd || ev.date || '';
+      return `
+        <div class="eventRow" data-evt="${ev.id}">
+          <div class="eventMeta">
+            <div class="eventTitle">${dateStr}${time} @ ${place} ${newBadge}</div>
+            <div class="eventSub">（締切：${deadline || '—'}）</div>
+          </div>
+          <div class="eventRight"><span class="pill sm ${sum.cls}">${sum.label}</span></div>
+        </div>
+        <div class="eventDetail" data-detail="${ev.id}"></div>
+      `;
+    }
+    function render(){
+      const listEl = E.list();
+      if (!listEl) return;
+      listEl.classList.toggle('compact', S.compact);
+
+      const rows = [];
+      for (const ev of S.events){
+        const sum = summarize(S.ansMap[ev.id]);
+        if (S.onlyNA && !(sum.label === '未回答' || sum.label === '一部未回答')) continue;
+        rows.push(rowHtml(ev, sum));
+      }
+      listEl.innerHTML = rows.length ? rows.join('') : '<div class="muted">該当する公演はありません</div>';
+
+      // 行クリックで詳細（家族別チップ）をLazy描画
+      listEl.querySelectorAll('.eventRow').forEach(row => {
+        row.addEventListener('click', () => {
+          const id  = row.getAttribute('data-evt');
+          const det = listEl.querySelector(`.eventDetail[data-detail="${id}"]`);
+          if (!det) return;
+          if (det.dataset.loaded !== '1'){
+            const arr = S.ansMap[id] || [];
+            det.innerHTML = `
+              <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
+                ${arr.map(m => {
+                  const name  = m?.member || m?.name || '';
+                  const v     = m?.answer || '未回答';
+                  const cls   = ansClass(v);
+                  return `<span class="pill sm ${cls}" title="${v}">${name}</span>`;
+                }).join('')}
+              </div>
+            `;
+            det.dataset.loaded = '1';
+          }
+          row.classList.toggle('open');
+          det.style.display = (det.style.display === 'block') ? 'none' : 'block';
+        });
+      });
+    }
+
+    // コントロールの結線
+    document.addEventListener('DOMContentLoaded', () => {
+      const c = E.ckC(); const n = E.ckN();
+      if (c){ S.compact = !!c.checked; c.addEventListener('change', () => { S.compact = !!c.checked; render(); }); }
+      if (n){ S.onlyNA  = !!n.checked; n.addEventListener('change', () => { S.onlyNA  = !!n.checked; render(); }); }
+    });
+
+    // 公開API
+    window.HomeEventsUI = {
+      __v: 3,
+      mount({events = [], myAnswersMap = {}} = {}){
+        S.events = Array.isArray(events) ? events : [];
+        S.ansMap = myAnswersMap || {};
+        // 初期チェック状態の再取得
+        const c = E.ckC(), n = E.ckN();
+        if (c) S.compact = !!c.checked;
+        if (n) S.onlyNA  = !!n.checked;
+        render();
+      }
+    };
+  })();
+  </script>
+</body>
 </html>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.4.2";
+const FRONT_VERSION = "Front v2.4.3";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
