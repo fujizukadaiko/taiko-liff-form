@@ -45,26 +45,26 @@
     }
       /* 見出し（h1〜h3）は和風の明朝体のまま */
       h1,h2,h3{
-        font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+        font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
         letter-spacing: 0.03em;
       }
       
-      /* セクションタイトルはゴシック太字で視認性重視 */
+      /* セクションタイトルはゴシック太字（視認性重視） */
       .sectionTitle{
         font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
         font-weight: 700;
         letter-spacing: 0.02em;
       }
       
-      /* ヘッダーのサイトタイトルだけ明朝体（和風） */
+      /* ヘッダーのサイトタイトルだけ明朝体（強制適用） */
       .siteTitle{
-        font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+        font-family: "Shippori Mincho", "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif !important;
+        font-weight: 600; /* ← 太すぎるなら 500 に */
         letter-spacing: 0.03em;
-        font-weight: 700;
       }
-
+    
     header{
-      padding:14px 16px; font-size:18px; font-weight:700;
+      padding:14px 16px; font-size:18px; /*font-weight:700;←削除 */
       background:#fff; border-bottom:1px solid var(--c-border);
       display:flex; justify-content:space-between; align-items:center;
     }
@@ -452,7 +452,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.3.6";
+const FRONT_VERSION = "Front v2.3.7";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
