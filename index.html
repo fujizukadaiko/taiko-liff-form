@@ -450,228 +450,268 @@
     });
   </script>
 
-  <!-- ===== HomeEventsUI v5 ===== -->
-  <script>
-  (function(){
-    if (window.HomeEventsUI && window.HomeEventsUI.__v === 5) return;
+  <!-- ===== HomeEventsUI v6 ===== -->
+<script>
+(function(){
+  if (window.HomeEventsUI && window.HomeEventsUI.__v === 6) return;
 
-    const S = { events:[], ansMap:{}, onlyNA:true }; // 初期ON（未回答 or 一部未回答 or 未定あり）
+  const S = { events:[], ansMap:{}, regNames:[], onlyNA:true }; // 初期ON
 
-    const E = {
-      box : () => document.getElementById('eventsBox'),
-      ckN : () => document.getElementById('homeOnlyNA'),
-    };
+  const E = {
+    box : () => document.getElementById('eventsBox'),
+    ckN : () => document.getElementById('homeOnlyNA'),
+  };
 
-    // 文字列 "YYYY/MM/DD (...)" → Date
-    function parseYmd(s){
-      if (!s) return null;
-      const m = String(s).match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
-      if (!m) return null;
-      const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
-      return isNaN(d) ? null : d;
+  /* ===== 表示用CSS微調整（2行レイアウト） ===== */
+  const css = `
+  .evList { margin-top: 4px; }
+  .eventRow {
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:#fff; border:1px solid var(--c-border); border-radius:12px;
+    padding:10px 12px; margin:6px 0;
+  }
+  .eventMeta { min-width:0; }
+  .eventTitle { font-weight:700; font-size:15px; line-height:1.35; white-space:normal; }
+  .eventSub { font-size:12px; color:var(--c-muted); margin-top:2px; }
+  .eventRight { display:flex; align-items:center; gap:6px; margin-left:8px; }
+
+  .dl-badge { font-size:11px; padding:2px 6px; border-radius:999px;
+              border:1px solid var(--c-border); background:#f7f7fb; color:#555; }
+  .dl-soon  { background:#fff4ce; border-color:#f1d28a; color:#7a5b00; }
+  .dl-today { background:#ffe3b3; border-color:#ffc766; color:#804a00; }
+  .dl-late  { background:#ffe1e1; border-color:#f6b5b5; color:#a12222; }
+
+  .eventDetail { display:none; padding:6px 6px 0 6px; }
+  .eventRow.open + .eventDetail { display:block; }
+  `;
+  const style = document.createElement('style'); style.textContent = css;
+  document.head.appendChild(style);
+
+  // ---- 文字列 "YYYY/MM/DD" を Date へ
+  function parseYmd(s){
+    if (!s) return null;
+    const m = String(s).match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
+    if (!m) return null;
+    const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
+    return isNaN(d) ? null : d;
+  }
+  function deadlineBadge(deadlineStr){
+    const d = parseYmd(deadlineStr);
+    if (!d) return `<span class="dl-badge">締切：—</span>`;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const diff = Math.floor((d - today)/86400000);
+    let cls = 'dl-badge', label = `締切：${deadlineStr}`;
+    if (diff < 0) cls += ' dl-late';
+    else if (diff === 0) cls += ' dl-today';
+    else if (diff <= 2) cls += ' dl-soon';
+    return `<span class="${cls}">${label}</span>`;
+  }
+
+  function ansClass(v){
+    if (!v || v === '未回答') return 'stat-na';
+    if (v === '未定')        return 'stat-pd';
+    if (v === '参加')        return 'stat-ok';
+    if (v === '欠席')        return 'stat-ng';
+    return 'stat-na';
+  }
+
+  /* ===== バッジ判定（登録演奏者の総数を基準） =====
+      ① 回答済：全員が 参加/欠席
+      ② 未回答：全員が 未回答（空）
+      ③ 一部未回答：上記以外で、未定が1人もいない
+      ④ 未定あり：1人でも未定がいれば最優先（未回答者がいてもOK）
+  ================================================== */
+  function summarize(eventId){
+    const reg = S.regNames || [];
+    const list = S.ansMap[eventId] || [];   // [{name, answer}, ...]
+    const map  = new Map(list.map(x => [String(x.name||''), String(x.answer||'')]));
+
+    // 総数0なら未回答扱い（＝まだ登録が無い）
+    if (reg.length === 0) return { label:'未回答', cls:'stat-na', key:'na' };
+
+    let cntDone = 0;      // 参加/欠席
+    let cntEmpty = 0;     // 完全未回答（空）
+    let hasPending = false;
+
+    for (const name of reg){
+      const v = (map.get(String(name)) || '').trim();
+      if (!v) cntEmpty++;
+      else if (v === '未定') hasPending = true;
+      else if (v === '参加' || v === '欠席') cntDone++;
+      else cntEmpty++; // 想定外は空扱い
     }
-    function parseDeadline(s){ return parseYmd(s); }
 
-    function deadlineBadge(deadlineStr){
-      const d = parseDeadline(deadlineStr);
-      if (!d) return `<span class="dl-badge">締切：—</span>`;
-      const today = new Date(); today.setHours(0,0,0,0);
-      const diff = Math.floor((d - today)/86400000);
-      let cls = 'dl-badge', label = `締切：${deadlineStr}`;
-      if (diff < 0) cls += ' dl-late';
-      else if (diff === 0) cls += ' dl-today';
-      else if (diff <= 2) cls += ' dl-soon';
-      return `<span class="${cls}">${label}</span>`;
-    }
+    if (hasPending)              return { label:'未定あり',   cls:'stat-pd', key:'pending' };
+    if (cntDone === reg.length)  return { label:'回答済',     cls:'stat-ok', key:'done'    };
+    if (cntEmpty === reg.length) return { label:'未回答',     cls:'stat-na', key:'na'      };
+    return                           { label:'一部未回答', cls:'stat-pd', key:'partial' };
+  }
 
-    function ansClass(v){
-      if (!v || v === '未回答') return 'stat-na';
-      if (v === '未定')        return 'stat-pd';
-      if (v === '参加')        return 'stat-ok';
-      if (v === '欠席')        return 'stat-ng';
-      return 'stat-na';
-    }
-    function summarize(list){
-      if (!list || !list.length) return { label:'未回答', cls:'stat-na', key:'na' };
-      let hasUn=false, hasUnd=false;
-      for (const a of list){
-        const v = (a?.answer || '').trim();
-        if (!v || v === '未回答') hasUn = true;
-        else if (v === '未定')    hasUnd = true;
-      }
-      if (hasUn)  return { label:'一部未回答', cls:'stat-pd', key:'partial' };
-      if (hasUnd) return { label:'未定あり',   cls:'stat-pd', key:'pending' };
-      return { label:'回答済', cls:'stat-ok', key:'done' };
-    }
+  function rowHtml(ev){
+    const sum      = summarize(ev.id);
+    const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge" style="background:#b197e3;">NEW</span>' : '';
+    const time     = ev.hm ? ` ${ev.hm}` : '';
+    const place    = ev.place || ev.venue || '';
+    const dateStr  = ev.ymd || ev.date || '';
+    const deadline = ev.deadline || ev.limit || ev.deadlineYmd || '';
 
-    function rowHtml(ev, sum){
-      const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge" style="background:#b197e3;">NEW</span>' : '';
-      const time     = ev.hm ? ` ${ev.hm}` : '';
-      const place    = ev.place || ev.venue || '';
-      const dateStr  = ev.ymd || ev.date || '';
-      const deadline = ev.deadline || ev.limit || ev.deadlineYmd || '';
-
-      return `
-        <div class="eventRow" data-evt="${ev.id}">
-          <div class="eventMeta">
-            <div class="eventTitle">${dateStr}${time} @ ${place} ${newBadge}</div>
-          </div>
-          <div class="eventRight">
-            ${deadlineBadge(deadline)}
-            <span class="pill sm ${sum.cls}">${sum.label}</span>
-          </div>
+    return `
+      <div class="eventRow" data-evt="${ev.id}">
+        <div class="eventMeta">
+          <div class="eventTitle">${dateStr}${time} @ ${place} ${newBadge}</div>
+          <div class="eventSub">${deadline ? `（締切：${deadline}）` : ''}</div>
         </div>
-        <div class="eventDetail" data-detail="${ev.id}"></div>
-      `;
-    }
+        <div class="eventRight">
+          ${deadlineBadge(deadline)}
+          <span class="pill sm ${sum.cls}">${sum.label}</span>
+        </div>
+      </div>
+      <div class="eventDetail" data-detail="${ev.id}"></div>
+    `;
+  }
 
-    function render(){
-      const box = E.box();
-      if (!box) return;
+  function render(){
+    const box = E.box();
+    if (!box) return;
 
-      // 昇順ソート
-      const list = (S.events || []).slice().sort((a,b) => {
-        const da = parseYmd(a.ymd || a.date) || new Date(8640000000000000);
-        const db = parseYmd(b.ymd || b.date) || new Date(8640000000000000);
-        return da - db;
-      });
-
-      const rows = [];
-      for (const ev of list){
-        const sum = summarize(S.ansMap[ev.id]);
-        // 未回答のみ表示＝ 未回答/一部未回答/未定あり を通す
-        if (S.onlyNA && !(sum.key === 'na' || sum.key === 'partial' || sum.key === 'pending')) continue;
-        rows.push(rowHtml(ev, sum));
-      }
-      box.innerHTML = rows.length ? `<div class="evList">${rows.join('')}</div>` : '<div class="listEmpty">該当する公演はありません</div>';
-
-      // 詳細（家族別チップ）を Lazy 描画
-      box.querySelectorAll('.eventRow').forEach(row => {
-        row.addEventListener('click', (e) => {
-          if (e.target.closest('.dl-badge') || e.target.closest('.pill')) return;
-          const id  = row.getAttribute('data-evt');
-          const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
-          if (!det) return;
-          if (det.dataset.loaded !== '1'){
-            const arr = S.ansMap[id] || [];
-            det.innerHTML = `
-              <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
-                ${arr.map(m => {
-                  const name  = m?.member || m?.name || '';
-                  const v     = m?.answer || '未回答';
-                  const cls   = ansClass(v);
-                  return `<span class="pill sm ${cls}" title="${v}">${name}</span>`;
-                }).join('')}
-              </div>`;
-            det.dataset.loaded = '1';
-          }
-          row.classList.toggle('open');
-          det.style.display = (det.style.display === 'block') ? 'none' : 'block';
-        });
-      });
-    }
-
-    // チェック（未回答のみ）の結線
-    document.addEventListener('DOMContentLoaded', () => {
-      const n = E.ckN();
-      if (n){
-        n.checked = true;
-        S.onlyNA  = true;
-        n.addEventListener('change', () => { S.onlyNA = !!n.checked; render(); });
-      }
+    // 昇順ソート
+    const list = (S.events || []).slice().sort((a,b) => {
+      const da = parseYmd(a.ymd || a.date) || new Date(8640000000000000);
+      const db = parseYmd(b.ymd || b.date) || new Date(8640000000000000);
+      return da - db;
     });
 
-    // 公開API
-    const API = {
-      __v: 5,
-      mount({events = [], myAnswersMap = {}} = {}){
-        S.events = Array.isArray(events) ? events : [];
-        S.ansMap = myAnswersMap || {};
-        const n = E.ckN(); if (n) S.onlyNA = !!n.checked;
-        render();
-      },
-      setEvents(e){ S.events = e || []; render(); },
-      setAnswers(a){ S.ansMap = a || {}; render(); },
-      render
-    };
-    window.HomeEventsUI = API;
-    window.renderEventsDense = API.mount; // 互換：既存コードから1行で呼べます
-
-    /* ---- 自動ブート（スマホでも初回から表示されるように） ----
-       以下の順で mount を試みます。
-       1) window.__HOME_EVENTS__ / __HOME_ANSWERS__ が存在 → mount
-       2) 'home:data' カスタムイベントを待つ
-       3) 300ms間隔×5秒 ポーリングで (1) を待つ
-    ---------------------------------------------------------------- */
-    function tryMountFromGlobals(){
-      const ev = window.__HOME_EVENTS__;
-      const mp = window.__HOME_ANSWERS__;
-      if (Array.isArray(ev) && mp && typeof mp === 'object'){
-        API.mount({events: ev, myAnswersMap: mp});
-        return true;
-      }
-      return false;
+    const rows = [];
+    for (const ev of list){
+      const sum = summarize(ev.id);
+      // 未回答のみ = 未回答/一部未回答/未定あり を通す
+      if (S.onlyNA && !(sum.key === 'na' || sum.key === 'partial' || sum.key === 'pending')) continue;
+      rows.push(rowHtml(ev));
     }
-    // 2) カスタムイベント
-    window.addEventListener('home:data', (e)=>{
-      const d = e.detail || {};
-      API.mount({ events: d.events || [], myAnswersMap: d.myAnswersMap || {} });
-    });
-    // 1)+3) すぐ試して、なければポーリング
-    if (!tryMountFromGlobals()){
-      let waited = 0;
-      const iv = setInterval(()=>{
-        if (tryMountFromGlobals()) { clearInterval(iv); }
-        else if ((waited += 300) > 5000) { clearInterval(iv); }
-      }, 300);
-    }
-    /* =========================================================
-       ★ 追加：ブリッジ関数
-       既存ロジックから取得した “そのままの配列” を渡せば、
-       自動で HomeEventsUI 用の形式に整形して mount します。
-       使い方：
-         window.renderHomeFromRaw(openList, myFamilyAnswers);
-    ========================================================= */
-    window.renderHomeFromRaw = function(openList, myFamilyAnswers){
-      try {
-        // 1) 公演リスト（id, ymd, hm, place, deadline, isNew or is_new）へ正規化
-        const events = (openList || []).map(x => ({
-          id      : x.id ?? x.eventId ?? x.eid ?? '',
-          ymd     : x.ymd ?? x.date ?? '',
-          hm      : x.hm ?? x.time ?? '',
-          place   : x.place ?? x.venue ?? x.location ?? '',
-          deadline: x.deadline ?? x.limit ?? x.deadlineYmd ?? '',
-          isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true)
-        }));
+    box.innerHTML = rows.length ? `<div class="evList">${rows.join('')}</div>`
+                                : '<div class="listEmpty">該当する公演はありません</div>';
 
-        // 2) 回答マップ { eventId: [{name, answer}, ...] } に正規化
-        const map = {};
-        for (const a of (myFamilyAnswers || [])){
-          const eid = a.eventId ?? a.id ?? a.eid ?? '';
-          if (!eid) continue;
-          if (!map[eid]) map[eid] = [];
-          map[eid].push({
-            name  : a.name ?? a.member ?? '',
-            answer: (a.answer ?? '').trim() || '未回答'
-          });
+    // 詳細（家族別チップ）Lazy描画
+    box.querySelectorAll('.eventRow').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.dl-badge') || e.target.closest('.pill')) return;
+        const id  = row.getAttribute('data-evt');
+        const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
+        if (!det) return;
+        if (det.dataset.loaded !== '1'){
+          const arr = S.ansMap[id] || [];
+          det.innerHTML = `
+            <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
+              ${arr.map(m => `<span class="pill sm ${ansClass(m.answer)}" title="${m.answer||'未回答'}">${m.name}</span>`).join('')}
+            </div>`;
+          det.dataset.loaded = '1';
         }
+        row.classList.toggle('open');
+        det.style.display = (det.style.display === 'block') ? 'none' : 'block';
+      });
+    });
+  }
 
-        // 3) HomeEventsUI へ受け渡し（自動描画）
-        window.__HOME_EVENTS__  = events;
-        window.__HOME_ANSWERS__ = map;
-        // すぐ mount（グローバルを見て自動でも描画されますが、即時反映のため直呼び）
-        window.renderEventsDense({ events, myAnswersMap: map });
-      } catch (err){
-        console.error('renderHomeFromRaw failed:', err);
+  // チェック（未回答のみ）
+  document.addEventListener('DOMContentLoaded', () => {
+    const n = E.ckN();
+    if (n){
+      n.checked = true;
+      S.onlyNA  = true;
+      n.addEventListener('change', () => { S.onlyNA = !!n.checked; render(); });
+    }
+  });
+
+  // 公開API
+  const API = {
+    __v: 6,
+    mount({events = [], myAnswersMap = {}, regNames = []} = {}){
+      S.events   = Array.isArray(events) ? events : [];
+      S.ansMap   = myAnswersMap || {};
+      S.regNames = Array.isArray(regNames) ? regNames : [];
+      const n = E.ckN(); if (n) S.onlyNA = !!n.checked;
+      render();
+    },
+    setEvents(e){ S.events = e || []; render(); },
+    setAnswers(a){ S.ansMap = a || {}; render(); },
+    setRegNames(names){ S.regNames = Array.isArray(names)? names: []; render(); },
+    render
+  };
+  window.HomeEventsUI = API;
+  window.renderEventsDense = API.mount; // 互換
+
+  // ---- 自動ブート（グローバル変数/イベント/ポーリング）
+  function tryMountFromGlobals(){
+    const ev = window.__HOME_EVENTS__;
+    const mp = window.__HOME_ANSWERS__;
+    const rn = window.__HOME_REGNAMES__;
+    if (Array.isArray(ev) && mp && typeof mp === 'object'){
+      API.mount({events: ev, myAnswersMap: mp, regNames: Array.isArray(rn)? rn: []});
+      return true;
+    }
+    return false;
+  }
+  window.addEventListener('home:data', (e)=>{
+    const d = e.detail || {};
+    API.mount({ events: d.events || [], myAnswersMap: d.myAnswersMap || {}, regNames: d.regNames || [] });
+  });
+  if (!tryMountFromGlobals()){
+    let waited = 0;
+    const iv = setInterval(()=>{
+      if (tryMountFromGlobals()) { clearInterval(iv); }
+      else if ((waited += 300) > 5000) { clearInterval(iv); }
+    }, 300);
+  }
+
+  /* ===== ブリッジ関数：既存配列→正規化して mount ===== */
+  window.renderHomeFromRaw = function(openList, myFamilyAnswers, regNames){
+    try {
+      const events = (openList || []).map(x => ({
+        id      : x.id ?? x.eventId ?? x.eid ?? '',
+        ymd     : x.ymd ?? x.date ?? '',
+        hm      : x.hm ?? x.time ?? '',
+        place   : x.place ?? x.venue ?? x.location ?? '',
+        deadline: x.deadline ?? x.limit ?? x.deadlineYmd ?? '',
+        isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true)
+      }));
+
+      const reg = Array.isArray(regNames) ? regNames : [];
+
+      // 回答マップを作る（全登録名を必ず1レコード化）
+      const tmp = {};
+      for (const a of (myFamilyAnswers || [])){
+        const eid = a.eventId ?? a.id ?? a.eid ?? '';
+        if (!eid) continue;
+        if (!tmp[eid]) tmp[eid] = new Map();
+        const nm = String(a.name ?? a.member ?? '');
+        const ans = String(a.answer || '').trim();
+        if (nm) tmp[eid].set(nm, ans); // 最終値が優先
       }
-    };
-  })();
-  </script>
+
+      const map = {};
+      for (const ev of events){
+        const m = tmp[ev.id] || new Map();
+        map[ev.id] = (reg.length ? reg : Array.from(m.keys()))
+          .map(nm => ({ name: nm, answer: (m.get(nm) || '') || '未回答'.replace('未回答','') })) // 空で渡し、集計側で空扱い
+          .map(o => ({ name:o.name, answer:o.answer || '' }));
+      }
+
+      // mount
+      window.__HOME_EVENTS__   = events;
+      window.__HOME_ANSWERS__  = map;
+      window.__HOME_REGNAMES__ = reg;
+      window.renderEventsDense({ events, myAnswersMap: map, regNames: reg });
+    } catch (err){
+      console.error('renderHomeFromRaw failed:', err);
+    }
+  };
+})();
+</script>
 </body>
 </html>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.4.9";
+const FRONT_VERSION = "Front v2.5.0";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
@@ -872,7 +912,38 @@ async function refreshData(){
     const r = await api(`?getAttendanceAll=1&lineId=${esc(state.lineId)}&eventIds=${esc(JSON.stringify(ids))}`);
     if (r.status === "ok" && r.map) state.answers = r.map;
   }
+  // --- HomeEventsUI へ受け渡し（登録名を基準にバッジ判定） ---
+  (function(){
+    // 登録演奏者（重複排除）
+    const regNames = Array.from(
+      new Set(state.members.map(m => m.performerName))
+    ).filter(Boolean);
 
+    // 公演（HomeEventsUI 期待形式）
+    const openList = state.events.map(e => ({
+      id:       e.eventId,
+      ymd:      ymdDow(parseYmdStrict(e.date)), // "YYYY/MM/DD（曜）"
+      hm:       hmFromTimeCell(e.time),
+      place:    e.place || "",
+      deadline: e.deadline || "",
+      isNew:    !!e.isNew
+    }));
+
+    // 回答（全登録名を必ず1レコード化：未回答は空文字）
+    const rows = [];
+    for (const ev of state.events){
+      const aMap = {};
+      (state.answers[ev.eventId] || []).forEach(r => { aMap[r.performerName] = r.attend || ""; });
+      for (const nm of regNames){
+        rows.push({ eventId: ev.eventId, name: nm, answer: aMap[nm] || "" });
+      }
+    }
+
+    // 描画（スマホでも自動で表示されます）
+    window.renderHomeFromRaw(openList, rows, regNames);
+  })();
+
+  // 以降は既存の renderHome() を呼んでOK（※ eventsBox は HomeEventsUI が描画する）
   renderHome();
   // ================= HomeEventsUI へのブリッジ（★追加） =================
   try {
@@ -925,20 +996,20 @@ async function refreshData(){
 /* ===== HOME描画 ===== */
 function renderHome(){
   // 現在配信中の公演
-  if (!state.events.length){
-    $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
-  } else {
-    $("#eventsBox").innerHTML = state.events.map(e=>{
-      const d = parseYmdStrict(e.date);
-      const dateDisp = ymdDow(d);
-      const timeDisp = hmFromTimeCell(e.time);
-      const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
-      const badge = e.isNew ? `<span class="badge">NEW</span>` : "";
-      return `<div class="card" style="margin:8px 0">
-        <div><b>${dateDisp} ${timeDisp}</b> @ ${e.place||""} ${badge}</div>
-        <div class="small muted">${deadlineStr}</div>
-      </div>`;
-    }).join("");
+  //if (!state.events.length){
+  //  $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
+  //} else {
+  //  $("#eventsBox").innerHTML = state.events.map(e=>{
+  //    const d = parseYmdStrict(e.date);
+  //    const dateDisp = ymdDow(d);
+  //    const timeDisp = hmFromTimeCell(e.time);
+  //    const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
+  //    const badge = e.isNew ? `<span class="badge">NEW</span>` : "";
+  //    return `<div class="card" style="margin:8px 0">
+  //      <div><b>${dateDisp} ${timeDisp}</b> @ ${e.place||""} ${badge}</div>
+  //      <div class="small muted">${deadlineStr}</div>
+  //    </div>`;
+  //  }).join("");
   }
 
   // ボタン
