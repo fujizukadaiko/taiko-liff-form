@@ -43,10 +43,25 @@
         radial-gradient(900px 500px  at 80% 60%, rgba(127,106,165,.04), transparent 35%),
         var(--c-bg);
     }
-    h1,h2,h3,.sectionTitle{
-      font-family:"Shippori Mincho","Yu Mincho","Hiragino Mincho ProN","MS PMincho",serif;
-      letter-spacing:.03em;
-    }
+      /* 見出し（h1〜h3）は和風の明朝体のまま */
+      h1,h2,h3{
+        font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+        letter-spacing: 0.03em;
+      }
+      
+      /* セクションタイトルはゴシック太字で視認性重視 */
+      .sectionTitle{
+        font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      
+      /* ヘッダーのサイトタイトルだけ明朝体（和風） */
+      .siteTitle{
+        font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+        letter-spacing: 0.03em;
+        font-weight: 700;
+      }
 
     header{
       padding:14px 16px; font-size:18px; font-weight:700;
@@ -178,7 +193,7 @@
 
 <body>
   <header class="is-sticky">
-    <div>公演 出欠フォーム</div>
+    <div>出欠入力と予定確認</div>
     <div class="ver" id="ver"></div>
   </header>
 
@@ -437,7 +452,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.3.5";
+const FRONT_VERSION = "Front v2.3.6";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
