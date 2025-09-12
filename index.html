@@ -1010,7 +1010,7 @@ function renderHome(){
   //      <div class="small muted">${deadlineStr}</div>
   //    </div>`;
   //  }).join("");
-  }
+  //}
 
   // ボタン
   const hasMembers = state.members.length > 0;
@@ -1018,16 +1018,22 @@ function renderHome(){
   $("#btnPrimary").disabled = false;
   $("#btnEditNames").style.display = hasMembers ? "" : "none";
 
-  // 登録状況
+  // 登録状況（answersBox）
   if (!hasMembers){
     $("#answersBox").innerHTML = `
       <div>まだ「初回登録」が済んでいません。</div>
       <div class="small">出欠の前に、入力者名と演奏者（家族分も可）の登録をしてください。</div>`;
+    return;
+  }
+
+  let html = "";
+  const perfs = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
+
+  if (state.events.length === 0){
+    html = `<div class="muted">配信中の公演がありません</div>`;
   } else {
-    let html = "";
     for (const e of state.events){
       const ans = state.answers[e.eventId] || [];
-      const perfs = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
       const map = {}; ans.forEach(r => { map[r.performerName] = r; });
 
       const d = parseYmdStrict(e.date);
@@ -1055,9 +1061,8 @@ function renderHome(){
         ${rows}
       </div>`;
     }
-    if (!html) html = `<div class="muted">配信中の公演がありません</div>`;
-    $("#answersBox").innerHTML = html;
   }
+  $("#answersBox").innerHTML = html;
 }
 
 /* ===== メインボタン ===== */
