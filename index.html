@@ -2195,8 +2195,10 @@ async function adminListFetch(){
 
   }catch(err){
     const msg = `<span class="err">エラー：${err.message||err}</span>`;
-    document.getElementById('adminListBoxTop')?.innerHTML = msg;
-    document.getElementById('adminListBox')?.innerHTML = msg;
+    const topEl = document.getElementById('adminListBoxTop');
+    if (topEl) topEl.innerHTML = msg;
+    const boxEl = document.getElementById('adminListBox');
+    if (boxEl) boxEl.innerHTML = msg;
   }
 }
 function adminEdit(obj){
