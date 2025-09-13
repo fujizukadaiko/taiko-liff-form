@@ -219,7 +219,8 @@
       </div>
 
       <div id="homeLog" class="muted" style="margin-top:8px;"></div>
-    </section><!-- HOME end -->
+    </section>
+    <!-- HOME end -->
 
     <!-- ===== フォーム（出欠） ===== -->
     <section id="view-form" data-view>
@@ -451,7 +452,6 @@
     /* ---- 表示系 CSS（上乗せ） ---- */
     const css = document.createElement('style');
     css.textContent = `
-      /* カードは既存 .card を使用 */
       .evList { margin-top: 6px; }
     
       .eventRow{
@@ -462,38 +462,43 @@
         padding:10px 12px;
         margin:8px 0;
       }
-    
       .eventMeta{ min-width:0; }
     
-      /* ← 1行目：左=出欠バッジ / 右=NEW */
-      .eventHeader{
-        display:flex; align-items:center; gap:8px;
-        margin-bottom:4px;
+      /* 1行目：左=出欠バッジ / 右=NEW */
+      .eventHead{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+        margin-bottom:6px;
       }
-      .eventHeader .badge-new{ margin-left:auto; } /* 右寄せ */
     
-      /* 2行目：日付 時刻 @ 場所（改行可） */
-      .eventTitle{
-        font-weight:700; font-size:15px; line-height:1.45;
-        word-break:break-word; white-space:normal;
-      }
-      .eventTitle{ display:flex; align-items:baseline; gap:4px; }
+      /* 2行目：日付 時刻 @ 場所（B案） */
+      .eventTitle{ display:flex; align-items:baseline; gap:4px; font-weight:700; font-size:15px; line-height:1.45; }
       .eventTitle .title-date{ white-space:nowrap; flex:0 0 auto; }
       .eventTitle .title-place{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto; }
-
-      /* 3行目：締切（小さめ） */
+    
+      /* 3行目：締切 */
       .eventSub{ font-size:12px; color:var(--c-muted); margin-top:2px; }
       .deadline{ color:#666; }
-      .deadline-soon{ color:#c33; font-weight:600; } /* 3日前以降を赤 */
+      .deadline-soon{ color:#c33; font-weight:600; }
     
-      /* NEWバッジ：紫枠・白背景・紫文字（ボタンのアウトライン風） */
+      /* NEWバッジ：ボタンのアウトライン風 */
       .badge-new{
-        display:inline-block; font-size:12px; padding:2px 8px;
-        border-radius:999px; background:#fff;
-        border:1px solid var(--c-primary-2); color:var(--c-primary-2);
-        font-weight:700;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:2px 8px;
+        height:22px;                 /* pill.sm と同じ背丈感 */
+        border-radius:999px;
+        font-size:11px;
+        font-weight:600;
+        color: var(--c-primary-2);
+        border:1.5px solid var(--c-primary-2);
+        background:#fff;
+        white-space:nowrap;
       }
-    
+      
       /* 詳細（家族別チップ） */
       .eventDetail{ display:none; padding:6px 6px 0 6px; }
       .eventRow.open + .eventDetail { display:block; }
@@ -561,28 +566,34 @@
       return { label:'一部未回答', cls:'stat-pd', key:'partial' };
     }
   
-    function rowHtml(ev, sum){
+      function rowHtml(ev, sum){
       const dateStr  = ev.ymd || ev.date || '';
-      const hm       = ev.hm || ''; // smallで小さめ表示にする
+      const hm       = ev.hm || '';
       const place    = ev.place || ev.venue || '';
       const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge-new">NEW</span>' : '';
       const dl       = ev.deadline || ev.limit || ev.deadlineYmd || '';
       const dlCls    = `deadline ${deadlineClass(dl)}`;
-    
-      // 場所があるときだけ「 @」を付ける
-      const atMark = place ? ' @' : '';
+      const atMark   = place ? ' @' : '';
     
       return `
         <div class="eventRow" data-evt="${ev.id}">
           <div class="eventMeta">
+    
+            <!-- 1行目：左=出欠 / 右=NEW -->
+            <div class="eventHead">
+              <span class="pill sm ${sum.cls}">${sum.label}</span>
+              ${newBadge}
+            </div>
+    
+            <!-- 2行目：B案（場所のみ省略可能） -->
             <div class="eventTitle" title="${dateStr}${hm ? ` ${hm}` : ''}${atMark} ${place}">
               <span class="title-date">${dateStr}${hm ? ` <small>${hm}</small>` : ''}${atMark}</span>
               <span class="title-place">${place}</span>
-              ${newBadge}
             </div>
+    
+            <!-- 3行目：締切 -->
             <div class="eventSub">締切：<span class="${dlCls}">${dl || '—'}</span></div>
           </div>
-          <div class="eventRight"><span class="pill sm ${sum.cls}">${sum.label}</span></div>
         </div>
         <div class="eventDetail" data-detail="${ev.id}"></div>
       `;
@@ -611,27 +622,29 @@
   
       // 詳細（家族別チップ）Lazyレンダリング
       box.querySelectorAll('.eventRow').forEach(row => {
-        row.addEventListener('click', (e) => {
-          if (e.target.closest('.pill')) return;
-          const id  = row.getAttribute('data-evt');
-          const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
-          if (!det) return;
-          if (det.dataset.loaded !== '1'){
-            const arr = S.ansMap[id] || [];
-            det.innerHTML = `
-              <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
-                ${arr.map(m => {
-                  const name = m?.name || m?.member || '';
-                  const v    = m?.answer || '未回答';
-                  return `<span class="pill sm ${ansClass(v)}" title="${v}">${name}</span>`;
-                }).join('')}
-              </div>`;
-            det.dataset.loaded = '1';
-          }
-          row.classList.toggle('open');
-          det.style.display = (det.style.display === 'block') ? 'none' : 'block';
-        });
+      row.addEventListener('click', (e) => {
+        // pill（出欠バッジ）や NEW バッジはトグル対象から除外
+        if (e.target.closest('.pill, .badge-new')) return;
+    
+        const id  = row.getAttribute('data-evt');
+        const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
+        if (!det) return;
+        if (det.dataset.loaded !== '1'){
+          const arr = S.ansMap[id] || [];
+          det.innerHTML = `
+            <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
+              ${arr.map(m => {
+                const name = m?.name || m?.member || '';
+                const v    = m?.answer || '未回答';
+                return `<span class="pill sm ${ansClass(v)}" title="${v}">${name}</span>`;
+              }).join('')}
+            </div>`;
+          det.dataset.loaded = '1';
+        }
+        row.classList.toggle('open');
+        det.style.display = (det.style.display === 'block') ? 'none' : 'block';
       });
+    });
     }
   
     // 「未回答のみ」
@@ -732,12 +745,12 @@
       } catch (err){
         console.error('renderHomeFromRaw failed:', err);
       }
-    };
-  })();
+      };
+      })();
 </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.5.2";
+const FRONT_VERSION = "Front v2.5.3";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
