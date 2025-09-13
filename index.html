@@ -894,7 +894,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.6.5";
+const FRONT_VERSION = "Front v2.6.6";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
@@ -1381,11 +1381,10 @@ function buildFormView(){
         `;
       }).join("")}
       <div class="line"></div>
-      <label>公演コメント（任意・100文字まで、代表1行）</label>
+      <label>コメント（任意・100文字まで）</label>
       <input type="text" maxlength="100" class="evComment" data-event="${e.eventId}"
              value="${ draftGetComment(e.eventId) ||
                      (ansList.find(x => (x.comment||"").trim())?.comment || "")}">
-      <div class="small muted" style="margin-top:4px;">※ コメントは代表して1つだけ保存されます</div>
     `;
 
     // 3) カード化 & イベント
