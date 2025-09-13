@@ -1442,7 +1442,8 @@ function bindHandlers(){
 
   // 管理画面
   $("#btnAdminBack").onclick = ()=> show("#view-home");
-  $("#btnAdminReload")?.onclick = ()=> adminListFetch();
+  document.getElementById('btnAdminReload')
+    ?.addEventListener('click', ()=> adminListFetch());
   $("#btnAdminFetch").onclick = ()=> adminListFetch();
   $("#btnAdminSubmit").onclick = ()=> adminSubmit();
   $("#btnAdminReset").onclick = ()=> enterAdminCreateMode();
