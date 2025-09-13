@@ -592,6 +592,39 @@
       font-size: 10px !important;
       line-height: 1.55;
     }
+    /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
+    .repControls{
+      display: grid;
+      grid-template-columns: auto max-content;
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: start;
+    }
+    .repLabel{
+      font-size: 14px;
+      color: var(--c-text);
+      white-space: nowrap;
+    }
+    /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
+    .repControls{
+      display: grid;
+      grid-template-columns: auto max-content;
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: start;
+    }
+    .repLabel{
+      font-size: 14px;
+      color: var(--c-text);
+      white-space: nowrap;
+    }
+    /* 下段に「再取得」ボタンを左寄せで配置 */
+    .repControls .span2{
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: flex-start;
+      margin-top: 4px;
+    }
   </style>
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -844,33 +877,34 @@
     <section id="view-admin-report" data-view>
       <div class="row-space">
         <div class="sectionTitle">出欠結果一覧（管理者）</div>
-        <div class="row" style="gap:8px;">
-          <button id="btnReportBack"   class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-          <button id="btnReportReload" class="btn btn-ghost btn-sm">再取得</button>
-        </div>
+        <!-- ① トップに戻るを右寄せ -->
+        <button id="btnReportBack" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
       </div>
-
+    
       <div class="card">
-        <div class="row" style="gap:12px;">
-          <div style="min-width:260px; flex:1;">
-            <label for="repEvent">公演を選択</label>
-            <select id="repEvent"><option value="">（選択してください）</option></select>
+        <!-- ラベル右にプルダウン -->
+        <div class="repControls">
+          <label for="repEvent" class="repLabel">公演を選択</label>
+          <select id="repEvent" class="selectBtn schedSel short">
+            <option value="">（選択してください）</option>
+          </select>
+    
+          <label for="repAttend" class="repLabel">出欠フィルタ</label>
+          <select id="repAttend" class="selectBtn schedSel short">
+            <option value="">（すべて）</option>
+            <option value="参加">参加</option>
+            <option value="欠席">欠席</option>
+            <option value="未定">未定</option>
+            <option value="未回答">未回答</option>
+          </select>
+    
+          <!-- ★ 左下に再取得ボタン（2列ぶち抜き） -->
+          <div class="span2">
+            <button id="btnReportReload" class="btn btn-ghost btn-sm" type="button">再取得</button>
           </div>
-          <div>
-            <label for="repAttend">出欠フィルタ</label>
-            <select id="repAttend">
-              <option value="">（すべて）</option>
-              <option value="参加">参加</option>
-              <option value="欠席">欠席</option>
-              <option value="未定">未定</option>
-            </select>
-          </div>
-        </div>
-        <div class="small muted" style="margin-top:6px;">
-          ※ 対象は「公開=Yes」かつ配信フラグが Y/S/D の予定のみ
         </div>
       </div>
-
+    
       <div id="repBox" class="muted">公演を選択してください</div>
     </section>
   </main>
@@ -1215,7 +1249,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.7.8";
+const FRONT_VERSION = "Front v2.7.9";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
@@ -2323,8 +2357,8 @@ function renderReport(){
     return;
   }
 
-  const selId = $("#repEvent").value; // 公演ID
-  const fAtt  = $("#repAttend").value; // 出欠フィルタ
+  const selId = $("#repEvent").value;    // 公演ID
+  const fAtt  = $("#repAttend").value;   // 出欠フィルタ（任意）
 
   if (!selId){
     box.innerHTML = `公演を選択してください`;
@@ -2337,41 +2371,94 @@ function renderReport(){
     return;
   }
 
-  let rows = Array.isArray(ev.rows) ? ev.rows : [];
-  if (fAtt) rows = rows.filter(r => (r.attend||"") === fAtt);
+  // rows 正規化
+  let rows = Array.isArray(ev.rows) ? ev.rows.slice() : [];
+  // 既存データの安全性確保
+  rows = rows.map(r => ({
+    name: r.name || r.performerName || "",
+    attend: r.attend || "未回答",
+    answeredAt: r.answeredAt || r.answered_at || ""
+  }));
 
-  if (rows.length === 0){
-    box.innerHTML = `<div class="listEmpty">該当データがありません</div>`;
-    return;
-  }
+  // ツール関数：日時の見栄え（なくても原文そのまま出せます）
+  const fmtAnswered = (s) => {
+    const t = String(s||"").trim();
+    return t ? `回答：${t}` : "";   // 未回答なら空
+  };
 
-  rows.sort((a,b)=> (String(a.name||"").localeCompare(String(b.name||"")) || String(a.answeredAt||"").localeCompare(String(b.answeredAt||""))));
+  // カテゴリごとにグルーピング
+  const groups = {
+    "参加":   [],
+    "未定":   [],
+    "未回答": [],
+    "欠席":   []
+  };
 
+  rows.forEach(r => {
+    const v = (r.attend || "").trim();
+    if (v === "参加") groups["参加"].push(r);
+    else if (v === "欠席") groups["欠席"].push(r);
+    else if (v === "未定") groups["未定"].push(r);
+    else groups["未回答"].push(r);
+  });
+
+  // フィルタがある場合はそのカテゴリのみ（表示順は要件通り）
+  const order = ["参加","未定","未回答","欠席"];
+  const showKeys = fAtt ? [fAtt] : order;
+
+  // 各カテゴリの見出しのバッジクラス
+  const badgeCls = (key) => {
+    if (key === "参加")   return "stat-ok";
+    if (key === "欠席")   return "stat-ng";
+    if (key === "未定")   return "stat-pd";
+    return "stat-na"; // 未回答
+  };
+
+  // ヘッダー部分（既存レイアウトを踏襲）
   const dateDisp = `${ev.ymd || ""}${ev.time ? " " + ev.time : ""}`;
-  const header = `
+  let html = `
     <div class="card">
       <div class="row-space">
         <div><b>${dateDisp}</b> @ ${ev.place||""}</div>
         <div><span class="tag ${ev.accepting==="open"?"open":"closed"}">${ev.accepting==="open"?"受付中":"受付終了"}</span></div>
       </div>
       <div class="small muted">${ev.title||""} <span class="small muted">（ID: ${ev.id}）</span></div>
-    </div>
+      <div class="line"></div>
   `;
 
-  const body = rows.map(r=>{
-    return `<div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <div><span class="pill">${r.name||""}</span></div>
-        <div><span class="pill sm ${
-          r.attend==="参加" ? "stat-ok" : r.attend==="欠席" ? "stat-ng" : r.attend==="未定" ? "stat-pd" : "stat-na"
-        }">${r.attend||"未回答"}</span></div>
-      </div>
-      ${r.comment?`<div class="small" style="margin-top:4px;">コメント：${r.comment}</div>`:""}
-      ${r.answeredAt?`<div class="small muted" style="margin-top:4px;">回答：${r.answeredAt}</div>`:""}
-    </div>`;
-  }).join("");
+  // 本文：カテゴリ別にまとめて1枚のカード内に展開
+  let hasAny = false;
+  for (const key of showKeys){
+    const list = groups[key] || [];
+    if (!list.length) continue;
+    hasAny = true;
 
-  box.innerHTML = header + body;
+    html += `
+      <div style="margin:6px 0;">
+        <span class="pill sm ${badgeCls(key)}">${key}</span>
+      </div>
+    `;
+
+    list
+      .sort((a,b)=> String(a.name||"").localeCompare(String(b.name||"")))
+      .forEach(r => {
+        const sub = fmtAnswered(r.answeredAt);
+        html += `<div class="row" style="justify-content:space-between; margin:4px 0;">
+          <div>${r.name||""}</div>
+          <div class="small muted">${sub}</div>
+        </div>`;
+      });
+
+    html += `<div class="line"></div>`;
+  }
+
+  // どのカテゴリも該当しない（フィルタで0件）場合
+  if (!hasAny){
+    html += `<div class="listEmpty">該当データがありません</div>`;
+  }
+
+  html += `</div>`; // 1枚のカードを閉じる
+  box.innerHTML = html;
 }
 
 /* ===== 起動 ===== */
