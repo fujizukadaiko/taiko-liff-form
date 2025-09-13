@@ -1249,7 +1249,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.8.1";
+const FRONT_VERSION = "Front v2.8.2";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzfQYMoGopR_bJLbBkQpjX876xVDa6W3RSG0ZnYx2VorugaH4x_TUV9zY_duzNxhPPSkw/exec";     // ←差し替え
 
@@ -2321,33 +2321,57 @@ function adminEdit(obj){
 
 /* ===== 出欠結果一覧（管理者） ===== */
 async function reportReload(){
-  $("#repBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
+  const box = $("#repBox");
+  box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+
+  // ① 公演プルダウンをロード完了まで無効化＆見た目も「読み込み中…」
+  const selEvent = $("#repEvent");
+  if (selEvent){
+    // 見た目統一（未付与の場合に備え保険でクラス付与）
+    selEvent.classList.add('selectBtn');
+    selEvent.disabled = true;
+    selEvent.innerHTML = `<option value="">読み込み中…</option>`;
+  }
+
   try{
     const r = await api(`?attendanceReport=1&lineId=${esc(state.lineId)}`);
     if (r.status!=="ok" || !Array.isArray(r.list)){
-      $("#repBox").innerHTML = `<span class="err">取得に失敗しました</span>`;
+      box.innerHTML = `<span class="err">取得に失敗しました</span>`;
+      if (selEvent){
+        selEvent.innerHTML = `<option value="">取得に失敗しました</option>`;
+        selEvent.disabled = false;     // ← 完了（失敗）したので操作は可能に戻す
+      }
       return;
     }
-    state.report = r.list; // [{id, ymd, time, title, place, flag, accepting, rows:[...]}]
+    state.report = r.list;
 
     // 公演セレクトを構築
-    const sel = $("#repEvent");
-    sel.innerHTML = `<option value="">（選択してください）</option>`;
-    const items = [...state.report].sort((a,b)=> 
-      (String(a.ymd||"").localeCompare(b.ymd||"") || String(a.time||"").localeCompare(b.time||"") || String(a.title||"").localeCompare(b.title||""))
-    );
-    for (const e of items){
-      const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
-      const opt = document.createElement("option");
-      opt.value = e.id;
-      opt.textContent = label;
-      sel.appendChild(opt);
+    if (selEvent){
+      selEvent.innerHTML = `<option value="">（選択してください）</option>`;
+      const items = [...state.report].sort((a,b)=> 
+        (String(a.ymd||"").localeCompare(b.ymd||"") ||
+         String(a.time||"").localeCompare(b.time||"") ||
+         String(a.title||"").localeCompare(b.title||""))
+      );
+      for (const e of items){
+        const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
+        const opt = document.createElement("option");
+        opt.value = e.id;
+        opt.textContent = label;
+        selEvent.appendChild(opt);
+      }
+      selEvent.disabled = false;       // ← 正常完了で有効化
     }
 
+    // 下部メッセージ
     $("#repBox").innerHTML = `公演を選択してください`;
 
   }catch(err){
-    $("#repBox").innerHTML = `<span class="err">エラー：${err.message||err}</span>`;
+    box.innerHTML = `<span class="err">エラー：${err.message||err}</span>`;
+    if (selEvent){
+      selEvent.innerHTML = `<option value="">取得エラー</option>`;
+      selEvent.disabled = false;       // ← 完了（失敗）したので有効化
+    }
   }
 }
 function renderReport(){
