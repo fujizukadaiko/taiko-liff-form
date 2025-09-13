@@ -455,6 +455,38 @@
       cursor: not-allowed;
       filter: saturate(.6);
     }
+    /* ---- 軽い削除ボタン（見た目を他ボタンと差別化） ---- */
+    .btn-remove{
+      background:#fff !important;
+      color:#222 !important;                         /* 黒系文字 */
+      border:1px solid #dcd2ef !important;           /* ごく薄い紫の枠 */
+      box-shadow:
+        0 2px 10px rgba(127,106,165,0.10),           /* 薄い紫のソフトシャドウ */
+        0 1px 0 rgba(0,0,0,0.02) inset;
+      transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
+    }
+    .btn-remove:hover{
+      filter: brightness(0.98);
+      box-shadow:
+        0 3px 12px rgba(127,106,165,0.16),
+        0 1px 0 rgba(0,0,0,0.03) inset;
+    }
+    .btn-remove:active{
+      transform: translateY(1px);
+    }
+    .btn-remove:focus-visible{
+      outline: none;
+      box-shadow:
+        0 0 0 3px rgba(127,106,165,0.12),            /* フォーカス時に薄いリング */
+        0 2px 10px rgba(127,106,165,0.10);
+    }
+    /* 無効時の視覚（全体ルールに準拠） */
+    .btn-remove[disabled]{
+      opacity: .55;
+      pointer-events: none;
+      cursor: not-allowed;
+      filter: saturate(.6);
+    }
   </style>
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1054,7 +1086,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.7.1";
+const FRONT_VERSION = "Front v2.7.2";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
@@ -1693,7 +1725,9 @@ function addPerformerField(value=""){
       <input type="text" id="${id}" class="regPerf" value="${value||""}" placeholder="例：藤塚 太郎">
     </div>
     <div>
-      <button type="button" class="ghost" onclick="this.closest('.row').remove()">削除</button>
+      <button type="button" class="btn btn-remove btn-sm"
+              onclick="this.closest('.row').remove()"
+              aria-label="この演奏者を削除">削除</button>
     </div>
   `;
   $("#perfList").appendChild(row);
