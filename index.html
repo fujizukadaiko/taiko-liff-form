@@ -206,6 +206,23 @@
       outline: none;
       box-shadow: 0 0 0 3px rgba(127,106,165,.18);
     }
+    /* ===== ガイドの赤強調 ===== */
+    .em-red{
+      color: var(--c-err);
+      font-weight: 700;
+    }
+    
+    /* ===== 送信ボタン：送信中は薄い紫＆操作不可 ===== */
+    .btn-primary[disabled],
+    .btn-primary:disabled{
+      background: #ede7ff !important;          /* 薄い紫 */
+      border-color: #d6ccff !important;
+      color: var(--c-primary-2) !important;
+      cursor: not-allowed !important;
+      pointer-events: none !important;          /* タップ無効（多重送信防止） */
+      box-shadow: none !important;
+      filter: saturate(.85);
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -309,7 +326,7 @@
 
       <div class="line"></div>
       <div class="row right">
-        <button id="btnSubmit" class="btn btn-primary" disabled>送信する</button>
+        <button id="btnSubmit" class="btn btn-primary" disabled>まとめて送信</button>
       </div>
       <div id="formLog" class="muted" style="margin-top:8px;"></div>
     </section>
@@ -825,7 +842,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.6.1";
+const FRONT_VERSION = "Front v2.6.2";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
@@ -930,11 +947,11 @@ function markUnsavedBadge(eventId){
   }
 }
 function updateSubmitButton(){
-  const has = hasAnyDraft();
   const btn = document.getElementById("btnSubmit");
   if (!btn) return;
-  btn.disabled = !has;
-  btn.textContent = has ? "（下書き）まとめて送信" : "送信する";
+  const has = hasAnyDraft();      // 何か1つでも未送信ドラフトがあるか
+  btn.disabled = !has;            // ない場合は押せない（空送信防止）
+  btn.textContent = "まとめて送信"; // ラベルは常に統一
 }
 
 /* ===== ユーティリティ ===== */
@@ -1207,7 +1224,11 @@ function buildFormView(){
   const boxHeader = $("#formEventsBox");
   const box = $("#formFields");
   box.innerHTML = "";
-  boxHeader.innerHTML = `<span class="muted">イベントをタップして出欠を入力してください</span>`;
+  boxHeader.innerHTML = `
+    <span class="muted">
+      イベントをタップして出欠を入力後、
+      <span class="em-red">送信ボタンを押してください。</span>
+    </span>`;
 
   if (!state.events.length){
     box.innerHTML = `<div class="muted">現在配信中の公演はありません</div>`;
