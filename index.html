@@ -2205,27 +2205,32 @@ async function adminListFetch(){
 
     const days = Number($("#ad_days").value || 60);
     const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
+
     if (r.status !== "ok" || !Array.isArray(r.items)){
       if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
       return;
     }
+
     if (r.items.length === 0){
       if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
       return;
-    // ---- ここから追加：並び替え用のユーティリティ ----
+    }  // ← ★ この閉じカッコが抜けていました
+
+    // ---- 並び替え用のユーティリティ（yyyy/MM/dd と yyyy-MM-dd の両対応）----
     const ymdKey = (s) => {
-      const m = String(s||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+      const t = String(s || "").replace(/-/g, "/");
+      const m = t.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
       return m ? `${m[1]}${m[2]}${m[3]}` : "99999999";   // 日付不明は末尾へ
     };
     const hmKey = (s) => {
-      const m = String(s||"").match(/^(\d{1,2}):(\d{2})$/);
-      return m ? `${String(m[1]).padStart(2,'0')}${m[2]}` : "9999"; // 時刻不明は末尾
+      const m = String(s || "").match(/^(\d{1,2}):(\d{2})$/);
+      return m ? `${String(m[1]).padStart(2,'0')}${m[2]}` : "9999"; // 時刻不明は末尾へ
     };
     const cmp = (a,b) =>
       ymdKey(a.ymd).localeCompare(ymdKey(b.ymd)) ||
       hmKey(a.hm).localeCompare(hmKey(b.hm))     ||
       String(a.title||"").localeCompare(String(b.title||"")) ||
-      String(a.id||"").localeCompare(String(b.id||""));     // 同日時はIDで
+      String(a.id||"").localeCompare(String(b.id||""));
 
     // 正規化
     const items = r.items.map(raw => ({
@@ -2244,10 +2249,10 @@ async function adminListFetch(){
       flag: raw.flag || "N"
     }));
 
-    // ★ 昇順ソート（日付→時刻→タイトル→ID）
+    // ★ 日付→時刻→タイトル→ID の昇順
     items.sort(cmp);
 
-    // （編集用に保持）
+    // 編集用に保持（グローバル）
     adminItemsMap = {};
     items.forEach(it => { adminItemsMap[String(it.id)] = it; });
 
@@ -2264,14 +2269,13 @@ async function adminListFetch(){
     `).join("");
 
     if (top) top.innerHTML = html;
-    if (box) box.innerHTML = html;
+    // 下部一覧は削除済みのため、box 参照はしない（削除済み）
 
   }catch(err){
     const msg = `<span class="err">エラー：${err.message||err}</span>`;
     const topEl = document.getElementById('adminListBoxTop');
     if (topEl) topEl.innerHTML = msg;
-    const boxEl = document.getElementById('adminListBox');
-    if (boxEl) boxEl.innerHTML = msg;
+    // 下部一覧は削除済みのため、adminListBox 参照はスキップ
   }
 }
 function adminEdit(obj){
