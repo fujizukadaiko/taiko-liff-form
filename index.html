@@ -572,6 +572,26 @@
     #adminListAcc.open .fHead{
       background:#efe7ff !important;
     }
+    /* アコーディオン内の編集ボタンを小さめ＆薄めトーンに */
+    #adminListAcc .btn-edit{
+      min-height: 32px;
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 9px;
+      background:#fff !important;
+      color: color-mix(in srgb, var(--c-primary-2), #000 0%) !important; /* 文字は既存と同系色 */
+      border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 12%) !important; /* 枠をワントーン薄く */
+      box-shadow: 0 1px 3px rgba(127,106,165,0.08);
+    }
+    #adminListAcc .btn-edit:hover{
+      background:#f8f6ff !important;
+      border-color: color-mix(in srgb, var(--c-primary-2), #000 20%) !important;
+    }
+    /* 管理フォームのみ：注釈の文字をさらに小さく（10px） */
+    #view-admin .hint{
+      font-size: 10px !important;
+      line-height: 1.55;
+    }
   </style>
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -1195,7 +1215,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.7.5";
+const FRONT_VERSION = "Front v2.7.6";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
@@ -2196,7 +2216,6 @@ async function adminListFetch(){
       if (box) box.innerHTML = empty;
       return;
     }
-
     const html = r.items.map(raw=>{
       const it = {
         id: raw.id || "",
@@ -2213,14 +2232,50 @@ async function adminListFetch(){
         status: raw.status || "archived",
         flag: raw.flag || "N"
       };
-      return `<div class="card">
-        <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
-        <div class="small">${it.type||""}：${it.title||""}</div>
-        <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
-         <div class="row" style="margin-top:8px; justify-content:flex-end;">
-          <button class="btn btn-ghost btn-sm" type="button" onclick='adminEdit(...)'>編集</button>
-        </div>
-      </div>`;
+     const html = r.items.map(raw=>{
+  const it = {
+    id: raw.id || "",
+    type: raw.type || "",
+    title: raw.title || "",
+    ymd: raw.ymd || "",
+    hm: raw.hm || "",
+    place: raw.place || "",
+    meetAt: raw.meetAt || "",
+    meetPlace: raw.meetPlace || "",
+    attendTarget: raw.attendTarget || "N",
+    deadline: raw.deadline || "",
+    publish: raw.publish || "No",
+    status: raw.status || "archived",
+    flag: raw.flag || "N"
+  };
+  const data = encodeURIComponent(JSON.stringify(it)); // 安全にエンコード
+
+  return `<div class="card">
+    <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
+    <div class="small">${it.type||""}：${it.title||""}</div>
+    <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
+    <div class="row" style="margin-top:8px; justify-content:flex-end;">
+      <button class="btn btn-ghost btn-edit" type="button" data-item="${data}">編集</button>
+    </div>
+  </div>`;
+}).join("");
+
+if (top) top.innerHTML = html;
+if (box) box.innerHTML = html;
+
+/* 編集ボタンのクリックをバインド（インラインonclickは廃止） */
+document.querySelectorAll('#adminListAcc .btn-edit').forEach(btn=>{
+  btn.addEventListener('click', (ev)=>{
+    ev.preventDefault();
+    ev.stopPropagation(); // アコーディオンのクリック伝播を止める
+    try{
+      const obj = JSON.parse(decodeURIComponent(btn.dataset.item || '{}'));
+      adminEdit(obj); // ← ここで編集モードへ
+    }catch(e){
+      console.error('edit-button parse failed', e);
+    }
+  });
+});
     }).join("");
 
     if (top) top.innerHTML = html;
