@@ -261,7 +261,49 @@
       .spinner { border-top-color: rgb(79 70 229); }
     }
   </script>
+  <!-- ===== Custom Overrides（最後に評価されるCSS） ===== -->
+  <style id="custom-overrides">
+    :root{
+      /* プルダウンの横幅（必要に応じて微調整） */
+      --attSel-width: 180px;
+    }
 
+    /* 名前 + セレクトを同じ行に。右側のセレクト幅を固定 */
+    .row-att{
+      display: grid;
+      grid-template-columns: 1fr var(--attSel-width);
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* ボタン風プルダウンの幅を統一（プレースホルダと選択後で幅が変わらないように） */
+    .selectBtn{
+      width: var(--attSel-width);
+      min-width: var(--attSel-width);
+      box-sizing: border-box;
+      white-space: nowrap;
+      border: 1.5px solid var(--c-primary-2);
+      color: var(--c-primary-2);
+      background: #fff;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 600;
+    }
+
+    /* プレースホルダ行（value=""）の色 */
+    .selectBtn option[value=""]{
+      color: #9aa;
+    }
+
+    /* すべてのボタンの disabled 視覚（前にご提示のものもここにまとめてOK） */
+    button[disabled],
+    .btn[disabled]{
+      opacity: .55;
+      pointer-events: none;
+      cursor: not-allowed;
+      filter: saturate(.6);
+    }
+  </style>
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -852,9 +894,9 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.6.4";
+const FRONT_VERSION = "Front v2.6.5";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwTC_4H19Sau_zxNiPsbS8hasalIID2dnoN_cucy4oC3OgpgNzi7PETl9zIiCs0VMMFaA/exec";     // ←差し替え
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
 /* ===== 状態 ===== */
 let state = {
