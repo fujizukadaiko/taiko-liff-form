@@ -223,6 +223,16 @@
       box-shadow: none !important;
       filter: saturate(.85);
     }
+    /* すべてのボタンの disabled 視覚 */
+    button[disabled],
+    .btn[disabled],
+    button:disabled,
+    .btn:disabled{
+      opacity: .55;
+      pointer-events: none;
+      cursor: not-allowed;
+      filter: saturate(.6);
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -842,7 +852,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.6.2";
+const FRONT_VERSION = "Front v2.6.3";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
@@ -1072,7 +1082,10 @@ function bindHandlers(){
   $("#btnReload").onclick      = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
   $("#btnPrimary").onclick     = onPrimary;
   $("#btnEditNames").onclick   = onEditNames;
-  $("#btnBackFromForm").onclick= ()=> show("#view-home");
+  $("#btnBackFromForm").onclick = () => {
+    if (state.submitting) return;       // 送信中は遷移させない
+    show("#view-home");
+  };
   $("#btnBackFromReg").onclick = ()=> show("#view-home");
   $("#btnSubmit").onclick      = onSubmit;
 
@@ -1349,7 +1362,19 @@ async function onSubmit(){
   if (state.submitting) return;
   state.submitting = true;
   const btn = $("#btnSubmit");
+  const backBtn = $("#btnBackFromForm");  // ← 追加
   btn.disabled = true; btn.textContent = "送信中…"; logForm("");
+  // 追加：トップへ戻るボタンを無効化
+  if (backBtn) backBtn.disabled = true;
+
+  // 追加：ブラウザ/LIFFの離脱警告（閉じる/戻るなど）
+  const navGuard = (e) => {
+    if (state.submitting) {
+      e.preventDefault();
+      e.returnValue = "";  // Chrome系で必要
+    }
+  };
+  window.addEventListener("beforeunload", navGuard);
 
   try{
     const payloads = draftBuildPayloads();
@@ -1393,6 +1418,11 @@ async function onSubmit(){
   }finally{
     state.submitting = false;
     btn.disabled = false; updateSubmitButton(); // 文言と活性を戻す
+     // 解除：トップへ戻るボタンを復活
+    if (backBtn) backBtn.disabled = false;
+
+    // 解除：離脱警告
+    window.removeEventListener("beforeunload", navGuard);
   }
 }
 
