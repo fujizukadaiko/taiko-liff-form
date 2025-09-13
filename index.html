@@ -131,6 +131,24 @@
       .btnRow{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
       .btnRow .btn{ width:100%; }
     }
+
+    /* ===== 出欠フォーム（アコーディオン） ===== */
+    .fEvent{ border:1px solid var(--c-border); border-radius:12px; background:#fff; margin:10px 0; }
+    .fHead{ padding:10px 12px; cursor:pointer; }
+    .fHead:hover{ background:#faf8ff; }
+    .fBody{ display:none; padding:0 12px 12px; }
+    .fEvent.open .fBody{ display:block; }
+    .fTitleRow{ display:flex; align-items:baseline; gap:6px; }
+    .fTitleRow .t-date{ white-space:nowrap; }
+    .fTitleRow .t-place{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto; }
+    .fStatusRow{ margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; }
+    .fSub{ margin-top:4px; font-size:12px; color:var(--c-muted); }
+    .badge-unsaved{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:2px 8px; height:22px; border-radius:999px;
+      font-size:11px; font-weight:600;
+      color:#b45309; border:1.5px solid #f59e0b; background:#fff8e6; white-space:nowrap;
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -206,7 +224,7 @@
           <div class="sectionTitle">回答受付中の公演</div>
           <label class="pill sm" style="margin-left:auto;">
             <input type="checkbox" id="homeOnlyNA" checked>
-            未回答のみ表示
+            未定/未回答のみ表示
           </label>
         </div>
         <div id="eventsBox"><div class="muted">読み込み中… <span class="spinner"></span></div></div>
@@ -234,7 +252,7 @@
 
       <div class="line"></div>
       <div class="row right">
-        <button id="btnSubmit" class="btn btn-primary">送信する</button>
+        <button id="btnSubmit" class="btn btn-primary" disabled>送信する</button>
       </div>
       <div id="formLog" class="muted" style="margin-top:8px;"></div>
     </section>
@@ -566,7 +584,7 @@
       return { label:'一部未回答', cls:'stat-pd', key:'partial' };
     }
   
-      function rowHtml(ev, sum){
+    function rowHtml(ev, sum){
       const dateStr  = ev.ymd || ev.date || '';
       const hm       = ev.hm || '';
       const place    = ev.place || ev.venue || '';
@@ -622,29 +640,29 @@
   
       // 詳細（家族別チップ）Lazyレンダリング
       box.querySelectorAll('.eventRow').forEach(row => {
-      row.addEventListener('click', (e) => {
-        // pill（出欠バッジ）や NEW バッジはトグル対象から除外
-        if (e.target.closest('.pill, .badge-new')) return;
-    
-        const id  = row.getAttribute('data-evt');
-        const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
-        if (!det) return;
-        if (det.dataset.loaded !== '1'){
-          const arr = S.ansMap[id] || [];
-          det.innerHTML = `
-            <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
-              ${arr.map(m => {
-                const name = m?.name || m?.member || '';
-                const v    = m?.answer || '未回答';
-                return `<span class="pill sm ${ansClass(v)}" title="${v}">${name}</span>`;
-              }).join('')}
-            </div>`;
-          det.dataset.loaded = '1';
-        }
-        row.classList.toggle('open');
-        det.style.display = (det.style.display === 'block') ? 'none' : 'block';
+        row.addEventListener('click', (e) => {
+          // pill（出欠バッジ）や NEW バッジはトグル対象から除外
+          if (e.target.closest('.pill, .badge-new')) return;
+      
+          const id  = row.getAttribute('data-evt');
+          const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
+          if (!det) return;
+          if (det.dataset.loaded !== '1'){
+            const arr = S.ansMap[id] || [];
+            det.innerHTML = `
+              <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
+                ${arr.map(m => {
+                  const name = m?.name || m?.member || '';
+                  const v    = m?.answer || '未回答';
+                  return `<span class="pill sm ${ansClass(v)}" title="${v}">${name}</span>`;
+                }).join('')}
+              </div>`;
+            det.dataset.loaded = '1';
+          }
+          row.classList.toggle('open');
+          det.style.display = (det.style.display === 'block') ? 'none' : 'block';
+        });
       });
-    });
     }
   
     // 「未回答のみ」
@@ -745,12 +763,12 @@
       } catch (err){
         console.error('renderHomeFromRaw failed:', err);
       }
-      };
-      })();
-</script>
+    };
+  })();
+  </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.5.3";
+const FRONT_VERSION = "Front v2.6.0";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
@@ -764,11 +782,103 @@ let state = {
   answers: {},       // { eventId: [...] }
   schedules: [],     // 今後の予定
   report:   [],      // 管理レポート（attendanceReport）
-  submitting: false
+  submitting: false  
 };
+
 let registerMode = "create"; // "create" | "edit"
 let adminMode = "create";    // "create" | "edit"（予定登録フォーム）
 let adminEditingId = "";     // 編集対象ID
+
+/* ===== ドラフト（一時保存） ===== */
+/* 保存スコープは lineId 単位。localStorage に永続化します */
+let draft = { byEvent: {} }; // { [eventId]: { members: { [name]: "参加|欠席|未定|"" }, comment: "" } }
+
+function draftStorageKey(){
+  return `attDraft:${state.lineId || 'guest'}`;
+}
+function draftLoad(){
+  try {
+    const raw = localStorage.getItem(draftStorageKey());
+    draft = raw ? JSON.parse(raw) : { byEvent:{} };
+  } catch(_){
+    draft = { byEvent:{} };
+  }
+}
+function draftSave(){
+  try { localStorage.setItem(draftStorageKey(), JSON.stringify(draft)); } catch(_){}
+}
+function draftClear(){
+  draft = { byEvent:{} };
+  draftSave();
+}
+function draftEnsure(evId){
+  if (!draft.byEvent[evId]) draft.byEvent[evId] = { members:{}, comment:"" };
+  return draft.byEvent[evId];
+}
+function draftSetAttend(evId, name, attend){
+  const d = draftEnsure(String(evId));
+  if (attend) d.members[name] = attend; else delete d.members[name];
+  draftSave();
+}
+function draftSetComment(evId, comment){
+  const d = draftEnsure(String(evId));
+  d.comment = comment || "";
+  draftSave();
+}
+function draftGetAttend(evId, name){
+  const d = draft.byEvent[String(evId)];
+  return d && d.members ? (d.members[name] || "") : "";
+}
+function draftGetComment(evId){
+  const d = draft.byEvent[String(evId)];
+  return d ? (d.comment || "") : "";
+}
+function draftBuildPayloads(){
+  // まとめて送信用に {eventId, performerName, attend, comment(先頭のみ)} を組み立て
+  const result = [];
+  for (const [eventId, block] of Object.entries(draft.byEvent || {})){
+    const names = Object.keys(block.members || {});
+    if (names.length === 0) continue;
+    const com = block.comment || "";
+    names.forEach((name, idx)=>{
+      result.push({
+        eventId, performerName:name, attend:block.members[name] || "",
+        _eventComment: (idx === 0 ? com : "")
+      });
+    });
+  }
+  return result;
+}
+
+/* ===== 送信用補助（未保存バッジ/送信ボタン活性） ===== */
+function hasAnyDraft(){
+  const b = draft.byEvent || {};
+  return Object.values(b).some(block =>
+    (Object.keys(block.members || {}).length > 0) ||
+    ((block.comment || "").trim() !== "")
+  );
+}
+function markUnsavedBadge(eventId){
+  const card = document.querySelector(`.fEvent[data-evt="${eventId}"]`);
+  if (!card) return;
+  const headRow = card.querySelector(".fTitleRow");
+  if (!headRow) return;
+  const cur = headRow.querySelector(".badge-unsaved");
+  const dblock = draft.byEvent[String(eventId)];
+  const need = !!dblock && (Object.keys(dblock.members||{}).length > 0 || (dblock.comment||"").trim() !== "");
+  if (need && !cur){
+    headRow.insertAdjacentHTML("beforeend", `<span class="badge-unsaved">未保存</span>`);
+  }else if (!need && cur){
+    cur.remove();
+  }
+}
+function updateSubmitButton(){
+  const has = hasAnyDraft();
+  const btn = document.getElementById("btnSubmit");
+  if (!btn) return;
+  btn.disabled = !has;
+  btn.textContent = has ? "（下書き）まとめて送信" : "送信する";
+}
 
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
@@ -863,6 +973,9 @@ async function init(){
     state.name   = idt && idt.name ? idt.name : "";
     $("#hello").textContent = state.name ? `こんにちは、${state.name} さん` : "";
 
+    /* ★ lineIdが確定したら、ドラフトを復元 */
+    draftLoad();
+
     bindHandlers();
     resetRegisterForm();
 
@@ -898,7 +1011,7 @@ function bindHandlers(){
   // レポート
   $("#btnReportBack").onclick = ()=> show("#view-home");
   $("#btnReportReload").onclick = ()=> reportReload();
-  $("#repEvent").addEventListener("change", renderReport); // 追加：公演選択で描画
+  $("#repEvent").addEventListener("change", renderReport);
   $("#repAttend").addEventListener("change", renderReport);
   
   // 管理メニュー（HOME）
@@ -923,7 +1036,6 @@ function bindHandlers(){
   $("#ad_type").addEventListener("change", adminTypeChangeAdapt);
 }
 
-/* ===== データ読み直し ===== */
 /* ===== データ読み直し（確定版） ===== */
 async function refreshData(){
   $("#eventsBox").innerHTML  = `読み込み中… <span class="spinner"></span>`;
@@ -947,12 +1059,10 @@ async function refreshData(){
     if (r.status === "ok" && r.map) state.answers = r.map;
   }
 
-  // 4) HomeEventsUI に“直接”渡す（ここが今回の要）
+  // 4) HomeEventsUI に“直接”渡す
   try{
-    // 4-1 イベント（UI 形式）
     const events = (state.events || []).map(x => ({
       id      : String(x.eventId ?? x.id ?? ''),
-      // 画面表示は「YYYY/MM/DD（曜）」にする
       ymd     : ymdDow(parseYmdStrict(x.date)) || String(x.date || x.ymd || ''),
       hm      : hmFromTimeCell(x.time ?? x.hm ?? ''),
       place   : x.place ?? x.venue ?? x.location ?? '',
@@ -960,7 +1070,6 @@ async function refreshData(){
       isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true)
     }));
 
-    // 4-2 回答マップ { eventId: [{name, answer}] }
     const myAnswersMap = {};
     for (const [eid, list] of Object.entries(state.answers || {})){
       myAnswersMap[String(eid)] = (list || []).map(r => ({
@@ -969,7 +1078,6 @@ async function refreshData(){
       }));
     }
 
-    // 4-3 登録演奏者（判定用）
     const performers = Array.from(new Set(
       (state.members || []).map(m => m.performerName).filter(Boolean)
     ));
@@ -983,10 +1091,10 @@ async function refreshData(){
     console.error('HomeEventsUI.mount failed', e);
   }
 
-  // 5) 下段の「あなたの登録状況」など従来UI
+  // 従来の下段 UI
   renderHome();
 
-  // 6) ボタンなどの復帰
+  // ボタンの復帰
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
@@ -995,74 +1103,25 @@ async function refreshData(){
 
 /* ===== HOME描画 ===== */
 function renderHome(){
-  // 現在配信中の公演
-  //if (!state.events.length){
-  //  $("#eventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
-  //} else {
-  //  $("#eventsBox").innerHTML = state.events.map(e=>{
-  //    const d = parseYmdStrict(e.date);
-  //    const dateDisp = ymdDow(d);
-  //    const timeDisp = hmFromTimeCell(e.time);
-  //    const deadlineStr = e.deadline ? `（締切：${e.deadline}）` : "";
-  //    const badge = e.isNew ? `<span class="badge">NEW</span>` : "";
-  //    return `<div class="card" style="margin:8px 0">
-  //      <div><b>${dateDisp} ${timeDisp}</b> @ ${e.place||""} ${badge}</div>
-  //      <div class="small muted">${deadlineStr}</div>
-  //    </div>`;
-  //  }).join("");
-  //}
-
-  // ボタン
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
   $("#btnEditNames").style.display = hasMembers ? "" : "none";
 
-  // 登録状況（answersBox）
+  // トップでは answersBox 非表示仕様のまま（必要なら表示可能）
+  const perfs = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
   if (!hasMembers){
     $("#answersBox").innerHTML = `
       <div>まだ「初回登録」が済んでいません。</div>
       <div class="small">出欠の前に、入力者名と演奏者（家族分も可）の登録をしてください。</div>`;
     return;
   }
-
-  let html = "";
-  const perfs = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
-
   if (state.events.length === 0){
-    html = `<div class="muted">配信中の公演がありません</div>`;
-  } else {
-    for (const e of state.events){
-      const ans = state.answers[e.eventId] || [];
-      const map = {}; ans.forEach(r => { map[r.performerName] = r; });
-
-      const d = parseYmdStrict(e.date);
-      const dateDisp = ymdDow(d);
-      const timeDisp = hmFromTimeCell(e.time);
-
-      let rows = perfs.map(name=>{
-        const a = map[name];
-        let cls="stat-na", label="未回答";
-        if (a && a.attend){
-          if (a.attend==="参加") { cls="stat-ok"; label="参加"; }
-          else if (a.attend==="欠席"){ cls="stat-ng"; label="欠席"; }
-          else if (a.attend==="未定"){ cls="stat-pd"; label="未定"; }
-        }
-        return `<div class="row" style="justify-content:space-between;">
-          <span class="pill">${name}</span>
-          <span class="pill sm ${cls}">${label}</span>
-        </div>`;
-      }).join("");
-
-      if (!rows) rows = `<div class="muted">演奏者が未登録です（初回登録をしてください）</div>`;
-
-      html += `<div class="card">
-        <div class="muted">【${dateDisp} ${timeDisp} @${e.place||""}】${e.isNew?` <span class="badge">NEW</span>`:""}</div>
-        ${rows}
-      </div>`;
-    }
+    $("#answersBox").innerHTML = `<div class="muted">配信中の公演がありません</div>`;
+    return;
   }
-  $("#answersBox").innerHTML = html;
+  // （ここは非表示カードなので最小限のままにしています）
+  $("#answersBox").innerHTML = "";
 }
 
 /* ===== メインボタン ===== */
@@ -1086,90 +1145,128 @@ function onEditNames(){
   show("#view-register");
 }
 
-/* ===== 出欠フォーム ===== */
+/* ===== 出欠フォーム（アコーディオン＋ドラフト） ===== */
 function buildFormView(){
-  if (!state.events.length){
-    $("#formEventsBox").innerHTML = `<span>現在配信中の公演はありません</span>`;
-  } else {
-    const headerHtml = state.events.map(e=>{
-      const d = parseYmdStrict(e.date);
-      const dateDisp = ymdDow(d);
-      const timeDisp = hmFromTimeCell(e.time);
-      const ans = state.answers[e.eventId] || [];
-      const perfs = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
-      const map = {}; ans.forEach(r => { map[r.performerName] = r; });
-      const rows = perfs.map(name=>{
-        const a = map[name];
-        let cls="stat-na", label="未回答";
-        if (a && a.attend){
-          if (a.attend==="参加") { cls="stat-ok"; label="参加"; }
-          else if (a.attend==="欠席"){ cls="stat-ng"; label="欠席"; }
-          else if (a.attend==="未定"){ cls="stat-pd"; label="未定"; }
-        }
-        return `<span class="pill sm ${cls}">${name}:${label}</span>`;
-      }).join(" ");
-      return `<div class="card" style="margin:8px 0">
-        <div><b>${dateDisp} ${timeDisp}</b> @ ${e.place||""} ${e.isNew?`<span class="badge">NEW</span>`:""}</div>
-        <div class="small muted">${e.deadline?`締切：${e.deadline}`:""}</div>
-        <div style="margin-top:6px;">${rows||""}</div>
-      </div>`;
-    }).join("");
-    $("#formEventsBox").innerHTML = headerHtml;
-  }
-
+  const boxHeader = $("#formEventsBox");
   const box = $("#formFields");
   box.innerHTML = "";
-  if (!state.events.length) return;
+  boxHeader.innerHTML = `<span class="muted">イベントをタップして出欠を入力してください</span>`;
 
-  for (const e of state.events){
-    const current = state.answers[e.eventId] || [];
-    const map = {}; current.forEach(r => map[r.performerName] = r);
-    const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
+  if (!state.events.length){
+    box.innerHTML = `<div class="muted">現在配信中の公演はありません</div>`;
+    updateSubmitButton();
+    return;
+  }
 
+  const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
+
+  state.events.forEach(e=>{
+    const ansList = state.answers[e.eventId] || [];
+    const ansMap = {}; ansList.forEach(r => ansMap[r.performerName] = r);
+
+    // 表示用
     const d = parseYmdStrict(e.date);
     const dateDisp = ymdDow(d);
     const timeDisp = hmFromTimeCell(e.time);
+    const place = e.place || "";
 
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `<div class="sectionTitle">【${dateDisp} ${timeDisp}】@${e.place||""}</div>`;
+    // 未保存有無
+    const dblock = draft.byEvent[String(e.eventId)];
+    const hasUnsaved = !!dblock && (
+      Object.keys(dblock.members || {}).length > 0 ||
+      (dblock.comment||"").trim() !== ""
+    );
 
-    performers.forEach((name, idx)=>{
-      const row = map[name] || {};
-      const attend = row.attend || "";
-      const idBase = `e${e.eventId}_i${idx}`;
-
-      const html = `
-        <div style="border-top:1px dashed var(--c-border); margin:10px 0; padding-top:10px;">
-          <div class="pill" style="margin-bottom:6px;">${name}</div>
-          <label for="${idBase}_att">出欠</label>
-          <select id="${idBase}_att" data-event="${e.eventId}" data-name="${name}">
-            <option value="">（選択してください）</option>
-            <option value="参加" ${attend==="参加"?"selected":""}>参加</option>
-            <option value="欠席" ${attend==="欠席"?"selected":""}>欠席</option>
-            <option value="未定" ${attend==="未定"?"selected":""}>未定</option>
-          </select>
+    // 1) ヘッダー
+    const head = document.createElement("div");
+    head.className = "fHead";
+    head.innerHTML = `
+      <div class="fTitle">
+        <div class="fTitleRow" title="${dateDisp} ${timeDisp} @ ${place}">
+          <span class="t-date">${dateDisp} <small>${timeDisp||""}</small> @</span>
+          <span class="t-place">${place||""}</span>
+          ${hasUnsaved ? `<span class="badge-unsaved">未保存</span>` : ``}
         </div>
-      `;
-      card.insertAdjacentHTML("beforeend", html);
-    });
-    // 公演コメント（共通1枠）
-    let eventComment = "";
-    for (const r of current) {
-      if ((r.comment||"").trim()) { eventComment = r.comment.trim(); break; }
-    }
-    const comId = `e${e.eventId}_eventcom`;
-    card.insertAdjacentHTML("beforeend", `
+      </div>
+      <div class="fStatusRow">
+        ${performers.map(name=>{
+          const a = ansMap[name];
+          let cls="stat-na", label="未回答";
+          const v = draftGetAttend(e.eventId, name) || (a?.attend || "");
+          if (v==="参加") cls="stat-ok", label="参加";
+          else if (v==="欠席") cls="stat-ng", label="欠席";
+          else if (v==="未定") cls="stat-pd", label="未定";
+          return `<span class="pill sm ${cls}">${name}:${label}</span>`;
+        }).join(" ")}
+      </div>
+      <div class="fSub">${e.deadline ? `締切：${e.deadline}` : "締切：—"}</div>
+    `;
+
+    // 2) ボディ（編集フォーム）
+    const body = document.createElement("div");
+    body.className = "fBody";
+    body.innerHTML = `
+      ${performers.map((name, idx)=>{
+        const current = draftGetAttend(e.eventId, name) || (ansMap[name]?.attend || "");
+        const idBase = `f${e.eventId}_${idx}`;
+        return `
+          <div class="row" style="justify-content:space-between; border-top:1px dashed var(--c-border); padding-top:8px; margin-top:8px;">
+            <span class="pill">${name}</span>
+            <select class="attSel" id="${idBase}_att" data-event="${e.eventId}" data-name="${name}">
+              <option value="">（選択してください）</option>
+              <option value="参加" ${current==="参加"?"selected":""}>参加</option>
+              <option value="欠席" ${current==="欠席"?"selected":""}>欠席</option>
+              <option value="未定" ${current==="未定"?"selected":""}>未定</option>
+            </select>
+          </div>
+        `;
+      }).join("")}
       <div class="line"></div>
-      <label for="${comId}">公演コメント（任意・100文字まで、代表して1行のみ保存）</label>
-      <input type="text" id="${comId}" value="${eventComment}" maxlength="100" placeholder="例：家族の予定調整中 など">
-    `);
-    
+      <label>公演コメント（任意・100文字まで、代表1行）</label>
+      <input type="text" maxlength="100" class="evComment" data-event="${e.eventId}"
+             value="${ draftGetComment(e.eventId) ||
+                     (ansList.find(x => (x.comment||"").trim())?.comment || "")}">
+      <div class="small muted" style="margin-top:4px;">※ コメントは代表して1つだけ保存されます</div>
+    `;
+
+    // 3) カード化 & イベント
+    const card = document.createElement("div");
+    card.className = "fEvent";
+    card.setAttribute("data-evt", e.eventId);
+    card.appendChild(head);
+    card.appendChild(body);
+
+    head.addEventListener("click", ()=>{
+      card.classList.toggle("open");
+    });
+
     box.appendChild(card);
-  }
+  });
+
+  // 入力監視（デリゲート）
+  box.addEventListener("change", (ev)=>{
+    const sel = ev.target.closest("select.attSel");
+    if (!sel) return;
+    const eid = sel.dataset.event;
+    const name = sel.dataset.name;
+    const val = sel.value;
+    draftSetAttend(eid, name, val);
+    markUnsavedBadge(eid);
+    updateSubmitButton();
+  });
+  box.addEventListener("input", (ev)=>{
+    const c = ev.target.closest("input.evComment");
+    if (!c) return;
+    const eid = c.dataset.event;
+    draftSetComment(eid, c.value);
+    markUnsavedBadge(eid);
+    updateSubmitButton();
+  });
+
+  updateSubmitButton();
 }
 
-/* ===== 出欠送信 ===== */
+/* ===== 出欠送信（ドラフト一括送信） ===== */
 async function onSubmit(){
   if (state.submitting) return;
   state.submitting = true;
@@ -1177,29 +1274,7 @@ async function onSubmit(){
   btn.disabled = true; btn.textContent = "送信中…"; logForm("");
 
   try{
-    const payloads = [];
-    const seen = new Set();
-
-    for (const e of state.events){
-      const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
-      // 公演コメント（共通1枠）
-      const eventComEl = document.getElementById(`e${e.eventId}_eventcom`);
-      const eventComment = (eventComEl?.value || "").trim();
-      
-      performers.forEach((name, idx)=>{
-        const idBase = `e${e.eventId}_i${idx}`;
-        const sel = document.getElementById(`${idBase}_att`);
-        if (!sel) return;
-        const attend = sel.value;
-        if (!attend) return; // 未選択は送信しない
-
-        const key = `${e.eventId}||${name}`;
-        if (seen.has(key)) return; seen.add(key);
-
-        payloads.push({ eventId:e.eventId, performerName:name, attend, _eventComment: eventComment });
-      });
-    }
-
+    const payloads = draftBuildPayloads();
     if (!payloads.length){ alert("送信する内容がありません（出欠の選択が未入力です）"); return; }
 
     // イベントIDでグループ化して送信（先頭のみコメントを付ける）
@@ -1229,6 +1304,7 @@ async function onSubmit(){
     }
 
     alert("送信しました");
+    draftClear(); // ★ 送信成功で下書きを破棄
     show("#view-home");
     logHome("更新中…");
     await refreshData();
@@ -1238,7 +1314,7 @@ async function onSubmit(){
     logForm(err.message || String(err));
   }finally{
     state.submitting = false;
-    btn.disabled = false; btn.textContent = "送信する";
+    btn.disabled = false; updateSubmitButton(); // 文言と活性を戻す
   }
 }
 
@@ -1353,7 +1429,7 @@ async function renderSchedules(initial=false){
     html += `
       <div class="card" style="margin-top:12px;">
         <div class="sectionTitle" style="margin:0 0 8px;">購読（自動反映）</div>
-        <div class="small">以下のURLをカレンダーアプリの「カレンダーを購読」等の項目に貼り付けてください。</div>
+        <div class="small muted">以下のURLをカレンダーアプリの「カレンダーを購読」等の項目に貼り付けてください。</div>
         <div class="row" style="margin-top:6px; gap:8px; flex-wrap:wrap;">
           <input type="text" id="icsFeedUrl" value="${feedUrl}" style="flex:1; min-width:240px;" readonly>
           <button class="ghost" onclick="copyIcsFeed()">コピー</button>
@@ -1389,15 +1465,13 @@ function adminTypeChangeAdapt(){
   const flagSel    = $("#ad_flag");
 
   if (t === "練習"){
-    // 練習：集合時間・集合場所・締切・配信フラグは無効化 & 値は空/Nへ
     $("#ad_meetAt").value    = "";  meetAt.disabled    = true;
     $("#ad_meetPlace").value = "";  meetPlace.disabled = true;
     attend.value = "N";             attend.disabled    = true;
     $("#ad_deadline").value  = "";  deadline.disabled  = true;
-    updateFlagOptions({ type:t, forceN:true, disable:true }); // N固定、無効化
+    updateFlagOptions({ type:t, forceN:true, disable:true });
 
   } else if (t === "発表"){
-    // 発表：すべて編集可。フラグ選択肢は新規/編集で分岐
     meetAt.disabled    = false;
     meetPlace.disabled = false;
     attend.disabled    = false;
@@ -1405,14 +1479,12 @@ function adminTypeChangeAdapt(){
     updateFlagOptions({ type:t, forceN:false, disable:false });
 
   } else {
-    // その他：集合時間は有効、集合場所も有効（要件上UIは無効化要求無し）
     meetAt.disabled    = false;
     meetPlace.disabled = false;
     attend.value       = "N";
     attend.disabled    = true;
-    // 期限はUI上は編集可（サーバ側ではクリアされる）
     deadline.disabled  = false;
-    updateFlagOptions({ type:t, forceN:true, disable:true }); // N固定、無効化
+    updateFlagOptions({ type:t, forceN:true, disable:true });
   }
 }
 // 配信フラグ選択肢の差し替え（新規=Y/Nのみ、編集=Y/S/D/N）/ 非発表はN固定
@@ -1421,7 +1493,6 @@ function updateFlagOptions({ type, forceN=false, disable=false }){
   const cur = sel.value || "N";
   sel.innerHTML = ""; // いったん空に
 
-  // 選択肢定義
   const opt = (v, label)=> {
     const o = document.createElement("option");
     o.value = v; o.textContent = label;
@@ -1430,22 +1501,18 @@ function updateFlagOptions({ type, forceN=false, disable=false }){
 
   if (type === "発表" && !forceN){
     if (adminMode === "create"){
-      // 新規は Y / N の2択
       opt("N","N");
       opt("Y","Y（初回配信対象）");
     }else{
-      // 編集は Y/S/D/N 全て
       opt("N","N");
       opt("Y","Y（初回配信対象）");
       opt("S","S（初回配信済）");
       opt("D","D（締切超過/締切停止）");
     }
   }else{
-    // 非発表（練習/その他）は N 固定
     opt("N","N");
   }
 
-  // 既存値の維持（許可外なら N に丸め）
   const allowed = Array.from(sel.options).map(o=>o.value);
   sel.value = allowed.includes(cur) ? cur : "N";
   sel.disabled = !!disable;
@@ -1463,16 +1530,13 @@ function enterAdminCreateMode(){
   $("#ad_hm").value = "";
   $("#ad_place").value = "";
   $("#ad_meetAt").value = "";
-  // ★ 集合場所のデフォルト値（新規のみ）
   $("#ad_meetPlace").value = "藤塚小学校";
   $("#ad_attendTarget").value = "N";
   $("#ad_deadline").value = "";
   $("#ad_publish").value = "Yes";
   $("#ad_status").value = "active";
-  // フラグは新規時は N 初期化。種別未選択のため一旦Nのみ
   $("#ad_flag").innerHTML = `<option value="N" selected>N</option><option value="Y">Y（初回配信対象）</option>`;
   $("#ad_flag").value = "N";
-  // 種別に応じたUI制御
   adminTypeChangeAdapt();
   logAdmin("");
 }
@@ -1496,9 +1560,7 @@ function fillAdminFormFromItem(it){
   $("#ad_publish").value = it.publish || "Yes";
   $("#ad_status").value  = it.status  || "active";
 
-  // 種別に応じたUI制御＆フラグ候補の差し替え
   adminTypeChangeAdapt();
-  // 値反映（候補に無い場合はNへ）
   $("#ad_flag").value = it.flag || "N";
   if (![...$("#ad_flag").options].map(o=>o.value).includes($("#ad_flag").value)){
     $("#ad_flag").value = "N";
@@ -1525,7 +1587,6 @@ async function adminSubmit(){
 
     if (!title || !type || !ymdIn){ throw new Error("タイトル/種別/公演日は必須です"); }
 
-    // ★ クライアント側バリデーション：発表のフラグ必須（新規=Y/N、編集=Y/S/D/N）
     if (type === "発表"){
       const allowed = (adminMode==="create") ? ["Y","N"] : ["Y","S","D","N"];
       if (!flag || !allowed.includes(flag)){
@@ -1536,14 +1597,13 @@ async function adminSubmit(){
       }
     }
 
-    // UI制御に従う（安全側）
     let meetAtSend = meetAt, meetPlSend = meetPl, attSend = attT, dlSend = dlIn;
     if (type==="練習"){
       meetAtSend = ""; meetPlSend = ""; attSend = "N"; dlSend = "";
     }
-    if (type!=="発表"){ attSend = "N"; /* dlSendはUI可だがサーバ側でクリア */ }
+    if (type!=="発表"){ attSend = "N"; }
 
-    const ymd = toYmdSlashFromDateInput(ymdIn); // yyyy/MM/dd
+    const ymd = toYmdSlashFromDateInput(ymdIn);
     const dl  = dlSend ? toYmdSlashFromDateInput(dlSend) : "";
 
     $("#btnAdminSubmit").disabled = true;
@@ -1652,9 +1712,7 @@ async function reportReload(){
 
     // 公演セレクトを構築
     const sel = $("#repEvent");
-    // 先頭に「選択してください」を維持し、他は一度クリア
     sel.innerHTML = `<option value="">（選択してください）</option>`;
-    // 日時→時間→タイトルでソート
     const items = [...state.report].sort((a,b)=> 
       (String(a.ymd||"").localeCompare(b.ymd||"") || String(a.time||"").localeCompare(b.time||"") || String(a.title||"").localeCompare(b.title||""))
     );
@@ -1666,7 +1724,6 @@ async function reportReload(){
       sel.appendChild(opt);
     }
 
-    // 初期表示は選択待ち
     $("#repBox").innerHTML = `公演を選択してください`;
 
   }catch(err){
@@ -1694,7 +1751,6 @@ function renderReport(){
     return;
   }
 
-  // rows をフィルタ
   let rows = Array.isArray(ev.rows) ? ev.rows : [];
   if (fAtt) rows = rows.filter(r => (r.attend||"") === fAtt);
 
@@ -1703,7 +1759,6 @@ function renderReport(){
     return;
   }
 
-  // 並び：氏名→回答日時
   rows.sort((a,b)=> (String(a.name||"").localeCompare(String(b.name||"")) || String(a.answeredAt||"").localeCompare(String(b.answeredAt||""))));
 
   const dateDisp = `${ev.ymd || ""}${ev.time ? " " + ev.time : ""}`;
