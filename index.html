@@ -149,6 +149,63 @@
       font-size:11px; font-weight:600;
       color:#b45309; border:1.5px solid #f59e0b; background:#fff8e6; white-space:nowrap;
     }
+    /* ===== 出欠フォーム 見た目調整 ===== */
+    /* ① 日付・時間・@場所 を太字に */
+    .fTitleRow .t-date,
+    .fTitleRow .t-place{
+      font-weight: 700;
+    }
+    
+    /* ② ガイド文（枠なし・背景なし・文字のみ） */
+    #view-form #formEventsBox.guidePlain{
+      background: transparent;
+      border: 0;
+      padding: 0;
+      margin: 4px 0 8px;
+    }
+    
+    /* ③ アコーディオン：選択中の色を少し濃い紫に */
+    .fHead{ transition: background-color .12s ease; }
+    .fHead:hover{ background: #f5efff; }
+    .fEvent.open .fHead{ background: #efe7ff; } /* ←濃いめに */
+    
+    /* ④ 名前の丸い枠を廃止してシンプルに */
+    .nameLabel{
+      font-weight: 600;
+      color: #444;
+      /* 枠・背景なし */
+      padding: 0;
+      border: 0;
+      background: transparent;
+    }
+    
+    /* ⑤ 名前と小さめプルダウンを同一行に配置 */
+    .row-att{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .attSel{
+      min-width: 120px;
+      width: auto;
+      height: 34px;
+      font-size: 14px;
+      padding: 6px 10px;
+    }
+    
+    /* ⑥ セレクトを“ボタン風”（紫枠・白背景・紫文字）に */
+    .selectBtn{
+      border: 1.5px solid var(--c-primary-2) !important;
+      background: #fff !important;
+      color: var(--c-primary-2) !important;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(127,106,165,0.14);
+    }
+    .selectBtn:focus{
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(127,106,165,.18);
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -247,7 +304,7 @@
         <button id="btnBackFromForm" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
       </div>
 
-      <div id="formEventsBox" class="card muted">公演読み込み中… <span class="spinner"></span></div>
+      <div id="formEventsBox" class="muted guidePlain">公演読み込み中… <span class="spinner"></span></div>
       <div id="formFields"></div>
 
       <div class="line"></div>
@@ -768,7 +825,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.6.0";
+const FRONT_VERSION = "Front v2.6.1";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwltiDNPrAIbLU0tommjwHhphICyyqPsHb9FcE_Dv7JUe-EPV1fj3qh3dkXxePyrHZLsQ/exec";     // ←差し替え
 
@@ -1210,9 +1267,9 @@ function buildFormView(){
         const current = draftGetAttend(e.eventId, name) || (ansMap[name]?.attend || "");
         const idBase = `f${e.eventId}_${idx}`;
         return `
-          <div class="row" style="justify-content:space-between; border-top:1px dashed var(--c-border); padding-top:8px; margin-top:8px;">
-            <span class="pill">${name}</span>
-            <select class="attSel" id="${idBase}_att" data-event="${e.eventId}" data-name="${name}">
+          <div class="row-att" style="border-top:1px dashed var(--c-border); padding-top:8px; margin-top:8px;">
+            <span class="nameLabel">${name}</span>
+            <select class="attSel selectBtn" id="${idBase}_att" data-event="${e.eventId}" data-name="${name}">
               <option value="">（選択してください）</option>
               <option value="参加" ${current==="参加"?"selected":""}>参加</option>
               <option value="欠席" ${current==="欠席"?"selected":""}>欠席</option>
