@@ -237,51 +237,98 @@
    Schedules用：プルダウンを少し低め（出欠フォームと統一）
    ※ 既存の .selectBtn を上書きします（全ページ共通OK）
    ========================================================= */
-.selectBtn{
-  height: 36px;         /* 高さをコンパクトに */
-  min-height: 36px;
-  line-height: 34px;    /* テキスト縦位置のバランス調整 */
-  padding: 0 12px;      /* 左右はそのまま */
-  font-size: 14px;      /* 少しだけ控えめ */
-}
-
-/* iOS / Safari 対応（矢印のズレを抑制：必要なら） */
-.selectBtn::-ms-expand { display: none; }
-.selectBtn {
-  -webkit-appearance: none;
-  appearance: none;
-}
+    .selectBtn{
+      height: 36px;         /* 高さをコンパクトに */
+      min-height: 36px;
+      line-height: 34px;    /* テキスト縦位置のバランス調整 */
+      padding: 0 12px;      /* 左右はそのまま */
+      font-size: 14px;      /* 少しだけ控えめ */
+    }
+    
+    /* iOS / Safari 対応（矢印のズレを抑制：必要なら） */
+    .selectBtn::-ms-expand { display: none; }
+    .selectBtn {
+      -webkit-appearance: none;
+      appearance: none;
+    }
 
 /* =========================================================
    ゴーストボタン（#btnFetchSchedules など）を紫ボーダーに統一
    既存 .btn, .btn-sm を活かして「色味」だけを合わせます
    ========================================================= */
-.btn.btn-ghost{
-  background: #fff !important;
-  color: var(--c-primary-2) !important;
-  border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 10%) !important;
-  box-shadow: 0 1px 4px rgba(127,106,165, 0.08); /* ごく薄い影 */
-  transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
-}
-.btn.btn-ghost:hover{
-  background: color-mix(in srgb, var(--c-primary), #fff 90%) !important; /* わずかに紫が乗る */
-  border-color: var(--c-primary) !important;
-  color: var(--c-primary-2) !important;
-  box-shadow: 0 2px 8px rgba(127,106,165, 0.12);
-}
-.btn.btn-ghost:focus-visible{
-  outline: 2px solid color-mix(in srgb, var(--c-primary), #000 0%) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary), #fff 80%) !important;
-}
-
-/* 送信中などの無効化見た目（全ボタン共通・再掲OK） */
-button[disabled],
-.btn[disabled]{
-  opacity: .55;
-  pointer-events: none;
-  cursor: not-allowed;
-  filter: saturate(.6);
-}
+    .btn.btn-ghost{
+      background: #fff !important;
+      color: var(--c-primary-2) !important;
+      border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 10%) !important;
+      box-shadow: 0 1px 4px rgba(127,106,165, 0.08); /* ごく薄い影 */
+      transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
+    }
+    .btn.btn-ghost:hover{
+      background: color-mix(in srgb, var(--c-primary), #fff 90%) !important; /* わずかに紫が乗る */
+      border-color: var(--c-primary) !important;
+      color: var(--c-primary-2) !important;
+      box-shadow: 0 2px 8px rgba(127,106,165, 0.12);
+    }
+    .btn.btn-ghost:focus-visible{
+      outline: 2px solid color-mix(in srgb, var(--c-primary), #000 0%) !important;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary), #fff 80%) !important;
+    }
+    
+    /* 送信中などの無効化見た目（全ボタン共通・再掲OK） */
+    button[disabled],
+    .btn[disabled]{
+      opacity: .55;
+      pointer-events: none;
+      cursor: not-allowed;
+      filter: saturate(.6);
+    }
+    /* ================================
+   今後の予定：レイアウトと見た目
+   ================================ */
+    
+    /* 2列グリッド：プルダウンを横並び、下段にボタン */
+    .schedControls{
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 10px 14px;
+      align-items: end;
+      justify-content: start; /* 横幅を内容サイズに合わせる */
+    }
+    .schedControls .field{
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .schedControls .span2{
+      grid-column: 1 / -1; /* 2列ぶち抜きで下段にボタン */
+    }
+    
+    /* プルダウンを短め幅に（内容量に応じて調整可） */
+    .schedSel{
+      width: 160px;          /* コンパクト幅（ご希望に応じて 140〜200pxで微調整可） */
+      max-width: 100%;
+    }
+    
+    /* モバイルで列落ちしても綺麗に見せる */
+    @media (max-width: 420px){
+      .schedControls{
+        grid-template-columns: 1fr 1fr; /* 2列のままでもOK。1列にしたければ 1fr に */
+      }
+      .schedSel{
+        width: 100%; /* 極端に狭い端末では全幅にして文字切れを防止 */
+      }
+    }
+    
+    /* 文字が見切れる対策：選択肢垂直位置のクリップを緩和 */
+    .selectBtn{
+      height: 36px;
+      min-height: 36px;
+      line-height: normal;  /* ← 重要：iOSで文字が切れないよう固定line-heightを解除 */
+      padding: 6px 12px;    /* 縦の余白で視認性を確保 */
+      font-size: 14px;
+      -webkit-appearance: none;
+      appearance: none;
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -468,28 +515,31 @@ button[disabled],
       </div>
 
       <div class="card">
-        <div class="row" style="gap:12px;">
-          <div>
+        <div class="schedControls">
+          <div class="field">
             <label for="selDays">表示期間（日数）</label>
-            <select id="selDays" class="selectBtn">
+            <select id="selDays" class="selectBtn schedSel">
               <option value="30">30日</option>
               <option value="60" selected>60日</option>
               <option value="90">90日</option>
             </select>
           </div>
-          <div>
+          <div class="field">
             <label for="selKind">種別フィルタ</label>
-            <select id="selKind" class="selectBtn">
+            <select id="selKind" class="selectBtn schedSel">
               <option value="">（すべて）</option>
               <option value="発表">発表</option>
               <option value="練習">練習</option>
               <option value="その他">その他</option>
             </select>
           </div>
-          <div style="align-self:flex-end;">
+      
+          <!-- 下段に再取得ボタン -->
+          <div class="field span2">
             <button id="btnFetchSchedules" class="btn btn-ghost btn-sm">再取得</button>
           </div>
         </div>
+      
         <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
       </div>
     </section>
@@ -938,7 +988,7 @@ button[disabled],
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.6.7";
+const FRONT_VERSION = "Front v2.6.8";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
