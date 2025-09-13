@@ -1215,7 +1215,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.7.7";
+const FRONT_VERSION = "Front v2.7.8";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
@@ -2212,58 +2212,66 @@ async function adminListFetch(){
     if (r.items.length === 0){
       if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
       return;
-    }
+    // ---- ここから追加：並び替え用のユーティリティ ----
+    const ymdKey = (s) => {
+      const m = String(s||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+      return m ? `${m[1]}${m[2]}${m[3]}` : "99999999";   // 日付不明は末尾へ
+    };
+    const hmKey = (s) => {
+      const m = String(s||"").match(/^(\d{1,2}):(\d{2})$/);
+      return m ? `${String(m[1]).padStart(2,'0')}${m[2]}` : "9999"; // 時刻不明は末尾
+    };
+    const cmp = (a,b) =>
+      ymdKey(a.ymd).localeCompare(ymdKey(b.ymd)) ||
+      hmKey(a.hm).localeCompare(hmKey(b.hm))     ||
+      String(a.title||"").localeCompare(String(b.title||"")) ||
+      String(a.id||"").localeCompare(String(b.id||""));     // 同日時はIDで
 
-    // ★ マップを初期化して、ID→オブジェクト を保存
+    // 正規化
+    const items = r.items.map(raw => ({
+      id: raw.id || "",
+      type: raw.type || "",
+      title: raw.title || "",
+      ymd: raw.ymd || "",
+      hm: raw.hm || "",
+      place: raw.place || "",
+      meetAt: raw.meetAt || "",
+      meetPlace: raw.meetPlace || "",
+      attendTarget: raw.attendTarget || "N",
+      deadline: raw.deadline || "",
+      publish: raw.publish || "No",
+      status: raw.status || "archived",
+      flag: raw.flag || "N"
+    }));
+
+    // ★ 昇順ソート（日付→時刻→タイトル→ID）
+    items.sort(cmp);
+
+    // （編集用に保持）
     adminItemsMap = {};
+    items.forEach(it => { adminItemsMap[String(it.id)] = it; });
 
-    const html = r.items.map(raw=>{
-      const it = {
-        id: raw.id || "",
-        type: raw.type || "",
-        title: raw.title || "",
-        ymd: raw.ymd || "",
-        hm: raw.hm || "",
-        place: raw.place || "",
-        meetAt: raw.meetAt || "",
-        meetPlace: raw.meetPlace || "",
-        attendTarget: raw.attendTarget || "N",
-        deadline: raw.deadline || "",
-        publish: raw.publish || "No",
-        status: raw.status || "archived",
-        flag: raw.flag || "N"
-      };
-      // マップへ退避（ボタンからはIDのみ参照）
-      adminItemsMap[String(it.id)] = it;
-
-      return `<div class="card">
+    const html = items.map(it => `
+      <div class="card">
         <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
         <div class="small">${it.type||""}：${it.title||""}</div>
         <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
         <div class="row" style="margin-top:8px; justify-content:flex-end;">
-          <button class="btn btn-ghost btn-edit" type="button" data-id="${String(it.id)}">編集</button>
+          <button class="btn btn-ghost btn-sm" type="button"
+                  onclick="adminEdit(adminItemsMap['${String(it.id)}'])">編集</button>
         </div>
-      </div>`;
-    }).join("");
+      </div>
+    `).join("");
 
     if (top) top.innerHTML = html;
-
-    // ★ 編集ボタンのイベントを安全にバインド（JSONは埋め込まない）
-    document.querySelectorAll('#adminListAcc .btn-edit').forEach(btn=>{
-      btn.addEventListener('click', (ev)=>{
-        ev.preventDefault();
-        ev.stopPropagation(); // アコーディオン開閉への伝播を止める
-        const id = btn.getAttribute('data-id') || "";
-        const obj = adminItemsMap[id];
-        if (!obj){ console.warn('admin item not found for id:', id); return; }
-        adminEdit(obj); // ここでフォームに反映＆アコーディオン閉じ
-      });
-    });
+    if (box) box.innerHTML = html;
 
   }catch(err){
     const msg = `<span class="err">エラー：${err.message||err}</span>`;
     const topEl = document.getElementById('adminListBoxTop');
     if (topEl) topEl.innerHTML = msg;
+    const boxEl = document.getElementById('adminListBox');
+    if (boxEl) boxEl.innerHTML = msg;
   }
 }
 function adminEdit(obj){
