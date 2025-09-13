@@ -827,7 +827,7 @@
 
         <div class="hint" style="margin-top:6px;">
           * 必須。IDは自動採番です。<br>
-          種別が「練習」の場合は集合時間/集合場所/締切日/配信フラグは無効化。<br>
+          種別が「練習」の場合は集合時間/集合場所/締切日/配信フラグ無効化。<br>
           種別が「発表」以外では「出欠対象」は自動で N 固定になります。<br>
           「発表」の配信フラグは <b>新規登録時は Y/N のみ</b>、<b>編集時は Y/S/D/N</b> が選択可能です。
         </div>
@@ -1215,7 +1215,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.7.6";
+const FRONT_VERSION = "Front v2.7.7";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
@@ -1235,6 +1235,7 @@ let state = {
 let registerMode = "create"; // "create" | "edit"
 let adminMode = "create";    // "create" | "edit"（予定登録フォーム）
 let adminEditingId = "";     // 編集対象ID
+let adminItemsMap = {};      // 管理一覧の行データを保持するマップ（編集ボタンから参照）
 
 /* ===== ドラフト（一時保存） ===== */
 /* 保存スコープは lineId 単位。localStorage に永続化します */
@@ -2199,23 +2200,23 @@ async function adminSubmit(){
 async function adminListFetch(){
   try{
     const top = document.getElementById('adminListBoxTop');
-    const box = document.getElementById('adminListBox');
+    // ⑥で下部一覧を削除しているため、#adminListBox は存在しない想定
     if (top) top.innerHTML = `読み込み中… <span class="spinner"></span>`;
-    if (box) box.innerHTML = `読み込み中… <span class="spinner"></span>`;
 
     const days = Number($("#ad_days").value || 60);
     const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
     if (r.status !== "ok" || !Array.isArray(r.items)){
       if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
-      if (box) box.innerHTML = `<span class="err">取得に失敗しました</span>`;
       return;
     }
     if (r.items.length === 0){
-      const empty = `<div class="listEmpty">該当する予定はありません</div>`;
-      if (top) top.innerHTML = empty;
-      if (box) box.innerHTML = empty;
+      if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
       return;
     }
+
+    // ★ マップを初期化して、ID→オブジェクト を保存
+    adminItemsMap = {};
+
     const html = r.items.map(raw=>{
       const it = {
         id: raw.id || "",
@@ -2232,61 +2233,37 @@ async function adminListFetch(){
         status: raw.status || "archived",
         flag: raw.flag || "N"
       };
-     const html = r.items.map(raw=>{
-  const it = {
-    id: raw.id || "",
-    type: raw.type || "",
-    title: raw.title || "",
-    ymd: raw.ymd || "",
-    hm: raw.hm || "",
-    place: raw.place || "",
-    meetAt: raw.meetAt || "",
-    meetPlace: raw.meetPlace || "",
-    attendTarget: raw.attendTarget || "N",
-    deadline: raw.deadline || "",
-    publish: raw.publish || "No",
-    status: raw.status || "archived",
-    flag: raw.flag || "N"
-  };
-  const data = encodeURIComponent(JSON.stringify(it)); // 安全にエンコード
+      // マップへ退避（ボタンからはIDのみ参照）
+      adminItemsMap[String(it.id)] = it;
 
-  return `<div class="card">
-    <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
-    <div class="small">${it.type||""}：${it.title||""}</div>
-    <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
-    <div class="row" style="margin-top:8px; justify-content:flex-end;">
-      <button class="btn btn-ghost btn-edit" type="button" data-item="${data}">編集</button>
-    </div>
-  </div>`;
-}).join("");
-
-if (top) top.innerHTML = html;
-if (box) box.innerHTML = html;
-
-/* 編集ボタンのクリックをバインド（インラインonclickは廃止） */
-document.querySelectorAll('#adminListAcc .btn-edit').forEach(btn=>{
-  btn.addEventListener('click', (ev)=>{
-    ev.preventDefault();
-    ev.stopPropagation(); // アコーディオンのクリック伝播を止める
-    try{
-      const obj = JSON.parse(decodeURIComponent(btn.dataset.item || '{}'));
-      adminEdit(obj); // ← ここで編集モードへ
-    }catch(e){
-      console.error('edit-button parse failed', e);
-    }
-  });
-});
+      return `<div class="card">
+        <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
+        <div class="small">${it.type||""}：${it.title||""}</div>
+        <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
+        <div class="row" style="margin-top:8px; justify-content:flex-end;">
+          <button class="btn btn-ghost btn-edit" type="button" data-id="${String(it.id)}">編集</button>
+        </div>
+      </div>`;
     }).join("");
 
     if (top) top.innerHTML = html;
-    if (box) box.innerHTML = html;
+
+    // ★ 編集ボタンのイベントを安全にバインド（JSONは埋め込まない）
+    document.querySelectorAll('#adminListAcc .btn-edit').forEach(btn=>{
+      btn.addEventListener('click', (ev)=>{
+        ev.preventDefault();
+        ev.stopPropagation(); // アコーディオン開閉への伝播を止める
+        const id = btn.getAttribute('data-id') || "";
+        const obj = adminItemsMap[id];
+        if (!obj){ console.warn('admin item not found for id:', id); return; }
+        adminEdit(obj); // ここでフォームに反映＆アコーディオン閉じ
+      });
+    });
 
   }catch(err){
     const msg = `<span class="err">エラー：${err.message||err}</span>`;
     const topEl = document.getElementById('adminListBoxTop');
     if (topEl) topEl.innerHTML = msg;
-    const boxEl = document.getElementById('adminListBox');
-    if (boxEl) boxEl.innerHTML = msg;
   }
 }
 function adminEdit(obj){
