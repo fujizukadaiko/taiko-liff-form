@@ -385,6 +385,43 @@
       font-size: 12px;
       color: var(--c-muted);
     }
+    /* ===== 演奏者行（ラベルは1行、下段で入力と削除を2列に並べる） ===== */
+    .perfRow{
+      display: grid;
+      grid-template-columns: 1fr auto;  /* 入力 1fr | 削除 auto */
+      grid-template-rows: auto auto;    /* 1段目: ラベル / 2段目: 入力＋削除 */
+      column-gap: 12px;
+      row-gap: 6px;
+      margin: 10px 0;
+      align-items: center;
+    }
+    
+    .perfRow .perfLabel{                 /* ラベルは2カラムぶち抜き */
+      grid-column: 1 / -1;
+      font-size: 12px;
+      color: var(--c-muted);
+    }
+    
+    .perfRow .regPerf{                   /* 入力欄 */
+      grid-column: 1 / 2;
+      width: 100%;
+      height: 44px;                      /* 入力の高さを固定 */
+    }
+    
+    .perfRow .btn-remove{                /* 削除ボタンを入力の高さに合わせる */
+      grid-column: 2 / 3;
+      min-height: 44px;
+      height: 44px;
+      padding: 0 14px;
+      border-radius: 12px;
+      align-self: end;                   /* 下段のベースラインに揃える */
+    }
+    
+    /* 画面が狭いときの左右パディング微調整（任意） */
+    @media (max-width: 420px){
+      .perfRow{ column-gap: 10px; }
+      .perfRow .btn-remove{ padding: 0 12px; }
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -1086,7 +1123,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.7.2";
+const FRONT_VERSION = "Front v2.7.3";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
@@ -1718,19 +1755,18 @@ function buildRegisterFormFromMembers(){
 function addPerformerField(value=""){
   const id = "perf_" + Math.random().toString(36).slice(2);
   const row = document.createElement("div");
-  row.className = "row"; row.style.margin = "6px 0";
+
+  // ここを perfRow（Grid レイアウト）に変更
+  row.className = "perfRow";
+
   row.innerHTML = `
-    <div style="flex:1; min-width:220px;">
-      <label for="${id}" class="muted">演奏者名</label>
-      <input type="text" id="${id}" class="regPerf" value="${value||""}" placeholder="例：藤塚 太郎">
-    </div>
-    <div>
-      <button type="button" class="btn btn-remove btn-sm"
-              onclick="this.closest('.row').remove()"
-              aria-label="この演奏者を削除">削除</button>
-    </div>
+    <label for="${id}" class="perfLabel">演奏者名</label>
+    <input type="text" id="${id}" class="regPerf" value="${value||""}" placeholder="例：藤塚 太郎">
+    <button type="button" class="btn btn-remove btn-sm"
+            onclick="this.closest('.perfRow').remove()"
+            aria-label="この演奏者を削除">削除</button>
   `;
-  $("#perfList").appendChild(row);
+  document.getElementById("perfList").appendChild(row);
 }
 async function onRegister(){
   try{
