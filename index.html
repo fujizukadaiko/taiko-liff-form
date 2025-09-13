@@ -422,6 +422,17 @@
       .perfRow{ column-gap: 10px; }
       .perfRow .btn-remove{ padding: 0 12px; }
     }
+    /* 無効（disabled）の見た目を統一：集合場所・出欠対象・締切日・配信フラグなど */
+    .selectBtn:disabled,
+    input[type="date"]:disabled,
+    input[type="time"]:disabled,
+    input[type="text"]:disabled {
+      color: #888 !important;
+      background: #f7f5ff !important;         /* ごく薄い紫 */
+      border-color: #e6e0f0 !important;
+      box-shadow: none !important;
+      cursor: not-allowed !important;
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -683,12 +694,18 @@
     <section id="view-admin" data-view>
       <div class="row-space">
         <div class="sectionTitle">予定登録（管理者）</div>
-        <div class="row" style="gap:8px;">
-          <button id="btnAdminBack"   class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-          <button id="btnAdminReload" class="btn btn-ghost btn-sm">一覧を再取得</button>
+        <button id="btnAdminBack" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
+      </div>
+      <!-- ★ 上段のアコーディオン：現在登録中のイベント一覧 -->
+      <div class="card fEvent" id="adminListAcc">
+        <div class="fHead" style="display:flex; align-items:center; justify-content:space-between;">
+          <div class="sectionTitle" style="margin:0;">現在登録中のイベント一覧</div>
+          <span class="small muted">タップで開閉</span>
+        </div>
+        <div class="fBody">
+          <div id="adminListBoxTop" class="muted">読み込み待機中</div>
         </div>
       </div>
-
       <div class="card">
         <div class="row-space">
           <div class="sectionTitle" id="adminFormTitle">新規登録</div>
@@ -697,26 +714,46 @@
 
         <div class="adminGrid">
           <div><label>タイトル *</label><input id="ad_title" type="text" placeholder="例：秋祭り演奏会"></div>
-          <div><label>種別 *</label>
-            <select id="ad_type"><option value="">（選択）</option><option value="発表">発表</option><option value="練習">練習</option><option value="その他">その他</option></select>
-          </div>
+         <!-- 種別 *： "(選択)" を削除し、プレースホルダに。クラス selectBtn を付与 -->
+        <div>
+          <label>種別 *</label>
+          <select id="ad_type" class="selectBtn" required>
+            <option value="" disabled hidden selected>（選択）</option>
+            <option value="発表">発表</option>
+            <option value="練習">練習</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
           <div><label>日付 *</label><input id="ad_ymd" type="date"></div>
           <div><label>時間（開始）</label><input id="ad_hm" type="time" placeholder="HH:mm"></div>
           <div><label>場所</label><input id="ad_place" type="text" placeholder="例：藤塚小体育館"></div>
           <div><label>集合時間（発表・その他のみ）</label><input id="ad_meetAt" type="time" placeholder="HH:mm"></div>
           <div><label>集合場所</label><input id="ad_meetPlace" type="text" placeholder="例：藤塚小学校"></div>
-          <div><label>出欠対象（発表のみ）</label>
-            <select id="ad_attendTarget"><option value="Y">Y</option><option value="N" selected>N</option></select>
+          <div>
+            <label>出欠対象（発表のみ）</label>
+            <select id="ad_attendTarget" class="selectBtn">
+              <option value="Y">Y</option>
+              <option value="N" selected>N</option>
+            </select>
           </div>
           <div><label>締切日</label><input id="ad_deadline" type="date"></div>
-          <div><label>公開</label>
-            <select id="ad_publish"><option value="Yes">Yes</option><option value="No">No</option></select>
+          <div>
+            <label>公開</label>
+            <select id="ad_publish" class="selectBtn">
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
           </div>
-          <div><label>ステータス</label>
-            <select id="ad_status"><option value="active" selected>active</option><option value="archived">archived</option></select>
+          <div>
+            <label>ステータス</label>
+            <select id="ad_status" class="selectBtn">
+              <option value="active" selected>active</option>
+              <option value="archived">archived</option>
+            </select>
           </div>
-          <div><label>配信フラグ（必須：発表のみ）</label>
-            <select id="ad_flag"><!-- 動的に選択肢 --></select>
+          <div>
+            <label>配信フラグ（必須：発表のみ）</label>
+            <select id="ad_flag" class="selectBtn"><!-- 動的に差し替え --></select>
           </div>
         </div>
 
@@ -738,7 +775,11 @@
         <div class="row" style="gap:12px;">
           <div>
             <label>一覧の表示期間（日数）</label>
-            <select id="ad_days"><option value="30">30日</option><option value="60" selected>60日</option><option value="90">90日</option></select>
+           <select id="ad_days" class="selectBtn">
+            <option value="30">30日</option>
+            <option value="60" selected>60日</option>
+            <option value="90">90日</option>
+          </select>
           </div>
           <div style="align-self:flex-end;">
             <button id="btnAdminFetch" class="btn btn-ghost btn-sm">一覧を取得</button>
@@ -1123,7 +1164,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.7.3";
+const FRONT_VERSION = "Front v2.7.4";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
@@ -1403,11 +1444,17 @@ function bindHandlers(){
 
   // 管理画面
   $("#btnAdminBack").onclick = ()=> show("#view-home");
-  $("#btnAdminReload").onclick = ()=> adminListFetch();
+  $("#btnAdminReload")?.onclick = ()=> adminListFetch();
   $("#btnAdminFetch").onclick = ()=> adminListFetch();
   $("#btnAdminSubmit").onclick = ()=> adminSubmit();
   $("#btnAdminReset").onclick = ()=> enterAdminCreateMode();
   $("#ad_type").addEventListener("change", adminTypeChangeAdapt);
+  
+  // アコーディオン開閉（出欠フォームのスタイルを流用）
+  const acc = document.getElementById('adminListAcc');
+  acc?.querySelector('.fHead')?.addEventListener('click', ()=>{
+    acc.classList.toggle('open');
+  });
 }
 
 /* ===== データ読み直し（確定版） ===== */
@@ -1882,13 +1929,30 @@ function adminTypeChangeAdapt(){
   const attend     = $("#ad_attendTarget");
   const deadline   = $("#ad_deadline");
   const flagSel    = $("#ad_flag");
+  const hm         = $("#ad_hm");
+  const place      = $("#ad_place");
+
+  // ユーザーが手で触ったら「自動入力フラグ」を解除
+  hm?.addEventListener('input',   ()=> hm.dataset.autofilled   = "0", { once:true });
+  place?.addEventListener('input',()=> place.dataset.autofilled= "0", { once:true });
 
   if (t === "練習"){
+    // 無効化（色はCSSで統一）
     $("#ad_meetAt").value    = "";  meetAt.disabled    = true;
     $("#ad_meetPlace").value = "";  meetPlace.disabled = true;
     attend.value = "N";             attend.disabled    = true;
     $("#ad_deadline").value  = "";  deadline.disabled  = true;
     updateFlagOptions({ type:t, forceN:true, disable:true });
+
+    // ★ デフォルト自動入力（未入力のときだけ）
+    if (hm && !hm.value){
+      hm.value = "17:15";
+      hm.dataset.autofilled = "1";
+    }
+    if (place && !place.value){
+      place.value = "藤塚小学校体育館";
+      place.dataset.autofilled = "1";
+    }
 
   } else if (t === "発表"){
     meetAt.disabled    = false;
@@ -1897,13 +1961,25 @@ function adminTypeChangeAdapt(){
     deadline.disabled  = false;
     updateFlagOptions({ type:t, forceN:false, disable:false });
 
-  } else {
+    // ★ 練習以外に戻したとき：自動入力だった分だけクリア
+    if (hm?.dataset.autofilled === "1"){ hm.value = ""; }
+    if (place?.dataset.autofilled === "1"){ place.value = ""; }
+    if (hm) hm.dataset.autofilled = "0";
+    if (place) place.dataset.autofilled = "0";
+
+  } else { // その他
     meetAt.disabled    = false;
     meetPlace.disabled = false;
     attend.value       = "N";
     attend.disabled    = true;
     deadline.disabled  = false;
     updateFlagOptions({ type:t, forceN:true, disable:true });
+
+    // ★ 同上：自動入力だった分だけクリア
+    if (hm?.dataset.autofilled === "1"){ hm.value = ""; }
+    if (place?.dataset.autofilled === "1"){ place.value = ""; }
+    if (hm) hm.dataset.autofilled = "0";
+    if (place) place.dataset.autofilled = "0";
   }
 }
 // 配信フラグ選択肢の差し替え（新規=Y/Nのみ、編集=Y/S/D/N）/ 非発表はN固定
@@ -2070,18 +2146,25 @@ async function adminSubmit(){
 }
 async function adminListFetch(){
   try{
-    $("#adminListBox").innerHTML = `読み込み中… <span class="spinner"></span>`;
+    const top = document.getElementById('adminListBoxTop');
+    const box = document.getElementById('adminListBox');
+    if (top) top.innerHTML = `読み込み中… <span class="spinner"></span>`;
+    if (box) box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+
     const days = Number($("#ad_days").value || 60);
     const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
     if (r.status !== "ok" || !Array.isArray(r.items)){
-      $("#adminListBox").innerHTML = `<span class="err">取得に失敗しました</span>`;
+      if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
+      if (box) box.innerHTML = `<span class="err">取得に失敗しました</span>`;
       return;
     }
     if (r.items.length === 0){
-      $("#adminListBox").innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+      const empty = `<div class="listEmpty">該当する予定はありません</div>`;
+      if (top) top.innerHTML = empty;
+      if (box) box.innerHTML = empty;
       return;
     }
-    
+
     const html = r.items.map(raw=>{
       const it = {
         id: raw.id || "",
@@ -2107,10 +2190,14 @@ async function adminListFetch(){
         </div>
       </div>`;
     }).join("");
-  
-    $("#adminListBox").innerHTML = html;
+
+    if (top) top.innerHTML = html;
+    if (box) box.innerHTML = html;
+
   }catch(err){
-    $("#adminListBox").innerHTML = `<span class="err">エラー：${err.message||err}</span>`;
+    const msg = `<span class="err">エラー：${err.message||err}</span>`;
+    document.getElementById('adminListBoxTop')?.innerHTML = msg;
+    document.getElementById('adminListBox')?.innerHTML = msg;
   }
 }
 function adminEdit(obj){
