@@ -376,6 +376,15 @@
       -webkit-appearance: none;
       appearance: none;
     }
+    /* 氏名編集(登録)ページの微調整 */
+    .regAddRow { 
+      margin-top: 12px;               /* 上と詰まらないように余白を追加 */
+    }
+    #regNote {
+      margin: 6px 0 8px;               /* タイトル直下の注意書きの行間 */
+      font-size: 12px;
+      color: var(--c-muted);
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -538,12 +547,21 @@
         <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
 
         <div class="line"></div>
-        <div class="row-space">
+        <div class="line"></div>
+
+        <!-- タイトル + 追加ボタン（余白をとるため regAddRow を付与） -->
+        <div class="row-space regAddRow">
           <div class="sectionTitle" style="margin:0;">演奏者（家族も追加可）</div>
           <button id="btnAddPerf" class="btn btn-ghost btn-sm" type="button">＋ 演奏者を追加</button>
         </div>
+        
+        <!-- ※注意書き：タイトル直下へ移動 -->
+        <div id="regNote" class="small muted">
+          ※ あなた自身が演奏する場合は、演奏者としてあなたの名前も追加してください。
+        </div>
+        
+        <!-- 演奏者入力リスト -->
         <div id="perfList"></div>
-        <div class="small muted">※ あなた自身が演奏する場合は、演奏者としてあなたの名前も追加してください。</div>
       </div>
 
       <div class="row right">
@@ -1036,7 +1054,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.7.0";
+const FRONT_VERSION = "Front v2.7.1";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
