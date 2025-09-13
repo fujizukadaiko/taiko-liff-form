@@ -453,19 +453,48 @@
     css.textContent = `
       /* カードは既存 .card を使用 */
       .evList { margin-top: 6px; }
+    
       .eventRow{
-        display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
-        border:1px solid var(--c-border); border-radius:12px; background:#fff;
-        padding:10px 12px; margin:8px 0;
+        display:block;
+        border:1px solid var(--c-border);
+        border-radius:12px;
+        background:#fff;
+        padding:10px 12px;
+        margin:8px 0;
       }
+    
       .eventMeta{ min-width:0; }
-      .eventTitle{ font-weight:700; font-size:15px; line-height:1.35; }
-      .eventTitle small{ font-weight:700; } /* 時刻は太字のまま小さめ */
+    
+      /* ← 1行目：左=出欠バッジ / 右=NEW */
+      .eventHeader{
+        display:flex; align-items:center; gap:8px;
+        margin-bottom:4px;
+      }
+      .eventHeader .badge-new{ margin-left:auto; } /* 右寄せ */
+    
+      /* 2行目：日付 時刻 @ 場所（改行可） */
+      .eventTitle{
+        font-weight:700; font-size:15px; line-height:1.45;
+        word-break:break-word; white-space:normal;
+      }
+      .eventTitle{ display:flex; align-items:baseline; gap:4px; }
+      .eventTitle .title-date{ white-space:nowrap; flex:0 0 auto; }
+      .eventTitle .title-place{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto; }
+
+      /* 3行目：締切（小さめ） */
       .eventSub{ font-size:12px; color:var(--c-muted); margin-top:2px; }
       .deadline{ color:#666; }
       .deadline-soon{ color:#c33; font-weight:600; } /* 3日前以降を赤 */
-      .eventRight{ display:flex; align-items:center; gap:6px; margin-left:8px; }
-      .badge-new{ display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; color:#fff; background:#b197e3; margin-left:8px; }
+    
+      /* NEWバッジ：紫枠・白背景・紫文字（ボタンのアウトライン風） */
+      .badge-new{
+        display:inline-block; font-size:12px; padding:2px 8px;
+        border-radius:999px; background:#fff;
+        border:1px solid var(--c-primary-2); color:var(--c-primary-2);
+        font-weight:700;
+      }
+    
+      /* 詳細（家族別チップ） */
       .eventDetail{ display:none; padding:6px 6px 0 6px; }
       .eventRow.open + .eventDetail { display:block; }
     `;
@@ -534,16 +563,23 @@
   
     function rowHtml(ev, sum){
       const dateStr  = ev.ymd || ev.date || '';
-      const time     = ev.hm ? ` <small>${ev.hm}</small>` : '';
+      const hm       = ev.hm || ''; // smallで小さめ表示にする
       const place    = ev.place || ev.venue || '';
       const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge-new">NEW</span>' : '';
       const dl       = ev.deadline || ev.limit || ev.deadlineYmd || '';
       const dlCls    = `deadline ${deadlineClass(dl)}`;
-  
+    
+      // 場所があるときだけ「 @」を付ける
+      const atMark = place ? ' @' : '';
+    
       return `
         <div class="eventRow" data-evt="${ev.id}">
           <div class="eventMeta">
-            <div class="eventTitle">${dateStr}${time}  @ ${place} ${newBadge}</div>
+            <div class="eventTitle" title="${dateStr}${hm ? ` ${hm}` : ''}${atMark} ${place}">
+              <span class="title-date">${dateStr}${hm ? ` <small>${hm}</small>` : ''}${atMark}</span>
+              <span class="title-place">${place}</span>
+              ${newBadge}
+            </div>
             <div class="eventSub">締切：<span class="${dlCls}">${dl || '—'}</span></div>
           </div>
           <div class="eventRight"><span class="pill sm ${sum.cls}">${sum.label}</span></div>
