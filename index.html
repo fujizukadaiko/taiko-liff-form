@@ -329,6 +329,53 @@
       -webkit-appearance: none;
       appearance: none;
     }
+    /* ================================
+   今後の予定：2行のラベル｜プルダウン配置
+   ================================ */
+    /* ラベル｜セレクト の2列グリッド。要素は [label, select, label, select, span2...] の順 */
+    .schedControls{
+      display: grid;
+      grid-template-columns: auto max-content; /* 左=ラベル、右=プルダウン */
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: start;
+    }
+    
+    /* ボタンは2列ぶち抜きで下段へ */
+    .schedControls .span2{
+      grid-column: 1 / -1;
+    }
+    
+    /* ラベル側のスタイル（任意） */
+    .scLabel{
+      font-size: 14px;
+      color: var(--c-text);
+      white-space: nowrap;
+    }
+    
+    /* プルダウンを短め幅に（前回より“半分”寄りのサイズ） */
+    .schedSel.short{
+      width: 120px;                  /* 目安：前回160px → 120px。さらに短くしたければ 96〜110pxなどに */
+      max-width: 100%;
+    }
+    
+    /* 端末幅が狭い時の保険：文字が見切れないように */
+    @media (max-width: 420px){
+      .schedSel.short{
+        width: clamp(100px, 40vw, 128px); /* 端末に応じて少し伸縮 */
+      }
+    }
+    
+    /* iOS 文字欠け対策（selectの縦詰まりを避ける） */
+    .selectBtn{
+      height: 36px;
+      min-height: 36px;
+      line-height: normal;
+      padding: 6px 12px;
+      font-size: 14px;
+      -webkit-appearance: none;
+      appearance: none;
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -514,25 +561,33 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="schedControls">
-          <div class="field">
-            <label for="selDays">表示期間（日数）</label>
-            <select id="selDays" class="selectBtn schedSel">
-              <option value="30">30日</option>
-              <option value="60" selected>60日</option>
-              <option value="90">90日</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="selKind">種別フィルタ</label>
-            <select id="selKind" class="selectBtn schedSel">
-              <option value="">（すべて）</option>
-              <option value="発表">発表</option>
-              <option value="練習">練習</option>
-              <option value="その他">その他</option>
-            </select>
-          </div>
+     <div class="card">
+      <div class="schedControls">
+        <!-- 1行目：表示期間（日数） | プルダウン -->
+        <label for="selDays" class="scLabel">表示期間（日数）</label>
+        <select id="selDays" class="selectBtn schedSel short">
+          <option value="30">30日</option>
+          <option value="60" selected>60日</option>
+          <option value="90">90日</option>
+        </select>
+    
+        <!-- 2行目：種別フィルタ | プルダウン -->
+        <label for="selKind" class="scLabel">種別フィルタ</label>
+        <select id="selKind" class="selectBtn schedSel short">
+          <option value="">（すべて）</option>
+          <option value="発表">発表</option>
+          <option value="練習">練習</option>
+          <option value="その他">その他</option>
+        </select>
+    
+        <!-- 下段：再取得ボタン（2列ぶち抜き） -->
+        <div class="span2">
+          <button id="btnFetchSchedules" class="btn btn-ghost btn-sm">再取得</button>
+        </div>
+      </div>
+    
+      <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
+    </div>
       
           <!-- 下段に再取得ボタン -->
           <div class="field span2">
@@ -988,7 +1043,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.6.8";
+const FRONT_VERSION = "Front v2.6.9";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyD3Geb_NdR_OQfYof2uEz5LzkzVXNetV8-uoWlouSy_PlD6iATSau8InV_L0N1voMnwg/exec";     // ←差し替え
 
