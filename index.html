@@ -339,8 +339,7 @@
       gap: 10px 14px;
       align-items: center;
       justify-content: start;
-    }
-    
+    }    
     /* ボタンは2列ぶち抜きで下段へ */
     .schedControls .span2{
       grid-column: 1 / -1;
@@ -432,6 +431,22 @@
       border-color: #e6e0f0 !important;
       box-shadow: none !important;
       cursor: not-allowed !important;
+    }
+    /* ===== 区分バッジ（⑧） ===== */
+    .seg-badge{
+      display:inline-flex; align-items:center; justify-content:center;
+      height:20px; padding:0 8px; border-radius:999px;
+      font-size:11px; font-weight:700; white-space:nowrap;
+      border:1.5px solid; margin-right:8px;
+    }
+    .seg-adult { 
+      color:#1d4ed8; background:#e6f0ff; border-color:#60a5fa; /* 青系(水色背景) */
+    }
+    .seg-child {
+      color:#b91c1c; background:#ffecec; border-color:#f59e9e; /* 落ち着いた赤 */
+    }
+    .seg-both  {
+      color:#6d5a93; background:#f1eaff; border-color:#bda8ea; /* 紫系 */
     }
   </style>
 
@@ -768,7 +783,13 @@
           <option value="練習">練習</option>
           <option value="その他">その他</option>
         </select>
-    
+        <!-- 2.5行目：★ 区分フィルタ（両方所属ユーザーのみ表示） -->
+          <label for="selSeg" class="scLabel" id="labSeg" style="display:none;">区分フィルタ</label>
+          <select id="selSeg" class="selectBtn schedSel short" style="display:none;">
+            <option value="">（すべて）</option>
+            <option value="adult">大人の部</option>
+            <option value="child">子どもの部</option>
+          </select>
         <!-- 下段：再取得ボタン（2列ぶち抜き） -->
         <div class="span2">
           <button id="btnFetchSchedules" class="btn btn-ghost btn-sm">再取得</button>
@@ -801,8 +822,20 @@
                 <option value="90">90日</option>
               </select>
             </div>
+             <!-- ★ 追加：対象区分フィルタ -->
+            <div>
+              <label>対象区分フィルタ</label>
+              <select id="ad_seg_filter" class="selectBtn">
+                <option value="">（すべて）</option>
+                <option value="adult">大人</option>
+                <option value="child">子ども</option>
+                <option value="both">両方</option>
+              </select>
+            </div>
             <div style="margin-left:auto;">
               <button id="btnAdminFetch" class="btn btn-ghost btn-sm">一覧を取得</button>
+            </div>
+          </div>
             </div>
           </div>
           <div id="adminListBoxTop" class="muted">読み込み待機中</div>
@@ -1259,9 +1292,9 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.9.0";
+const FRONT_VERSION = "Front v2.9.1";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxvUxQ_WzhgDnAdnI5YBh6RY5Ft0_O6fMLdpQ9ZFn0y_2_D0jQxa-TWUO-vYl1T5tsa_g/exec";     // ←差し替え
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwpg5w0K3eCMcFd6hLcqmfdZqF8K0_3iDjTy4K68PaHEg3yHwINny_FsxpPJlighruvWw/exec";     // ←差し替え
 
 /* ===== 状態 ===== */
 let state = {
@@ -1390,6 +1423,10 @@ function updateSubmitButton(){
 
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
+/* ===== 区分(セグメント) 正規化 & 判定ヘルパー ===== */
+const INCLUDE_BOTH_FOR_ALL = false; 
+// ↑②の仕様に合わせて false（＝常に『両方』は表示対象から除外）
+// 運用で方針変更する場合は true にすると、常に『両方』を表示に含められます。
 function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classList.remove("show")); $(id).classList.add("show"); }
 function logHome(t){ $("#homeLog").textContent = t||""; }
 function logForm(t){ $("#formLog").textContent = t||""; }
@@ -1409,6 +1446,61 @@ function hmFromTimeCell(v){
   const m = s.match(/^(\d{1,2}):(\d{2})$/); 
   if (m) return `${z(m[1])}:${m[2]}`;
   return "";
+}
+function normSeg(raw){
+  const s = String(raw||"").trim();
+  if (!s) return "";
+  // メンバー側：子どもの部 / 大人の部
+  if (s.includes("大人")) return "adult";
+  if (s.includes("子ども") || s.includes("子供")) return "child";
+  // イベント側：子ども / 大人 / 両方
+  if (s.includes("両方")) return "both";
+  if (s.includes("大人")) return "adult";
+  if (s.includes("子ども") || s.includes("子供")) return "child";
+  return "";
+}
+function dispSeg(n){ // 表示用ラベル
+  if (n==="adult") return "大人の部";
+  if (n==="child") return "子どもの部";
+  if (n==="both")  return "両方";
+  return "";
+}
+
+function getMemberSegSet(){
+  const segs = new Set();
+  (state.members||[]).forEach(m=>{
+    const n = normSeg(m.segment || m.区分);
+    if (n) segs.add(n);
+  });
+  return segs;
+}
+function userHasBoth(){
+  const s = getMemberSegSet();
+  return s.has("adult") && s.has("child");
+}
+function eventVisibleForUser(eventSegRaw, userSegSet){
+  const e = normSeg(eventSegRaw);
+  if (userSegSet.has("adult") && userSegSet.has("child")){
+    // 両方所属 → 大人/子どもだけ表示（②仕様に合わせ『両方』は除外）
+    return (e==="adult" || e==="child") || (INCLUDE_BOTH_FOR_ALL && e==="both");
+  }
+  if (userSegSet.has("adult")){
+    return (e==="adult") || (INCLUDE_BOTH_FOR_ALL && e==="both");
+  }
+  if (userSegSet.has("child")){
+    return (e==="child") || (INCLUDE_BOTH_FOR_ALL && e==="both");
+  }
+  // 区分が未登録なら何も表示しない
+  return false;
+}
+function buildNameSegMap(){
+  const map = {};
+  (state.members||[]).forEach(m=>{
+    const n = (m.performerName||"").trim();
+    const s = normSeg(m.segment || m.区分);
+    if (n && s) map[n] = s; // name -> 'adult' / 'child'
+  });
+  return map;
 }
 // 厳密に日付文字列をパース
 function parseYmdStrict(s){
@@ -1577,15 +1669,36 @@ async function refreshData(){
     if (r.status === "ok" && r.map) state.answers = r.map;
   }
 
-  // 4) HomeEventsUI に“直接”渡す
+  // ★ ② ユーザーの区分に応じて、見せるイベントをフィルタ
+  const userSegSet = getMemberSegSet();
+  const filteredEvents = (state.events||[]).filter(e=>{
+    // e.segment / e.targetSegment / e.attendSegment などの候補から拾う
+    const evSeg = e.segment || e.targetSegment || e.attendSegment || e.segmentRaw || "";
+    return eventVisibleForUser(evSeg, userSegSet);
+  });
+
+  // ★ performers を「ユーザーの区分に合う人」に限定（Homeの集計ずれ防止）
+  const nmSeg = buildNameSegMap();
+  const allNames = Array.from(new Set((state.members||[]).map(m=>m.performerName).filter(Boolean)));
+  let performersForHome = [];
+  if (userSegSet.has("adult") && !userSegSet.has("child")){
+    performersForHome = allNames.filter(n => nmSeg[n]==="adult");
+  } else if (userSegSet.has("child") && !userSegSet.has("adult")){
+    performersForHome = allNames.filter(n => nmSeg[n]==="child");
+  } else {
+    performersForHome = allNames.filter(n => nmSeg[n]==="adult" || nmSeg[n]==="child");
+  }
+
+  // 4) HomeEventsUI に“直接”渡す（★ フィルタ済イベントを使用）
   try{
-    const events = (state.events || []).map(x => ({
+    const events = (filteredEvents || []).map(x => ({
       id      : String(x.eventId ?? x.id ?? ''),
       ymd     : ymdDow(parseYmdStrict(x.date)) || String(x.date || x.ymd || ''),
       hm      : hmFromTimeCell(x.time ?? x.hm ?? ''),
       place   : x.place ?? x.venue ?? x.location ?? '',
       deadline: String(x.deadline ?? x.limit ?? x.deadlineYmd ?? ''),
-      isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true)
+      isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true),
+      segment : x.segment || x.targetSegment || x.attendSegment || "" // 参照用
     }));
 
     const myAnswersMap = {};
@@ -1596,12 +1709,8 @@ async function refreshData(){
       }));
     }
 
-    const performers = Array.from(new Set(
-      (state.members || []).map(m => m.performerName).filter(Boolean)
-    ));
-
     if (window.HomeEventsUI){
-      window.HomeEventsUI.mount({ events, myAnswersMap, performers });
+      window.HomeEventsUI.mount({ events, myAnswersMap, performers: performersForHome });
     }else{
       console.warn('HomeEventsUI is not loaded yet');
     }
@@ -1609,8 +1718,8 @@ async function refreshData(){
     console.error('HomeEventsUI.mount failed', e);
   }
 
-  // 従来の下段 UI
-  renderHome();
+  // 従来UIの描画（フォームでもフィルタ済イベントを使うため保持）
+  state._filteredEventsForViews = filteredEvents;
 
   // ボタンの復帰
   const hasMembers = state.members.length > 0;
@@ -1690,15 +1799,17 @@ function buildFormView(){
       <span class="em-red">送信ボタンを押してください。</span>
     </span>`;
 
-  if (!state.events.length){
-    box.innerHTML = `<div class="muted">現在配信中の公演はありません</div>`;
+  const eventsForForm = state._filteredEventsForViews || [];
+  if (!eventsForForm.length){
+    box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
     updateSubmitButton();
     return;
   }
 
-  const performers = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
+  const nameSegMap = buildNameSegMap();
+  const uniqueNamesAll = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
 
-  state.events.forEach(e=>{
+  eventsForForm.forEach(e=>{
     const ansList = state.answers[e.eventId] || [];
     const ansMap = {}; ansList.forEach(r => ansMap[r.performerName] = r);
 
@@ -1708,6 +1819,21 @@ function buildFormView(){
     const timeDisp = hmFromTimeCell(e.time);
     const place = e.place || "";
 
+    // ★ イベントの対象区分
+    const evSegNorm = normSeg(e.segment || e.targetSegment || e.attendSegment || "");
+    const segBadgeLabel = dispSeg(evSegNorm);
+    const segBadgeCls = evSegNorm==="adult" ? "seg-adult" : evSegNorm==="child" ? "seg-child" : "seg-both";
+
+    // ★ このイベントに表示する演奏者（①仕様）
+    const performers = uniqueNamesAll.filter(n=>{
+      const ms = nameSegMap[n]; // 'adult' / 'child'
+      if (!ms) return false;
+      if (evSegNorm==="adult") return ms==="adult";
+      if (evSegNorm==="child") return ms==="child";
+      if (evSegNorm==="both")  return (ms==="adult" || ms==="child");
+      return false;
+    });
+
     // 未保存有無
     const dblock = draft.byEvent[String(e.eventId)];
     const hasUnsaved = !!dblock && (
@@ -1715,12 +1841,13 @@ function buildFormView(){
       (dblock.comment||"").trim() !== ""
     );
 
-    // 1) ヘッダー
+    // 1) ヘッダー（⑧：区分バッジ追加）
     const head = document.createElement("div");
     head.className = "fHead";
     head.innerHTML = `
       <div class="fTitle">
         <div class="fTitleRow" title="${dateDisp} ${timeDisp} @ ${place}">
+          ${segBadgeLabel ? `<span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span>` : ``}
           <span class="t-date">${dateDisp} <small>${timeDisp||""}</small> @</span>
           <span class="t-place">${place||""}</span>
           ${hasUnsaved ? `<span class="badge-unsaved">未保存</span>` : ``}
@@ -1760,20 +1887,14 @@ function buildFormView(){
                      (ansList.find(x => (x.comment||"").trim())?.comment || "")}">
     `;
 
-    // 3) カード化 & イベント
     const card = document.createElement("div");
     card.className = "fEvent";
     card.setAttribute("data-evt", e.eventId);
     card.appendChild(head);
     card.appendChild(body);
-
-    head.addEventListener("click", ()=>{
-      card.classList.toggle("open");
-    });
-
+    head.addEventListener("click", ()=> card.classList.toggle("open"));
     box.appendChild(card);
   });
-
   // 入力監視（デリゲート）
   box.addEventListener("change", (ev)=>{
     const sel = ev.target.closest("select.attSel");
@@ -1962,6 +2083,13 @@ async function onRegister(){
 }
 
 /* ===== 今後の予定（Schedules） ===== */
+// init() 内の末尾などで…
+if (userHasBoth()){
+  $("#labSeg").style.display = "";
+  $("#selSeg").style.display = "";
+}
+
+// renderSchedules() 内：取得後に ②＆③のロジックを適用
 async function renderSchedules(initial=false){
   const box = $("#schedulesBox");
   box.innerHTML = `読み込み中… <span class="spinner"></span>`;
@@ -1969,7 +2097,6 @@ async function renderSchedules(initial=false){
   try{
     const days = Number($("#selDays").value || 60);
     const kind = $("#selKind").value || "";
-
     const url = kind
       ? `?schedules=1&days=${esc(days)}&kind=${esc(kind)}`
       : `?schedules=1&days=${esc(days)}`;
@@ -1979,7 +2106,24 @@ async function renderSchedules(initial=false){
       box.innerHTML = `<span class="err">取得に失敗しました</span>`;
       return;
     }
-    state.schedules = r.schedules;
+    // ベース：②のユーザー区分フィルタ
+    const segSet = getMemberSegSet();
+    let arr = r.schedules.filter(it => {
+      const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
+      return eventVisibleForUser(evSeg, segSet);
+    });
+
+    // ③ 追加：『両方所属』のユーザーだけ区分フィルタを適用
+    const uiSeg = $("#selSeg")?.value || "";
+    if (userHasBoth() && uiSeg){
+      arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
+    }
+
+    state.schedules = arr;
+    if (!state.schedules.length){
+      box.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+      return;
+    }
 
     if (!state.schedules.length){
       box.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
@@ -1990,12 +2134,10 @@ async function renderSchedules(initial=false){
     // let html = `<div class="small muted" style="margin-bottom:8px;">
     //   ・各予定から「Googleカレンダー」/「iOS(ICS)」に追加できます。購読（自動反映）は下のリンクから登録してください。
     // </div>`;
-    let html = "";
-    
-    html += state.schedules.map(it=>{
+    let html = state.schedules.map(it=>{
       return `<div class="card">
         <div><b>${it.date} ${it.time||""}</b> @ ${it.place||""}</div>
-        <div class="small muted">${it.kind||""} ${it.title||""}</div>
+        <div class="small muted">${dispSeg(normSeg(it.segment||""))} ${it.kind||""} ${it.title||""}</div>
         ${it.memo?`<div class="small">${it.memo}</div>`:""}
       </div>`;
     }).join("");
@@ -2140,6 +2282,10 @@ function enterAdminCreateMode(){
   $("#ad_status").value = "active";
   $("#ad_flag").innerHTML = `<option value="N" selected>N</option><option value="Y">Y（初回配信対象）</option>`;
   $("#ad_flag").value = "N";
+
+  // ★ ⑤ 対象区分デフォルト＝子ども（明示）
+  $("#ad_segment").value = "子ども";
+
   adminTypeChangeAdapt();
   logAdmin("");
 }
@@ -2177,7 +2323,7 @@ async function adminSubmit(){
     logAdmin("");
 
     const type  = $("#ad_type").value.trim();
-    const title = $("#ad_title").value.trim();
+    let   title = $("#ad_title").value.trim();
     const ymdIn = $("#ad_ymd").value.trim();   // yyyy-mm-dd
     const hm    = $("#ad_hm").value.trim();
     const place = $("#ad_place").value.trim();
@@ -2187,12 +2333,22 @@ async function adminSubmit(){
     const dlIn  = $("#ad_deadline").value.trim();
     const pub   = $("#ad_publish").value.trim();
     const st    = $("#ad_status").value.trim();
-    const flag  = $("#ad_flag").value.trim();
-    const seg = $("#ad_segment").value.trim(); // 必須
+    const segRaw = $("#ad_segment").value.trim(); // ← 追加
+    let seg = segRaw;
+    // セグメント表記ゆれを正す（スプシ側：子ども/大人/両方 を想定）
+    if (seg.includes("大人")) seg = "大人";
+    else if (seg.includes("子ども") || seg.includes("子供")) seg = "子ども";
+    else if (seg.includes("両方")) seg = "両方";
 
     if (!title || !type || !ymdIn){ throw new Error("タイトル/種別/公演日は必須です"); }
 
+    // ④-2 大人の部ならタイトル先頭に【大人の部】を必ず付与（種別問わず）
+    if (seg === "大人" && !title.startsWith("【大人の部】")){
+      title = `【大人の部】${title}`;
+    }
+
     if (type === "発表"){
+      const flag = $("#ad_flag").value.trim();
       const allowed = (adminMode==="create") ? ["Y","N"] : ["Y","S","D","N"];
       if (!flag || !allowed.includes(flag)){
         throw new Error(adminMode==="create"
@@ -2214,19 +2370,28 @@ async function adminSubmit(){
     $("#btnAdminSubmit").disabled = true;
     $("#btnAdminSubmit").textContent = (adminMode==="edit" ? "保存中…" : "登録中…");
 
+    // ★ 送信：&segment= を常に付与
+    let urlBase = `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}`
+      + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
+      + (hm?`&hm=${esc(hm)}`:"")
+      + (place?`&place=${esc(place)}`:"")
+      + (meetAtSend?`&meetAt=${esc(meetAtSend)}`:"")
+      + (meetPlSend?`&meetPlace=${esc(meetPlSend)}`:"")
+      + `&attendTarget=${esc(attSend)}`
+      + (dl?`&deadline=${esc(dl)}`:"")
+      + `&publish=${esc(pub)}&status=${esc(st)}`
+      + `&segment=${esc(seg)}`;
+
     let res;
     if (adminMode === "create"){
-      const url = `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}`
-        + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
-        + (hm?`&hm=${esc(hm)}`:"")
-        + (place?`&place=${esc(place)}`:"")
-        + (meetAtSend?`&meetAt=${esc(meetAtSend)}`:"")
-        + (meetPlSend?`&meetPlace=${esc(meetPlSend)}`:"")
-        + `&attendTarget=${esc(attSend)}`
-        + (dl?`&deadline=${esc(dl)}`:"")
-        + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
-        + `&segment=${esc(seg)}`;
-      res = await api(url);
+      // flag は発表のみ有効
+      if (type==="発表"){
+        const flag = $("#ad_flag").value.trim();
+        urlBase += `&flag=${esc(flag)}`;
+      } else {
+        urlBase += `&flag=N`;
+      }
+      res = await api(urlBase);
       if (res.status!=="ok") throw new Error(res.message||"登録に失敗しました");
       alert(`登録しました（ID: ${res.id || "(不明)"}）`);
       enterAdminCreateMode();
@@ -2234,16 +2399,8 @@ async function adminSubmit(){
 
     } else {
       if (!adminEditingId){ throw new Error("編集対象IDが不正です"); }
-      const url = `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}&id=${esc(adminEditingId)}`
-        + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
-        + (hm?`&hm=${esc(hm)}`:"")
-        + (place?`&place=${esc(place)}`:"")
-        + (meetAtSend?`&meetAt=${esc(meetAtSend)}`:"")
-        + (meetPlSend?`&meetPlace=${esc(meetPlSend)}`:"")
-        + `&attendTarget=${esc(attSend)}`
-        + (dl?`&deadline=${esc(dl)}`:"")
-        + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
-        + `&segment=${esc(seg)}`;
+      const url = urlBase + `&id=${esc(adminEditingId)}`
+        + (type==="発表" ? `&flag=${esc($("#ad_flag").value.trim())}` : `&flag=N`);
       res = await api(url);
       if (res.status!=="ok") throw new Error(res.message||"保存に失敗しました");
       alert("保存しました");
@@ -2259,7 +2416,6 @@ async function adminSubmit(){
 async function adminListFetch(){
   try{
     const top = document.getElementById('adminListBoxTop');
-    // ⑥で下部一覧を削除しているため、#adminListBox は存在しない想定
     if (top) top.innerHTML = `読み込み中… <span class="spinner"></span>`;
 
     const days = Number($("#ad_days").value || 60);
@@ -2269,27 +2425,10 @@ async function adminListFetch(){
       if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
       return;
     }
-
     if (r.items.length === 0){
       if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
       return;
-    }  
-
-    // ---- 並び替え用のユーティリティ（yyyy/MM/dd と yyyy-MM-dd の両対応）----
-    const ymdKey = (s) => {
-      const t = String(s || "").replace(/-/g, "/");
-      const m = t.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-      return m ? `${m[1]}${m[2]}${m[3]}` : "99999999";   // 日付不明は末尾へ
-    };
-    const hmKey = (s) => {
-      const m = String(s || "").match(/^(\d{1,2}):(\d{2})$/);
-      return m ? `${String(m[1]).padStart(2,'0')}${m[2]}` : "9999"; // 時刻不明は末尾へ
-    };
-    const cmp = (a,b) =>
-      ymdKey(a.ymd).localeCompare(ymdKey(b.ymd)) ||
-      hmKey(a.hm).localeCompare(hmKey(b.hm))     ||
-      String(a.title||"").localeCompare(String(b.title||"")) ||
-      String(a.id||"").localeCompare(String(b.id||""));
+    }
 
     // 正規化
     const items = r.items.map(raw => ({
@@ -2305,20 +2444,39 @@ async function adminListFetch(){
       deadline: raw.deadline || "",
       publish: raw.publish || "No",
       status: raw.status || "archived",
-      flag: raw.flag || "N"
+      flag: raw.flag || "N",
+      segment: raw.segment || raw.targetSegment || raw.attendSegment || ""  // ★ 追加
     }));
 
-    // ★ 日付→時刻→タイトル→ID の昇順
-    items.sort(cmp);
+    // ★ ⑥ フィルタ適用
+    const f = $("#ad_seg_filter")?.value || "";
+    const items2 = f ? items.filter(it => normSeg(it.segment) === f) : items;
 
-    // 編集用に保持（グローバル）
+    // ソート
+    const ymdKey = (s) => {
+      const t = String(s || "").replace(/-/g, "/");
+      const m = t.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+      return m ? `${m[1]}${m[2]}${m[3]}` : "99999999";
+    };
+    const hmKey = (s) => {
+      const m = String(s || "").match(/^(\d{1,2}):(\d{2})$/);
+      return m ? `${String(m[1]).padStart(2,'0')}${m[2]}` : "9999";
+    };
+    items2.sort((a,b)=>
+      ymdKey(a.ymd).localeCompare(ymdKey(b.ymd)) ||
+      hmKey(a.hm).localeCompare(hmKey(b.hm)) ||
+      String(a.title||"").localeCompare(String(b.title||"")) ||
+      String(a.id||"").localeCompare(String(b.id||""))
+    );
+
+    // 編集用保持
     adminItemsMap = {};
-    items.forEach(it => { adminItemsMap[String(it.id)] = it; });
+    items2.forEach(it => { adminItemsMap[String(it.id)] = it; });
 
-    const html = items.map(it => `
+    const html = items2.map(it => `
       <div class="card">
         <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
-        <div class="small">${it.type||""}：${it.title||""}</div>
+        <div class="small">${dispSeg(normSeg(it.segment||""))}｜${it.type||""}：${it.title||""}</div>
         <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
         <div class="row" style="margin-top:8px; justify-content:flex-end;">
           <button class="btn btn-ghost btn-sm" type="button"
@@ -2328,13 +2486,10 @@ async function adminListFetch(){
     `).join("");
 
     if (top) top.innerHTML = html;
-    // 下部一覧は削除済みのため、box 参照はしない（削除済み）
-
   }catch(err){
     const msg = `<span class="err">エラー：${err.message||err}</span>`;
     const topEl = document.getElementById('adminListBoxTop');
     if (topEl) topEl.innerHTML = msg;
-    // 下部一覧は削除済みのため、adminListBox 参照はスキップ
   }
 }
 function adminEdit(obj){
@@ -2345,14 +2500,13 @@ function adminEdit(obj){
 }
 
 /* ===== 出欠結果一覧（管理者） ===== */
+/* 出欠結果一覧（管理者） */
 async function reportReload(){
   const box = $("#repBox");
   box.innerHTML = `読み込み中… <span class="spinner"></span>`;
 
-  // ① 公演プルダウンをロード完了まで無効化＆見た目も「読み込み中…」
   const selEvent = $("#repEvent");
   if (selEvent){
-    // 見た目統一（未付与の場合に備え保険でクラス付与）
     selEvent.classList.add('selectBtn');
     selEvent.disabled = true;
     selEvent.innerHTML = `<option value="">読み込み中…</option>`;
@@ -2364,38 +2518,47 @@ async function reportReload(){
       box.innerHTML = `<span class="err">取得に失敗しました</span>`;
       if (selEvent){
         selEvent.innerHTML = `<option value="">取得に失敗しました</option>`;
-        selEvent.disabled = false;     // ← 完了（失敗）したので操作は可能に戻す
+        selEvent.disabled = false;
       }
       return;
     }
     state.report = r.list;
 
-    // 公演セレクトを構築
-    if (selEvent){
-      selEvent.innerHTML = `<option value="">（選択してください）</option>`;
-      const items = [...state.report].sort((a,b)=> 
-        (String(a.ymd||"").localeCompare(b.ymd||"") ||
-         String(a.time||"").localeCompare(b.time||"") ||
-         String(a.title||"").localeCompare(b.title||""))
-      );
-      for (const e of items){
-        const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
-        const opt = document.createElement("option");
-        opt.value = e.id;
-        opt.textContent = label;
-        selEvent.appendChild(opt);
+    // ★ ⑦ 可能なら全会員のセグメントマップを取得（任意API）
+    state.memberSegMap = {};
+    try{
+      const mm = await api(`?membersAll=1`);
+      if (mm.status==="ok" && Array.isArray(mm.list)){
+        mm.list.forEach(m=>{
+          const n = (m.name || m.performerName || "").trim();
+          const s = normSeg(m.segment || m.区分 || "");
+          if (n && s) state.memberSegMap[n] = s; // name -> 'adult'/'child'
+        });
       }
-      selEvent.disabled = false;       // ← 正常完了で有効化
+    }catch(_){/* optional */}
+
+    // 公演セレクト
+    selEvent.innerHTML = `<option value="">（選択してください）</option>`;
+    const items = [...state.report].sort((a,b)=> 
+      (String(a.ymd||"").localeCompare(b.ymd||"") ||
+       String(a.time||"").localeCompare(b.time||"") ||
+       String(a.title||"").localeCompare(b.title||""))
+    );
+    for (const e of items){
+      const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
+      const opt = document.createElement("option");
+      opt.value = e.id;
+      opt.textContent = label;
+      selEvent.appendChild(opt);
     }
+    selEvent.disabled = false;
 
-    // 下部メッセージ
     $("#repBox").innerHTML = `公演を選択してください`;
-
   }catch(err){
     box.innerHTML = `<span class="err">エラー：${err.message||err}</span>`;
     if (selEvent){
       selEvent.innerHTML = `<option value="">取得エラー</option>`;
-      selEvent.disabled = false;       // ← 完了（失敗）したので有効化
+      selEvent.disabled = false;
     }
   }
 }
@@ -2406,8 +2569,8 @@ function renderReport(){
     return;
   }
 
-  const selId = $("#repEvent").value; // 公演ID
-  const fAtt  = $("#repAttend").value; // 出欠フィルタ（空=すべて）
+  const selId = $("#repEvent").value;
+  const fAtt  = $("#repAttend").value;
   if (!selId){ box.innerHTML = `公演を選択してください`; return; }
 
   const ev = state.report.find(x => String(x.id) === String(selId));
@@ -2416,44 +2579,30 @@ function renderReport(){
   const rows = Array.isArray(ev.rows) ? ev.rows : [];
   const dateDisp = `${ev.ymd || ""}${ev.time ? " " + ev.time : ""}`;
 
-  // ① 回答済みマップ（名前 → 行）
   const ansMap = new Map();
   rows.forEach(r => { if (r?.name) ansMap.set(String(r.name), r); });
-
-  // ② roster（なければ空配列）
   const roster = Array.isArray(ev.roster) ? ev.roster.slice() : [];
-
-  // ③ 未回答 = roster から回答者を引いたもの
   const notAnsweredNames = roster.filter(n => !ansMap.has(String(n)));
 
-  // ④ カテゴリ分け（参加 / 欠席 / 未定 / 未回答）
   const group = { "参加":[], "未定":[], "未回答":[], "欠席":[] };
   rows.forEach(r => {
     const att = (r.attend||"").trim();
     if (att==="参加") group["参加"].push(r);
     else if (att==="欠席") group["欠席"].push(r);
     else if (att==="未定") group["未定"].push(r);
-    else group["未回答"].push({ name:r.name, attend:"未回答" }); // 想定外値は未回答扱い
+    else group["未回答"].push({ name:r.name, attend:"未回答" });
   });
-  notAnsweredNames.forEach(n => {
-    group["未回答"].push({ name:n, attend:"未回答" });
-  });
+  notAnsweredNames.forEach(n => { group["未回答"].push({ name:n, attend:"未回答" }); });
 
-  // ⑤ フィルタ適用（空なら全カテゴリ）
   const showKeys = fAtt ? [fAtt] : ["参加","未定","未回答","欠席"];
-
-  // ⑥ 並べ替え（名前昇順、answeredAtは表示だけ）
   const byName = (a,b) => String(a.name||"").localeCompare(String(b.name||""));
   Object.keys(group).forEach(k => group[k].sort(byName));
 
-  const badgeCls = (k) => {
-    if (k==="参加") return "stat-ok";
-    if (k==="欠席") return "stat-ng";
-    if (k==="未定") return "stat-pd";
-    return "stat-na"; // 未回答
-  };
+  const badgeCls = (k) => k==="参加" ? "stat-ok" : k==="欠席" ? "stat-ng" : k==="未定" ? "stat-pd" : "stat-na";
 
-  // ⑦ 1枚カードで出力
+  // ★ 大人タグ付け：state.memberSegMap[name]==="adult" なら【大人の部】を付与
+  const segLookup = state.memberSegMap || {};
+
   let html = `
     <div class="card">
       <div class="row-space">
@@ -2463,7 +2612,6 @@ function renderReport(){
       <div class="small muted">${ev.title||""} <span class="small muted">（ID: ${ev.id}）</span></div>
       <div class="line"></div>
   `;
-
   showKeys.forEach(k => {
     const list = group[k];
     if (!list || list.length===0) return;
@@ -2471,18 +2619,21 @@ function renderReport(){
       <div style="margin:8px 0;">
         <span class="pill sm ${badgeCls(k)}">${k}</span>
         <div style="margin-top:6px;">
-          ${list.map(r => `
-            <div class="row" style="justify-content:space-between; margin:6px 0;">
-              <div>${r.name||""}</div>
-              ${r.answeredAt ? `<div class="small muted">回答：${r.answeredAt}</div>` : ``}
-            </div>
-          `).join("")}
+          ${list.map(r => {
+            const seg = segLookup[r.name];
+            const dispName = (seg==="adult") ? `${r.name}【大人の部】` : r.name;
+            return `
+              <div class="row" style="justify-content:space-between; margin:6px 0;">
+                <div>${dispName||""}</div>
+                ${r.answeredAt ? `<div class="small muted">回答：${r.answeredAt}</div>` : ``}
+              </div>
+            `;
+          }).join("")}
         </div>
         <div class="line"></div>
       </div>
     `;
   });
-
   html += `</div>`;
   box.innerHTML = html;
 }
