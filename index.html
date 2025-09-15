@@ -652,6 +652,7 @@
         <div class="row" style="gap:8px;">
           <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm" data-view-target="view-admin">予定登録/編集</button>
           <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm" data-view-target="view-admin-report">出欠結果一覧</button>
+          <a href="https://your-domain.github.io/your-repo/summary.html" target="_blank" class="btn btn-outline btn-sm">サマリ</a>
         </div>
         <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
       </div>
@@ -830,6 +831,15 @@
           <div><label>場所</label><input id="ad_place" type="text" placeholder="例：藤塚小体育館"></div>
           <div><label>集合時間（発表・その他のみ）</label><input id="ad_meetAt" type="time" placeholder="HH:mm"></div>
           <div><label>集合場所</label><input id="ad_meetPlace" type="text" placeholder="例：藤塚小学校"></div>
+          <!-- フォームの対象項目追加 -->
+          <div>
+            <label>対象区分 *</label>
+            <select id="ad_segment" class="selectBtn" required>
+              <option value="子ども" selected>子ども</option>
+              <option value="大人">大人</option>
+              <option value="両方">両方</option>
+            </select>
+          </div>
           <div>
             <label>出欠対象（発表のみ）</label>
             <select id="ad_attendTarget" class="selectBtn">
@@ -1249,9 +1259,9 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.8.2";
+const FRONT_VERSION = "Front v2.9.0";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzfQYMoGopR_bJLbBkQpjX876xVDa6W3RSG0ZnYx2VorugaH4x_TUV9zY_duzNxhPPSkw/exec";     // ←差し替え
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxvUxQ_WzhgDnAdnI5YBh6RY5Ft0_O6fMLdpQ9ZFn0y_2_D0jQxa-TWUO-vYl1T5tsa_g/exec";     // ←差し替え
 
 /* ===== 状態 ===== */
 let state = {
@@ -1879,14 +1889,20 @@ function buildRegisterFormFromMembers(){
   const inputName = (state.members[0]?.inputName || state.name || "");
   $("#regInputName").value = inputName;
   $("#perfList").innerHTML = "";
-  const names = Array.from(new Set(state.members.map(m=>m.performerName))).filter(Boolean);
-  if (names.length === 0) {
-    addPerformerField("");
-  } else {
-    names.forEach(n=> addPerformerField(n));
-  }
+  const byName = new Map();
+ (state.members||[]).forEach(m=>{
+   if (!m.performerName) return;
+   byName.set(m.performerName, m.segment || m?.区分 || "子どもの部");
+ });
+ if (byName.size===0) {
+   addPerformerField("", "子どもの部");
+ } else {
+   for (const [nm, seg] of byName.entries()){
+     addPerformerField(nm, seg);
+   }
+ }
 }
-function addPerformerField(value=""){
+function addPerformerField(value="", segValue="子どもの部"){
   const id = "perf_" + Math.random().toString(36).slice(2);
   const row = document.createElement("div");
 
@@ -1896,6 +1912,10 @@ function addPerformerField(value=""){
   row.innerHTML = `
     <label for="${id}" class="perfLabel">演奏者名</label>
     <input type="text" id="${id}" class="regPerf" value="${value||""}" placeholder="例：藤塚 太郎">
+    <select class="regPerfSeg selectBtn" style="height:44px;">
+     <option value="子どもの部" ${segValue==="子どもの部"?"selected":""}>子どもの部</option>
+     <option value="大人の部"   ${segValue==="大人の部"  ?"selected":""}>大人の部</option>
+   </select>
     <button type="button" class="btn btn-remove btn-sm"
             onclick="this.closest('.perfRow').remove()"
             aria-label="この演奏者を削除">削除</button>
@@ -1908,20 +1928,21 @@ async function onRegister(){
     const inputName = $("#regInputName").value.trim();
     if (!inputName) throw new Error("入力者氏名を入力してください");
 
-    const names = Array.from(document.querySelectorAll(".regPerf"))
-      .map(el => (el.value||"").trim())
-      .filter(Boolean);
-
-    const uniq = Array.from(new Set(names));
-    if (uniq.length === 0) throw new Error("演奏者を1名以上入力してください");
+    // {name, segment} の配列にまとめる
+   const items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
+     const name = row.querySelector(".regPerf")?.value.trim();
+     const seg  = row.querySelector(".regPerfSeg")?.value || "子どもの部";
+    return name ? { name, segment: seg } : null;
+   }).filter(Boolean);
+   if (items.length === 0) throw new Error("演奏者を1名以上入力してください");
 
     $("#btnRegister").disabled = true; $("#btnRegister").textContent = (registerMode==="edit" ? "保存中…" : "登録中…");
 
     let url = "";
     if (registerMode === "edit") {
-      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list=${esc(JSON.stringify(uniq))}&purge=0`;
+      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list2=${esc(JSON.stringify(items))}&purge=0`;
     } else {
-      url = `${API_ENDPOINT}?registerBulk=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list=${esc(JSON.stringify(uniq))}`;
+      url = `${API_ENDPOINT}?registerBulk=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list2=${esc(JSON.stringify(items))}`;
     }
 
     const r = await fetch(url); const j = await r.json();
@@ -2141,6 +2162,7 @@ function fillAdminFormFromItem(it){
   $("#ad_deadline").value = toDateInputFromYmdSlash(it.deadline || "");
   $("#ad_publish").value = it.publish || "Yes";
   $("#ad_status").value  = it.status  || "active";
+  $("#ad_segment").value = it.segment || "子ども";
 
   adminTypeChangeAdapt();
   $("#ad_flag").value = it.flag || "N";
@@ -2166,6 +2188,7 @@ async function adminSubmit(){
     const pub   = $("#ad_publish").value.trim();
     const st    = $("#ad_status").value.trim();
     const flag  = $("#ad_flag").value.trim();
+    const seg = $("#ad_segment").value.trim(); // 必須
 
     if (!title || !type || !ymdIn){ throw new Error("タイトル/種別/公演日は必須です"); }
 
@@ -2202,6 +2225,7 @@ async function adminSubmit(){
         + `&attendTarget=${esc(attSend)}`
         + (dl?`&deadline=${esc(dl)}`:"")
         + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
+        + `&segment=${esc(seg)}`;
       res = await api(url);
       if (res.status!=="ok") throw new Error(res.message||"登録に失敗しました");
       alert(`登録しました（ID: ${res.id || "(不明)"}）`);
@@ -2219,6 +2243,7 @@ async function adminSubmit(){
         + `&attendTarget=${esc(attSend)}`
         + (dl?`&deadline=${esc(dl)}`:"")
         + `&publish=${esc(pub)}&status=${esc(st)}&flag=${esc(flag)}`;
+        + `&segment=${esc(seg)}`;
       res = await api(url);
       if (res.status!=="ok") throw new Error(res.message||"保存に失敗しました");
       alert("保存しました");
@@ -2248,7 +2273,7 @@ async function adminListFetch(){
     if (r.items.length === 0){
       if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
       return;
-    }  // ← ★ この閉じカッコが抜けていました
+    }  
 
     // ---- 並び替え用のユーティリティ（yyyy/MM/dd と yyyy-MM-dd の両対応）----
     const ymdKey = (s) => {
