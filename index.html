@@ -1292,7 +1292,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.9.1";
+const FRONT_VERSION = "Front v2.9.2";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwpg5w0K3eCMcFd6hLcqmfdZqF8K0_3iDjTy4K68PaHEg3yHwINny_FsxpPJlighruvWw/exec";     // ←差し替え
 
@@ -1478,6 +1478,22 @@ function userHasBoth(){
   const s = getMemberSegSet();
   return s.has("adult") && s.has("child");
 }
+  /* --- 区分フィルタの表示/非表示を切り替える --- */
+function updateSegFilterUI(){
+  // 「同じLINEアカウントで大人/子ども両方の名簿レコードがあるか？」
+  const showIt = userHasBoth();
+  const lab = document.getElementById('labSeg');
+  const sel = document.getElementById('selSeg');
+  if (!lab || !sel) return; // HTMLがまだない場合でも安全にスキップ
+
+  lab.style.display = showIt ? '' : 'none';
+  sel.style.display = showIt ? '' : 'none';
+
+  // 非表示にしたときは値をクリア（＝全予定表示）
+  if (!showIt) {
+    sel.value = '';
+  }
+}
 function eventVisibleForUser(eventSegRaw, userSegSet){
   const e = normSeg(eventSegRaw);
   if (userSegSet.has("adult") && userSegSet.has("child")){
@@ -1608,9 +1624,11 @@ function bindHandlers(){
   $("#btnAddPerf").onclick     = ()=> addPerformerField("");
   $("#btnRegister").onclick    = onRegister;
 
-  $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); renderSchedules(true); };
+  $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); updateSegFilterUI(); renderSchedules(true); };
   $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
   $("#btnFetchSchedules").onclick    = ()=> renderSchedules(false);
+  // 区分フィルタが変更されたら 今後の予定を再描画
+  document.getElementById('selSeg')?.addEventListener('change', ()=> renderSchedules(false));
   // レポート
   $("#btnReportBack").onclick = ()=> show("#view-home");
   $("#btnReportReload").onclick = ()=> reportReload();
@@ -1660,6 +1678,8 @@ async function refreshData(){
   // 2) 会員
   const w = await api(`?whoami=1&id=${esc(state.lineId)}`);
   state.members = (w.status==="ok" ? (w.members||[]) : []);
+  // ★ ここで区分フィルタUIの可視/不可視を更新
+  updateSegFilterUI();
 
   // 3) 回答
   state.answers = {};
