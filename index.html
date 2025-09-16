@@ -1292,7 +1292,7 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.9.2";
+const FRONT_VERSION = "Front v2.9.3";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
 const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwpg5w0K3eCMcFd6hLcqmfdZqF8K0_3iDjTy4K68PaHEg3yHwINny_FsxpPJlighruvWw/exec";     // ←差し替え
 
@@ -1494,10 +1494,15 @@ function updateSegFilterUI(){
     sel.value = '';
   }
 }
+// 修正後：ユーザー区分が1つも無いときは「全表示」にフォールバック
 function eventVisibleForUser(eventSegRaw, userSegSet){
+  // フォールバック：ユーザー側の区分情報が無い → 絞り込まず表示する
+  if (!userSegSet || userSegSet.size === 0) return true;
+
   const e = normSeg(eventSegRaw);
+
+  // 両方所属ユーザー：大人/子ども（必要に応じ both も）表示
   if (userSegSet.has("adult") && userSegSet.has("child")){
-    // 両方所属 → 大人/子どもだけ表示（②仕様に合わせ『両方』は除外）
     return (e==="adult" || e==="child") || (INCLUDE_BOTH_FOR_ALL && e==="both");
   }
   if (userSegSet.has("adult")){
@@ -1506,8 +1511,8 @@ function eventVisibleForUser(eventSegRaw, userSegSet){
   if (userSegSet.has("child")){
     return (e==="child") || (INCLUDE_BOTH_FOR_ALL && e==="both");
   }
-  // 区分が未登録なら何も表示しない
-  return false;
+  // 念のための保険（ここに来るのは稀）
+  return true;
 }
 function buildNameSegMap(){
   const map = {};
@@ -1691,17 +1696,20 @@ async function refreshData(){
 
   // ★ ② ユーザーの区分に応じて、見せるイベントをフィルタ
   const userSegSet = getMemberSegSet();
+  
   const filteredEvents = (state.events||[]).filter(e=>{
-    // e.segment / e.targetSegment / e.attendSegment などの候補から拾う
     const evSeg = e.segment || e.targetSegment || e.attendSegment || e.segmentRaw || "";
     return eventVisibleForUser(evSeg, userSegSet);
   });
-
-  // ★ performers を「ユーザーの区分に合う人」に限定（Homeの集計ずれ防止）
+  
   const nmSeg = buildNameSegMap();
   const allNames = Array.from(new Set((state.members||[]).map(m=>m.performerName).filter(Boolean)));
-  let performersForHome = [];
-  if (userSegSet.has("adult") && !userSegSet.has("child")){
+  let performersForHome;
+  
+  if (!userSegSet || userSegSet.size === 0) {
+    // フォールバック：全員表示
+    performersForHome = allNames;
+  } else if (userSegSet.has("adult") && !userSegSet.has("child")){
     performersForHome = allNames.filter(n => nmSeg[n]==="adult");
   } else if (userSegSet.has("child") && !userSegSet.has("adult")){
     performersForHome = allNames.filter(n => nmSeg[n]==="child");
@@ -1845,13 +1853,22 @@ function buildFormView(){
     const segBadgeCls = evSegNorm==="adult" ? "seg-adult" : evSegNorm==="child" ? "seg-child" : "seg-both";
 
     // ★ このイベントに表示する演奏者（①仕様）
+    // 修正後：ユーザー or 名前側の区分が取れない場合は“絞り込まず全員表示”
+    const userSegSet = getMemberSegSet();
     const performers = uniqueNamesAll.filter(n=>{
       const ms = nameSegMap[n]; // 'adult' / 'child'
-      if (!ms) return false;
+    
+      // フォールバック：ユーザー区分が無い → 全員対象
+      if (!userSegSet || userSegSet.size === 0) return true;
+    
+      // 名前側の区分が未知 → ひとまず含める（除外しない）
+      if (!ms) return true;
+    
       if (evSegNorm==="adult") return ms==="adult";
       if (evSegNorm==="child") return ms==="child";
       if (evSegNorm==="both")  return (ms==="adult" || ms==="child");
-      return false;
+      // イベント側の区分が曖昧なら除外しない
+      return true;
     });
 
     // 未保存有無
@@ -2132,6 +2149,14 @@ async function renderSchedules(initial=false){
       const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
       return eventVisibleForUser(evSeg, segSet);
     });
+    
+    // ユーザー区分が無い場合は UI の区分フィルタも無効扱い（そのまま全件表示）
+    if (segSet && segSet.size > 0) {
+      const uiSeg = $("#selSeg")?.value || "";
+      if (userHasBoth() && uiSeg){
+        arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
+      }
+    }
 
     // ③ 追加：『両方所属』のユーザーだけ区分フィルタを適用
     const uiSeg = $("#selSeg")?.value || "";
