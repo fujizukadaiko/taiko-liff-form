@@ -668,6 +668,23 @@
 </head>
 
 <body>
+  <script>
+  // 画面に即表示する簡易トラッパー（暫定）
+  window.addEventListener('error',  e => {
+    const msg = `[JS ERROR] ${e.message} @ ${e.filename}:${e.lineno}`;
+    console.error(msg, e);
+    document.body.insertAdjacentHTML('afterbegin',
+      `<div style="position:fixed;left:8px;right:8px;top:8px;z-index:9999;background:#fffbe6;border:1px solid #f3d27a;padding:8px;border-radius:8px;font:12px/1.5 system-ui">${msg}</div>`);
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const r = e.reason || {};
+    const msg = `[Promise ERROR] ${r.message || r}`;
+    console.error(msg, e);
+    document.body.insertAdjacentHTML('afterbegin',
+      `<div style="position:fixed;left:8px;right:8px;top:56px;z-index:9999;background:#fffbe6;border:1px solid #f3d27a;padding:8px;border-radius:8px;font:12px/1.5 system-ui">${msg}</div>`);
+  });
+</script>
+  
   <header class="is-sticky">
     <div class="siteTitle">出欠入力と予定確認</div>
     <div class="ver" id="ver"></div>
