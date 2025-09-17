@@ -640,7 +640,10 @@
       justify-content: flex-start;
       margin-top: 4px;
     }
+    /* ===== 出欠：セグメントを独立行にしたときの余白（最小CSS） ===== */
+    .fHead .seg-badge{ margin: 0 0 4px 0; }   /* 上段バッジの下に少し余白 */
   </style>
+  
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -1292,9 +1295,9 @@
   </script>
 <script>
 /* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.9.4";
+const FRONT_VERSION = "Front v2.9.5";
 const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbycjyQ4FZPycvj3ygyBeaOTMGpVY_OtZSRgfA_G-eluNVEpRPMS5DAoFC2QkrnM6FuyCQ/exec";     // ←差し替え
+const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwxoW17g41EL37RiTamH17mg9M1BP0MDn6ZyfG2RMA30Doh1ZCwA9qw_g4-cB3VNZTB6w/exec";     // ←差し替え
 
 /* ===== 状態 ===== */
 let state = {
@@ -1817,149 +1820,166 @@ function renderAttendSelectHTML(evId, name, current){
   `;
 }
 /* ===== 出欠フォーム（アコーディオン＋ドラフト） ===== */
-function buildFormView(){
-  const boxHeader = $("#formEventsBox");
-  const box = $("#formFields");
-  box.innerHTML = "";
-  boxHeader.innerHTML = `
-    <span class="muted">
-      イベントをタップして出欠を入力後、
-      <span class="em-red">送信ボタンを押してください。</span>
-    </span>`;
+(() => {
+  if (window.__AttendBlockV__ && window.__AttendBlockV__ >= 3) return;
+  window.__AttendBlockV__ = 3;
 
-  const eventsForForm = state._filteredEventsForViews || [];
-  if (!eventsForForm.length){
-    box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
-    updateSubmitButton();
-    return;
-  }
-
-  const nameSegMap = buildNameSegMap();
-  const uniqueNamesAll = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
-
-  eventsForForm.forEach(e=>{
-    const ansList = state.answers[e.eventId] || [];
-    const ansMap = {}; ansList.forEach(r => ansMap[r.performerName] = r);
-
-    // 表示用
-    const d = parseYmdStrict(e.date);
-    const dateDisp = ymdDow(d);
-    const timeDisp = hmFromTimeCell(e.time);
-    const place = e.place || "";
-
-    // ★ イベントの対象区分
-    const evSegNorm = normSeg(e.segment || e.targetSegment || e.attendSegment || "");
+  // 1件分のフォームカードHTMLを返す（バッジは1段上に独立行で表示）
+  window.renderAttendEvent = function(ev, ctx){
+    // ctx: { uniqueNamesAll, ansMap, nameSegMap, userSegSet }
+    const dateDisp = ymdDow(parseYmdStrict(ev.date));
+    const timeDisp = hmFromTimeCell(ev.time);
+    const place    = ev.place || "";
+    const evSegNorm = normSeg(ev.segment || ev.targetSegment || ev.attendSegment || "");
     const segBadgeLabel = dispSeg(evSegNorm);
     const segBadgeCls = evSegNorm==="adult" ? "seg-adult" : evSegNorm==="child" ? "seg-child" : "seg-both";
 
-    // ★ このイベントに表示する演奏者（①仕様）
-    // 修正後：ユーザー or 名前側の区分が取れない場合は“絞り込まず全員表示”
-    const userSegSet = getMemberSegSet();
-    const performers = uniqueNamesAll.filter(n=>{
-      const ms = nameSegMap[n]; // 'adult' / 'child'
-    
-      // フォールバック：ユーザー区分が無い → 全員対象
-      if (!userSegSet || userSegSet.size === 0) return true;
-    
-      // 名前側の区分が未知 → ひとまず含める（除外しない）
-      if (!ms) return true;
-    
+    // 表示対象の演奏者を決定（ユーザー/名前側の区分が欠落していれば除外しない＝全表示）
+    const performers = (ctx.uniqueNamesAll||[]).filter(n=>{
+      const ms = ctx.nameSegMap[n]; // 'adult'/'child'/undefined
+      if (!ctx.userSegSet || ctx.userSegSet.size===0) return true; // フォールバック：全員表示
+      if (!ms) return true; // 名前側の区分が未知 → 除外しない
       if (evSegNorm==="adult") return ms==="adult";
       if (evSegNorm==="child") return ms==="child";
       if (evSegNorm==="both")  return (ms==="adult" || ms==="child");
-      // イベント側の区分が曖昧なら除外しない
       return true;
     });
 
-    // 未保存有無
-    const dblock = draft.byEvent[String(e.eventId)];
+    // 未保存バッジ判定
+    const dblock = (draft.byEvent||{})[String(ev.eventId)];
     const hasUnsaved = !!dblock && (
       Object.keys(dblock.members || {}).length > 0 ||
       (dblock.comment||"").trim() !== ""
     );
 
-    // 1) ヘッダー（⑧：区分バッジ追加）
-    const head = document.createElement("div");
-    head.className = "fHead";
-    head.innerHTML = `
-      <div class="fTitle">
-        <div class="fTitleRow" title="${dateDisp} ${timeDisp} @ ${place}">
-          ${segBadgeLabel ? `<span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span>` : ``}
-          <span class="t-date">${dateDisp} <small>${timeDisp||""}</small> @</span>
-          <span class="t-place">${place||""}</span>
-          ${hasUnsaved ? `<span class="badge-unsaved">未保存</span>` : ``}
+    // ステータス行（pill）表示のため、現在値（ドラフト優先）を取得
+    const pills = performers.map(name=>{
+      const current = draftGetAttend(ev.eventId, name) || (ctx.ansMap[name]?.attend || "");
+      let cls="stat-na", label="未回答";
+      if (current==="参加") cls="stat-ok", label="参加";
+      else if (current==="欠席") cls="stat-ng", label="欠席";
+      else if (current==="未定") cls="stat-pd", label="未定";
+      return `<span class="pill sm ${cls}">${name}:${label}</span>`;
+    }).join(" ");
+
+    // セレクト（初回だけplaceholderを出す）
+    const rows = performers.map(name=>{
+      const current = draftGetAttend(ev.eventId, name) || (ctx.ansMap[name]?.attend || "");
+      const placeholderOpt = (current === "")
+        ? `<option value="" disabled hidden selected>（選択してください）</option>` : "";
+      return `
+        <div class="row-att" style="border-top:1px dashed var(--c-border); padding-top:8px; margin-top:8px;">
+          <span class="nameLabel">${name}</span>
+          <select class="attSel selectBtn" data-event="${ev.eventId}" data-name="${name}">
+            ${placeholderOpt}
+            <option value="参加" ${current==="参加"?"selected":""}>参加</option>
+            <option value="欠席" ${current==="欠席"?"selected":""}>欠席</option>
+            <option value="未定" ${current==="未定"?"selected":""}>未定</option>
+          </select>
+        </div>
+      `;
+    }).join("");
+
+    const initComment = draftGetComment(ev.eventId)
+      || ((ctx.ansList||[]).find(x => (x.comment||"").trim())?.comment || "");
+
+    return `
+      <div class="fEvent" data-evt="${ev.eventId}">
+        <div class="fHead">
+          <div class="fTitle">
+            <!-- ★ 区分バッジを独立行で先頭に -->
+            ${segBadgeLabel ? `<div style="margin-bottom:4px;"><span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span></div>` : ``}
+
+            <!-- 日付・時間・場所の行 -->
+            <div class="fTitleRow" title="${dateDisp} ${timeDisp} @ ${place}">
+              <span class="t-date">${dateDisp} <small>${timeDisp||""}</small> @</span>
+              <span class="t-place">${place||""}</span>
+              ${hasUnsaved ? `<span class="badge-unsaved">未保存</span>` : ``}
+            </div>
+          </div>
+          <div class="fStatusRow">${pills}</div>
+          <div class="fSub">${ev.deadline ? `締切：${ev.deadline}` : "締切：—"}</div>
+        </div>
+        <div class="fBody">
+          ${rows}
+          <div class="line"></div>
+          <label>コメント（任意・100文字まで）</label>
+          <input type="text" maxlength="100" class="evComment" data-event="${ev.eventId}" value="${initComment}">
         </div>
       </div>
-      <div class="fStatusRow">
-        ${performers.map(name=>{
-          const a = ansMap[name];
-          let cls="stat-na", label="未回答";
-          const v = draftGetAttend(e.eventId, name) || (a?.attend || "");
-          if (v==="参加") cls="stat-ok", label="参加";
-          else if (v==="欠席") cls="stat-ng", label="欠席";
-          else if (v==="未定") cls="stat-pd", label="未定";
-          return `<span class="pill sm ${cls}">${name}:${label}</span>`;
-        }).join(" ")}
-      </div>
-      <div class="fSub">${e.deadline ? `締切：${e.deadline}` : "締切：—"}</div>
     `;
+  };
 
-    // 2) ボディ（編集フォーム）
-    const body = document.createElement("div");
-    body.className = "fBody";
-    body.innerHTML = `
-      ${performers.map((name)=>{
-        const current = draftGetAttend(e.eventId, name) || (ansMap[name]?.attend || "");
-        return `
-          <div class="row-att" style="border-top:1px dashed var(--c-border); padding-top:8px; margin-top:8px;">
-            <span class="nameLabel">${name}</span>
-            ${renderAttendSelectHTML(e.eventId, name, current)}
-          </div>
-        `;
-      }).join("")}
-      <div class="line"></div>
-      <label>コメント（任意・100文字まで）</label>
-      <input type="text" maxlength="100" class="evComment" data-event="${e.eventId}"
-             value="${ draftGetComment(e.eventId) ||
-                     (ansList.find(x => (x.comment||"").trim())?.comment || "")}">
-    `;
+  // ===== 既存の buildFormView を置換（renderAttendEvent を使用） =====
+  window.buildFormView = function(){
+    const boxHeader = $("#formEventsBox");
+    const box = $("#formFields");
+    box.innerHTML = "";
+    boxHeader.innerHTML = `
+      <span class="muted">
+        イベントをタップして出欠を入力後、
+        <span class="em-red">送信ボタンを押してください。</span>
+      </span>`;
 
-    const card = document.createElement("div");
-    card.className = "fEvent";
-    card.setAttribute("data-evt", e.eventId);
-    card.appendChild(head);
-    card.appendChild(body);
-    head.addEventListener("click", ()=> card.classList.toggle("open"));
-    box.appendChild(card);
-  });
-  // 入力監視（デリゲート）
-  box.addEventListener("change", (ev)=>{
-    const sel = ev.target.closest("select.attSel");
-    if (!sel) return;
-    const eid = sel.dataset.event;
-    const name = sel.dataset.name;
-    const val = sel.value;
-    if (val === "") {
-      // placeholder（未選択）＝ドラフトから除外（既存は保持）
-      draftSetAttend(eid, name, "");
-    } else {
-      draftSetAttend(eid, name, val);
+    const eventsForForm = state._filteredEventsForViews || [];
+    if (!eventsForForm.length){
+      box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
+      updateSubmitButton();
+      return;
     }
-    markUnsavedBadge(eid);
-    updateSubmitButton();
-  });
 
-  box.addEventListener("input", (ev)=>{
-    const c = ev.target.closest("input.evComment");
-    if (!c) return;
-    const eid = c.dataset.event;
-    draftSetComment(eid, c.value);
-    markUnsavedBadge(eid);
-    updateSubmitButton();
-  });
+    const nameSegMap = buildNameSegMap();
+    const uniqueNamesAll = Array.from(new Set((state.members||[]).map(m => m.performerName))).filter(Boolean);
+    const userSegSet = getMemberSegSet();
 
-  updateSubmitButton();
-}
+    // まとめてレンダリング（HTML組み立て）
+    const html = eventsForForm.map(e=>{
+      const ansList = state.answers[e.eventId] || [];
+      const ansMap  = {}; ansList.forEach(r => ansMap[r.performerName] = r);
+      return window.renderAttendEvent({
+        eventId : e.eventId,
+        date    : e.date,
+        time    : e.time,
+        place   : e.place || "",
+        deadline: e.deadline || "",
+        segment : e.segment || e.targetSegment || e.attendSegment || ""
+      }, {
+        uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet
+      });
+    }).join("");
+
+    box.innerHTML = html;
+
+    // アコーディオン開閉
+    box.querySelectorAll(".fEvent .fHead").forEach(h=>{
+      h.addEventListener("click", () => h.closest(".fEvent")?.classList.toggle("open"));
+    });
+
+    // 入力監視（デリゲート）
+    box.addEventListener("change", (ev)=>{
+      const sel = ev.target.closest("select.attSel");
+      if (!sel) return;
+      const eid = sel.dataset.event;
+      const name = sel.dataset.name;
+      const val  = sel.value;
+      draftSetAttend(eid, name, val || "");
+      markUnsavedBadge(eid);
+      updateSubmitButton();
+    });
+
+    box.addEventListener("input", (ev)=>{
+      const c = ev.target.closest("input.evComment");
+      if (!c) return;
+      const eid = c.dataset.event;
+      draftSetComment(eid, c.value);
+      markUnsavedBadge(eid);
+      updateSubmitButton();
+    });
+
+    updateSubmitButton();
+  };
+})();
+/* ===== 出欠フォーム（アコーディオン＋ドラフト） END ===== */
 
 /* ===== 出欠送信（ドラフト一括送信） ===== */
 async function onSubmit(){
@@ -2120,100 +2140,91 @@ async function onRegister(){
 }
 
 /* ===== 今後の予定（Schedules） ===== */
-// init() 内の末尾などで…
-if (userHasBoth()){
-  $("#labSeg").style.display = "";
-  $("#selSeg").style.display = "";
-}
+(() => {
+  if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 4) return;
+  window.__SchedulesBlockV__ = 4;
 
-// renderSchedules() 内：取得後に ②＆③のロジックを適用
-async function renderSchedules(initial=false){
-  const box = $("#schedulesBox");
-  box.innerHTML = `読み込み中… <span class="spinner"></span>`;
-
-  try{
-    const days = Number($("#selDays").value || 60);
-    const kind = $("#selKind").value || "";
-    const url = kind
-      ? `?schedules=1&days=${esc(days)}&kind=${esc(kind)}`
-      : `?schedules=1&days=${esc(days)}`;
-
-    const r = await api(url);
-    if (r.status !== "ok" || !Array.isArray(r.schedules)) {
-      box.innerHTML = `<span class="err">取得に失敗しました</span>`;
-      return;
-    }
-    // ベース：②のユーザー区分フィルタ
-    const segSet = getMemberSegSet();
-    let arr = r.schedules.filter(it => {
-      const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
-      return eventVisibleForUser(evSeg, segSet);
-    });
-    
-    // ユーザー区分が無い場合は UI の区分フィルタも無効扱い（そのまま全件表示）
-    if (segSet && segSet.size > 0) {
-      const uiSeg = $("#selSeg")?.value || "";
-      if (userHasBoth() && uiSeg){
-        arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
-      }
-    }
-
-    // ③ 追加：『両方所属』のユーザーだけ区分フィルタを適用
-    const uiSeg = $("#selSeg")?.value || "";
-    if (userHasBoth() && uiSeg){
-      arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
-    }
-
-    state.schedules = arr;
-    if (!state.schedules.length){
-      box.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
-      return;
-    }
-
-    if (!state.schedules.length){
-      box.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
-      return;
-    }
-     // 先頭の案内文は非表示（出力しない）
-    // const feedUrl = `${API_ENDPOINT}?icsFeed=1`;
-    // let html = `<div class="small muted" style="margin-bottom:8px;">
-    //   ・各予定から「Googleカレンダー」/「iOS(ICS)」に追加できます。購読（自動反映）は下のリンクから登録してください。
-    // </div>`;
-    let html = state.schedules.map(it=>{
-      return `<div class="card">
-        <div><b>${it.date} ${it.time||""}</b> @ ${it.place||""}</div>
-        <div class="small muted">${dispSeg(normSeg(it.segment||""))} ${it.kind||""} ${it.title||""}</div>
-        ${it.memo?`<div class="small">${it.memo}</div>`:""}
-      </div>`;
-    }).join("");
-
-   // html += `
-   //   <div class="card" style="margin-top:12px;">
-   //     <div class="sectionTitle" style="margin:0 0 8px;">購読（自動反映）</div>
-   //     <div class="small muted">以下のURLをカレンダーアプリの「カレンダーを購読」等の項目に貼り付けてください。</div>
-   //     <div class="row" style="margin-top:6px; gap:8px; flex-wrap:wrap;">
-   //       <input type="text" id="icsFeedUrl" value="${feedUrl}" style="flex:1; min-width:240px;" readonly>
-   //       <button class="ghost" onclick="copyIcsFeed()">コピー</button>
-   //       <button class="ghost" onclick="window.open('${feedUrl}','_blank')">開く</button>
-   //     </div>
-   //     <div class="small muted" style="margin-top:6px;">
-   //       ※ Googleカレンダーに購読を追加する場合は、Googleカレンダーの「他のカレンダー」→「URL で追加」から登録してください。
-   //     </div>
-   //   </div>
-   // `;
-
-    box.innerHTML = html;
-
-  }catch(err){
-    box.innerHTML = `<span class="err">エラー: ${err.message||err}</span>`;
+  // 表示専用：1件カード
+  function renderScheduleCard(it){
+    const seg = dispSeg(normSeg(it.segment||it.targetSegment||it.attendSegment||""));
+    const titleLine = [seg, it.kind||"", it.title||""].filter(Boolean).join(" ");
+    const memoLine  = it.memo ? `<div class="small">${it.memo}</div>` : "";
+    return `<div class="card">
+      <div><b>${it.date} ${it.time||""}</b> @ ${it.place||""}</div>
+      <div class="small muted">${titleLine}</div>
+      ${memoLine}
+    </div>`;
   }
-}
-function copyIcsFeed(){
-  const ipt = $("#icsFeedUrl");
-  ipt.select();
-  document.execCommand("copy");
-  alert("購読URLをコピーしました");
-}
+
+  // 表示専用：リスト全体（他所からも使えるよう公開）
+  window.renderSchedulesView = function(list){
+    if (!Array.isArray(list) || list.length===0) {
+      return `<div class="listEmpty">該当する予定はありません</div>`;
+    }
+    return list.map(renderScheduleCard).join("");
+  };
+
+  // 区分フィルタの表示/非表示を更新
+  function exposeSegFilterIfNeeded(){
+    if (typeof updateSegFilterUI === "function") updateSegFilterUI();
+  }
+
+  // 取得〜表示の本体
+  window.renderSchedules = async function(initial=false){
+    const box = $("#schedulesBox");
+    box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+
+    try{
+      if (initial) exposeSegFilterIfNeeded();
+
+      const days = Number($("#selDays").value || 60);
+      const kind = $("#selKind").value || "";
+      const url = kind
+        ? `?schedules=1&days=${esc(days)}&kind=${esc(kind)}`
+        : `?schedules=1&days=${esc(days)}`;
+
+      const r = await api(url);
+      if (r.status !== "ok" || !Array.isArray(r.schedules)) {
+        box.innerHTML = `<span class="err">取得に失敗しました</span>`;
+        return;
+      }
+
+      // ② ユーザー区分ベースのフィルタ
+      const segSet = getMemberSegSet();
+      let arr = r.schedules.filter(it => {
+        const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
+        return eventVisibleForUser(evSeg, segSet);
+      });
+
+      // ③ 『両方所属』ユーザーだけ UI の区分フィルタを適用
+      if (segSet && segSet.size > 0 && userHasBoth()){
+        const uiSeg = $("#selSeg")?.value || "";
+        if (uiSeg){
+          arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
+        }
+      }
+
+      state.schedules = arr;
+      box.innerHTML = window.renderSchedulesView(state.schedules);
+
+    }catch(err){
+      box.innerHTML = `<span class="err">エラー: ${err.message||err}</span>`;
+    }
+  };
+
+  // 互換ラッパ（外部から手動再読込したい場合）
+  window.loadSchedules = function(){ renderSchedules(false); };
+
+  // （必要なら）ICS購読URLコピー
+  window.copyIcsFeed = function(){
+    const ipt = $("#icsFeedUrl");
+    if (!ipt) return;
+    ipt.select();
+    document.execCommand("copy");
+    alert("購読URLをコピーしました");
+  };
+})();
+/* ===== 今後の予定（Schedules） END ===== */
 
 /* ===== 予定登録（管理者） ===== */
 // 種別変更に応じて UI を制御（練習=集合場所/配信フラグ/締切日も無効化）
