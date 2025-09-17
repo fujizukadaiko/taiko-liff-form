@@ -2269,7 +2269,7 @@ function addPerformerField(value="", segValue="子どもの部"){
   row.innerHTML = `
     <label for="${id}" class="perfLabel">演奏者名</label>
     <input type="text" id="${id}" class="regPerf" value="${value||""}" placeholder="例：藤塚 太郎">
-    <select class="regPerfSeg selectBtn" style="height:44px;">
+    <select class="regPerfSeg selectBtn">
      <option value="子どもの部" ${segValue==="子どもの部"?"selected":""}>子どもの部</option>
      <option value="大人の部"   ${segValue==="大人の部"  ?"selected":""}>大人の部</option>
    </select>
