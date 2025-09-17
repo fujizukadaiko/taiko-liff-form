@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.0.0";
+  const FRONT_VERSION = "Front v3.0.1";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwxoW17g41EL37RiTamH17mg9M1BP0MDn6ZyfG2RMA30Doh1ZCwA9qw_g4-cB3VNZTB6w/exec";     // ←差し替え
 
@@ -1026,7 +1026,8 @@
       events: [],          // [{id, ymd, hm, place, deadline, isNew, segment}]
       ansMap: {},          // { eventId: [{name, answer}] }
       names : [],          // 登録演奏者
-      onlyNA: true
+      onlyNA: true,
+      nameSegMap: {}       // { [name]: 'adult'|'child' }
     };
   
     /* 参照 */
@@ -1084,21 +1085,37 @@
       return 'stat-na';
     }
   
-    function summarizeForNames(answerList){
-      const namesCnt = S.names.length;
-      const list = Array.isArray(answerList) ? answerList : [];
-      let hasPending = false, decidedCnt = 0;
-      for (const a of list){
-        const v = (a?.answer || '').trim();
-        if (v === '未定') { hasPending = true; }
-        if (v === '参加' || v === '欠席') decidedCnt++;
-      }
-      if (hasPending) return { label:'未定あり', cls:'stat-pd', key:'pending' };
-      if (namesCnt === 0) return { label:'未回答', cls:'stat-na', key:'na' };
-      if (decidedCnt === 0) return { label:'未回答', cls:'stat-na', key:'na' };
-      if (decidedCnt >= namesCnt) return { label:'回答済', cls:'stat-ok', key:'done' };
-      return { label:'一部未回答', cls:'stat-pd', key:'partial' };
+    function summarizeForEvent(ev){
+    const evSeg = normSeg(ev.segment || ev.targetSegment || ev.attendSegment || '');
+    const answers = Array.isArray(S.ansMap[ev.id]) ? S.ansMap[ev.id] : [];
+    const byName = new Map(answers.map(a => [String(a?.name || a?.member || ''), a]));
+
+    // 該当者だけ（イベント区分と名前の区分が一致する人）を対象にする
+    const eligible = S.names.filter(n => {
+      const ns = S.nameSegMap[n]; // 'adult' | 'child' | undefined
+      if (!evSeg || evSeg === 'both') return true;            // 両方は全員対象
+      if (!ns) return true;                                   // 区分不明は除外しない（後方互換）
+      return ns === evSeg;
+    });
+
+    const total = eligible.length;
+    if (total === 0) return { label:'未回答', cls:'stat-na', key:'na' }; // 念のため
+
+    let missing = 0, hasPending = false, decidedCnt = 0;
+    for (const n of eligible){
+      const rec = byName.get(n);
+      if (!rec){ missing++; continue; }
+      const v = (rec.answer || '').trim();
+      if (v === '未定') hasPending = true;
+      if (v === '参加' || v === '欠席') decidedCnt++;
     }
+
+   if (missing > 0)        return { label:'一部未回答', cls:'stat-pd', key:'partial' };
+    if (hasPending)         return { label:'未定あり',   cls:'stat-pd', key:'pending' };
+    if (decidedCnt === 0)   return { label:'未回答',     cls:'stat-na', key:'na' };
+    if (decidedCnt === total) return { label:'回答済',   cls:'stat-ok', key:'done' };
+    return { label:'一部未回答', cls:'stat-pd', key:'partial' };
+  }
   
     function rowHtml(ev, sum){
       const dateStr  = ev.ymd || ev.date || '';
@@ -1149,7 +1166,7 @@
       });
       const rows = [];
       for (const ev of list){
-        const sum = summarizeForNames(S.ansMap[ev.id]);
+        const sum = summarizeForEvent(ev);
         if (S.onlyNA && !(sum.key === 'na' || sum.key === 'partial' || sum.key === 'pending')) continue;
         rows.push(rowHtml(ev, sum));
       }
@@ -1194,10 +1211,11 @@
     /* 公開API */
     const API = {
       __v: 7,
-      mount({events = [], myAnswersMap = {}, performers = []} = {}){
+      mount({events = [], myAnswersMap = {}, performers = [], nameSegMap = {}} = {}){
         S.events = Array.isArray(events) ? events : [];
         S.ansMap = myAnswersMap || {};
         S.names  = Array.isArray(performers) ? performers : [];
+        S.nameSegMap = nameSegMap || {};2
         const n = E.ckN(); if (n) S.onlyNA = !!n.checked;
         render();
       },
@@ -1255,11 +1273,17 @@
   
         const members = membersArray || (window.state && Array.isArray(window.state.members) ? window.state.members : []);
         const performers = Array.from(new Set(members.map(m => m.performerName).filter(Boolean)));
+        const nameSegMap = {};
+        members.forEach(m=>{
+          const n = (m.performerName||'').trim();
+          const s = normSeg(m.segment || m.区分 || '');
+          if (n && s) nameSegMap[n] = s;
+        });
   
         window.__HOME_EVENTS__   = events;
         window.__HOME_ANSWERS__  = map;
         window.__HOME_MEMBERS__  = performers;
-        window.renderEventsDense({ events, myAnswersMap: map, performers });
+        window.renderEventsDense({ events, myAnswersMap: map, performers, nameSegMap });
       } catch (err){
         console.error('renderHomeFromRaw failed:', err);
       }
@@ -1715,6 +1739,7 @@ function bootHomeQuickRender(){
   const performers = Array.from(
     new Set((state.members||[]).map(m=>m.performerName).filter(Boolean))
   );
+  const nameSegMap = buildNameSegMap(); // 既存のヘルパーを利用
 
   const events = filteredEvents.map(x => ({
     id      : String(x.eventId ?? x.id ?? ''),
@@ -1726,7 +1751,7 @@ function bootHomeQuickRender(){
     segment : x.segment || x.targetSegment || x.attendSegment || ""
   }));
 
-  window.HomeEventsUI?.mount({ events, myAnswersMap: {}, performers });
+  window.HomeEventsUI?.mount({ events, myAnswersMap: {}, performers, nameSegMap });
   // フォーム側でも使えるよう保持
   state._filteredEventsForViews = filteredEvents;
 }
@@ -1755,8 +1780,9 @@ function mountHomeWithFilters(){
   const performers = Array.from(
     new Set((state.members||[]).map(m=>m.performerName).filter(Boolean))
   );
+  const nameSegMap = buildNameSegMap();
 
-  window.HomeEventsUI?.mount({ events, myAnswersMap, performers });
+  window.HomeEventsUI?.mount({ events, myAnswersMap, performers, nameSegMap });
 }
 
 /* ===== データ読み直し（段階表示 & キャッシュ対応） ===== */
