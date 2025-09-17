@@ -4,7 +4,26 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>公演 出欠フォーム</title>
+  
+<!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
+<script>
+  // 以後、このブロックだけを更新してください
+  /* ===== 設定 ===== */
+  const FRONT_VERSION = "Front v2.9.6";
+  const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwxoW17g41EL37RiTamH17mg9M1BP0MDn6ZyfG2RMA30Doh1ZCwA9qw_g4-cB3VNZTB6w/exec";     // ←差し替え
 
+  // （オプション）設定チェック：重複定義や未設定を早期に気づけます
+  (function(){
+    if (!FRONT_VERSION || !LIFF_ID || !API_ENDPOINT) {
+      console.warn("[config] 設定が未入力の項目があります。FRONT_VERSION/LIFF_ID/API_ENDPOINT を確認してください。");
+    }
+    // window.__APP_CONFIG__ として他スクリプトから参照も可
+    window.__APP_CONFIG__ = { FRONT_VERSION, LIFF_ID, API_ENDPOINT };
+  })();
+</script>
+<!-- ===== /設定（共通） v1 ===== -->
+  
   <!-- Google Fonts（本文=ゴシック / 見出し=明朝） -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -815,8 +834,10 @@
           <div class="sectionTitle" style="margin:0;">現在登録中のイベント一覧</div>
           <span class="small muted">タップで開閉</span>
         </div>
+      
         <div class="fBody">
-           <div class="row" style="gap:12px; align-items:flex-end; margin:6px 0;">
+          <!-- 上部のコントロール列 -->
+          <div class="row" style="gap:12px; align-items:flex-end; margin:6px 0;">
             <div>
               <label>一覧の表示期間（日数）</label>
               <select id="ad_days" class="selectBtn">
@@ -825,7 +846,8 @@
                 <option value="90">90日</option>
               </select>
             </div>
-             <!-- ★ 追加：対象区分フィルタ -->
+      
+            <!-- 追加：対象区分フィルタ -->
             <div>
               <label>対象区分フィルタ</label>
               <select id="ad_seg_filter" class="selectBtn">
@@ -835,15 +857,17 @@
                 <option value="both">両方</option>
               </select>
             </div>
+      
             <div style="margin-left:auto;">
-              <button id="btnAdminFetch" class="btn btn-ghost btn-sm">一覧を取得</button>
+              <button id="btnAdminFetch" class="btn btn-ghost btn-sm" type="button">一覧を取得</button>
             </div>
           </div>
-            </div>
-          </div>
+      
+          <!-- ★ 一覧の描画先はアコーディオンの『中』 -->
           <div id="adminListBoxTop" class="muted">読み込み待機中</div>
         </div>
       </div>
+      <!-- ★ ここまでがアコーディオン -->
       <div class="card">
         <div class="row-space">
           <div class="sectionTitle" id="adminFormTitle">新規登録</div>
@@ -975,17 +999,17 @@
     });
   </script>
 
-  <!-- ===== HomeEventsUI v6 ===== -->
+  <!-- ===== HomeEventsUI v7 ===== -->
   <script>
   (function(){
-    if (window.HomeEventsUI && window.HomeEventsUI.__v === 6) return;
+    if (window.HomeEventsUI && window.HomeEventsUI.__v === 7) return;
   
     /* 状態 */
     const S = {
-      events: [],          // [{id, ymd, hm, place, deadline, isNew}]
+      events: [],          // [{id, ymd, hm, place, deadline, isNew, segment}]
       ansMap: {},          // { eventId: [{name, answer}] }
-      names : [],          // ★ 登録演奏者（期待人数の基準）["猪股 千尋","こうしくん",...]
-      onlyNA: true         // 「未回答のみ」= 未回答/一部未回答/未定あり を表示
+      names : [],          // 登録演奏者
+      onlyNA: true
     };
   
     /* 参照 */
@@ -994,63 +1018,34 @@
       ckN : () => document.getElementById('homeOnlyNA'),
     };
   
-    /* ---- 表示系 CSS（上乗せ） ---- */
+    /* 追加CSS（最小変更） */
     const css = document.createElement('style');
     css.textContent = `
       .evList { margin-top: 6px; }
-    
       .eventRow{
-        display:block;
-        border:1px solid var(--c-border);
-        border-radius:12px;
-        background:#fff;
-        padding:10px 12px;
-        margin:8px 0;
+        display:block;border:1px solid var(--c-border);border-radius:12px;background:#fff;
+        padding:10px 12px;margin:8px 0;
       }
-      .eventMeta{ min-width:0; }
-    
-      /* 1行目：左=出欠バッジ / 右=NEW */
       .eventHead{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:8px;
-        margin-bottom:6px;
+        display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;
       }
-    
-      /* 2行目：日付 時刻 @ 場所（B案） */
+      .eventHead-left{ display:flex; align-items:center; gap:6px; }
+      .eventHead-right{ display:flex; align-items:center; gap:6px; margin-left:auto; }
+      .badge-new{
+        display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;height:22px;
+        border-radius:999px;font-size:11px;font-weight:600;color: var(--c-primary-2);
+        border:1.5px solid var(--c-primary-2);background:#fff;white-space:nowrap;
+      }
       .eventTitle{ display:flex; align-items:baseline; gap:4px; font-weight:700; font-size:15px; line-height:1.45; }
       .eventTitle .title-date{ white-space:nowrap; flex:0 0 auto; }
       .eventTitle .title-place{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto; }
-    
-      /* 3行目：締切 */
       .eventSub{ font-size:12px; color:var(--c-muted); margin-top:2px; }
-      .deadline{ color:#666; }
-      .deadline-soon{ color:#c33; font-weight:600; }
-    
-      /* NEWバッジ：ボタンのアウトライン風 */
-      .badge-new{
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        padding:2px 8px;
-        height:22px;                 /* pill.sm と同じ背丈感 */
-        border-radius:999px;
-        font-size:11px;
-        font-weight:600;
-        color: var(--c-primary-2);
-        border:1.5px solid var(--c-primary-2);
-        background:#fff;
-        white-space:nowrap;
-      }
-      
-      /* 詳細（家族別チップ） */
-      .eventDetail{ display:none; padding:6px 6px 0 6px; }
-      .eventRow.open + .eventDetail { display:block; }
+      .deadline{ color:#666; } .deadline-soon{ color:#c33; font-weight:600; }
+      /* 区分バッジは既存 .seg-badge / .seg-adult / .seg-child / .seg-both を利用 */
     `;
     document.head.appendChild(css);
   
-    /* ---- Util ---- */
+    /* Util */
     function parseYmd(s){
       if (!s) return null;
       const m = String(s).match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
@@ -1058,16 +1053,12 @@
       const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
       return isNaN(d) ? null : d;
     }
-  
     function deadlineClass(deadlineStr){
-      const d = parseYmd(deadlineStr);
-      if (!d) return '';
+      const d = parseYmd(deadlineStr); if (!d) return '';
       const today = new Date(); today.setHours(0,0,0,0);
       const diff = Math.floor((d - today)/86400000);
-      // 3日前（diff <= 3）以降は赤。超過（負）もこのクラスで赤
       return (diff <= 3) ? 'deadline-soon' : '';
     }
-  
     function ansClass(v){
       if (!v || v === '未回答') return 'stat-na';
       if (v === '未定')        return 'stat-pd';
@@ -1076,38 +1067,19 @@
       return 'stat-na';
     }
   
-    /* ====== バッジ判定（要件準拠） ======
-       ① 回答済み       : names 全員が「参加」or「欠席」
-       ② 未回答         : names 全員が回答登録なし（＝回答0件）
-       ③ 一部未回答     : 参加/欠席の回答はあるが、未登録者がいる（未定の人がいれば④に上書き）
-       ④ 未定あり       : 1人でも「未定」がいれば最優先で未定あり（他の人の状態は不問）
-    ====================================== */
     function summarizeForNames(answerList){
       const namesCnt = S.names.length;
       const list = Array.isArray(answerList) ? answerList : [];
-  
-      let hasPending = false;
-      let decidedCnt = 0; // 参加/欠席の人数
-  
+      let hasPending = false, decidedCnt = 0;
       for (const a of list){
         const v = (a?.answer || '').trim();
         if (v === '未定') { hasPending = true; }
         if (v === '参加' || v === '欠席') decidedCnt++;
       }
-  
-      // ④ 未定あり（最優先）
       if (hasPending) return { label:'未定あり', cls:'stat-pd', key:'pending' };
-  
-      // names が未登録なら未回答扱い（フォーム未作成の意味合い）
       if (namesCnt === 0) return { label:'未回答', cls:'stat-na', key:'na' };
-  
-      // ② 未回答（誰も参加/欠席を選んでいない）
       if (decidedCnt === 0) return { label:'未回答', cls:'stat-na', key:'na' };
-  
-      // ① 全員が参加/欠席なら回答済
       if (decidedCnt >= namesCnt) return { label:'回答済', cls:'stat-ok', key:'done' };
-  
-      // ③ 上記いずれでもなく、参加/欠席はあるが欠けがある
       return { label:'一部未回答', cls:'stat-pd', key:'partial' };
     }
   
@@ -1119,23 +1091,30 @@
       const dl       = ev.deadline || ev.limit || ev.deadlineYmd || '';
       const dlCls    = `deadline ${deadlineClass(dl)}`;
       const atMark   = place ? ' @' : '';
-    
+      // 区分（左）バッジ
+      const segNorm  = normSeg(ev.segment || '');
+      const segLbl   = dispSeg(segNorm);
+      const segCls   = segNorm==='adult' ? 'seg-adult' : segNorm==='child' ? 'seg-child' : 'seg-both';
+      const segBadge = segLbl ? `<span class="seg-badge ${segCls}">${segLbl}</span>` : '';
+  
       return `
         <div class="eventRow" data-evt="${ev.id}">
           <div class="eventMeta">
-    
-            <!-- 1行目：左=出欠 / 右=NEW -->
+            <!-- 1行目：左=区分 / 右=回答ステータス + NEW -->
             <div class="eventHead">
-              <span class="pill sm ${sum.cls}">${sum.label}</span>
-              ${newBadge}
+              <div class="eventHead-left">${segBadge}</div>
+              <div class="eventHead-right">
+                <span class="pill sm ${sum.cls}">${sum.label}</span>
+                ${newBadge}
+              </div>
             </div>
-    
-            <!-- 2行目：B案（場所のみ省略可能） -->
+  
+            <!-- 2行目：日付 時刻 @ 場所 -->
             <div class="eventTitle" title="${dateStr}${hm ? ` ${hm}` : ''}${atMark} ${place}">
               <span class="title-date">${dateStr}${hm ? ` <small>${hm}</small>` : ''}${atMark}</span>
               <span class="title-place">${place}</span>
             </div>
-    
+  
             <!-- 3行目：締切 -->
             <div class="eventSub">締切：<span class="${dlCls}">${dl || '—'}</span></div>
           </div>
@@ -1145,32 +1124,25 @@
     }
   
     function render(){
-      const box = E.box();
-      if (!box) return;
-  
-      // 昇順ソート（日付不明は末尾）
+      const box = E.box(); if (!box) return;
       const list = (S.events || []).slice().sort((a,b) => {
         const da = parseYmd(a.ymd || a.date) || new Date(8640000000000000);
         const db = parseYmd(b.ymd || b.date) || new Date(8640000000000000);
         return da - db;
       });
-  
       const rows = [];
       for (const ev of list){
         const sum = summarizeForNames(S.ansMap[ev.id]);
-        // 未回答のみ= 未回答/一部未回答/未定あり を通す
         if (S.onlyNA && !(sum.key === 'na' || sum.key === 'partial' || sum.key === 'pending')) continue;
         rows.push(rowHtml(ev, sum));
       }
       box.innerHTML = rows.length ? `<div class="evList">${rows.join('')}</div>`
                                   : '<div class="listEmpty">該当する公演はありません</div>';
   
-      // 詳細（家族別チップ）Lazyレンダリング
+      // 詳細: 家族別チップ
       box.querySelectorAll('.eventRow').forEach(row => {
         row.addEventListener('click', (e) => {
-          // pill（出欠バッジ）や NEW バッジはトグル対象から除外
-          if (e.target.closest('.pill, .badge-new')) return;
-      
+          if (e.target.closest('.pill, .badge-new, .seg-badge')) return;
           const id  = row.getAttribute('data-evt');
           const det = box.querySelector(`.eventDetail[data-detail="${id}"]`);
           if (!det) return;
@@ -1192,7 +1164,7 @@
       });
     }
   
-    // 「未回答のみ」
+    // 未回答のみチェック
     document.addEventListener('DOMContentLoaded', () => {
       const n = E.ckN();
       if (n){
@@ -1204,7 +1176,7 @@
   
     /* 公開API */
     const API = {
-      __v: 6,
+      __v: 7,
       mount({events = [], myAnswersMap = {}, performers = []} = {}){
         S.events = Array.isArray(events) ? events : [];
         S.ansMap = myAnswersMap || {};
@@ -1218,13 +1190,9 @@
       render
     };
     window.HomeEventsUI = API;
-    window.renderEventsDense = API.mount; // 互換
+    window.renderEventsDense = API.mount;
   
-    /* ====== 自動ブート ======
-       1) __HOME_EVENTS__/__HOME_ANSWERS__/__HOME_MEMBERS__ があれば mount
-       2) 'home:data' カスタムイベント待機
-       3) 300ms × 5秒ポーリング
-    ===================================== */
+    // 自動ブート（既存互換はそのまま）
     function tryMountFromGlobals(){
       const ev = window.__HOME_EVENTS__;
       const mp = window.__HOME_ANSWERS__;
@@ -1237,11 +1205,7 @@
     }
     window.addEventListener('home:data', (e)=>{
       const d = e.detail || {};
-      API.mount({
-        events: d.events || [],
-        myAnswersMap: d.myAnswersMap || {},
-        performers: d.performers || []
-      });
+      API.mount({ events: d.events||[], myAnswersMap: d.myAnswersMap||{}, performers: d.performers||[] });
     });
     if (!tryMountFromGlobals()){
       let waited = 0;
@@ -1251,12 +1215,7 @@
       }, 300);
     }
   
-    /* ===== ブリッジ関数（既存ロジックから渡すだけ） =====
-       window.renderHomeFromRaw(openList, myFamilyAnswers, membersArray?)
-       - openList: state.events そのまま
-       - myFamilyAnswers: [{eventId, name, answer}] の配列
-       - membersArray: state.members そのまま or 省略可（window.state.members から拾う）
-    -------------------------------------------------------- */
+    // ブリッジ関数（互換）
     window.renderHomeFromRaw = function(openList, myFamilyAnswers, membersArray){
       try {
         const events = (openList || []).map(x => ({
@@ -1265,7 +1224,8 @@
           hm      : x.hm ?? x.time ?? '',
           place   : x.place ?? x.venue ?? x.location ?? '',
           deadline: x.deadline ?? x.limit ?? x.deadlineYmd ?? '',
-          isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true)
+          isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true),
+          segment : x.segment || x.targetSegment || x.attendSegment || "" // ★ 追加：区分
         }));
   
         const map = {};
@@ -1273,13 +1233,9 @@
           const eid = a.eventId ?? a.id ?? a.eid ?? '';
           if (!eid) continue;
           if (!map[eid]) map[eid] = [];
-          map[eid].push({
-            name  : a.name ?? a.member ?? '',
-            answer: (a.answer ?? '').trim() || '未回答'
-          });
+          map[eid].push({ name: a.name ?? a.member ?? '', answer: (a.answer ?? '').trim() || '未回答' });
         }
   
-        // 登録演奏者（期待人数の基準）
         const members = membersArray || (window.state && Array.isArray(window.state.members) ? window.state.members : []);
         const performers = Array.from(new Set(members.map(m => m.performerName).filter(Boolean)));
   
@@ -1293,12 +1249,9 @@
     };
   })();
   </script>
-<script>
-/* ===== 設定 ===== */
-const FRONT_VERSION = "Front v2.9.5";
-const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwxoW17g41EL37RiTamH17mg9M1BP0MDn6ZyfG2RMA30Doh1ZCwA9qw_g4-cB3VNZTB6w/exec";     // ←差し替え
+  <!-- ===== HomeEventsUI v7 END ===== -->
 
+<script>
 /* ===== 状態 ===== */
 let state = {
   lineId: "",
@@ -2139,12 +2092,20 @@ async function onRegister(){
   }
 }
 
-/* ===== 今後の予定（Schedules） ===== */
+<!-- ===== 今後の予定（Schedules） v5 ===== -->
+<script>
 (() => {
-  if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 4) return;
-  window.__SchedulesBlockV__ = 4;
+  if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 5) return;
+  window.__SchedulesBlockV__ = 5;
 
-  // 表示専用：1件カード
+  function parseYmdStrictLocal(s){
+    const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+    if (!m) return null;
+    const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
+    return isNaN(d) ? null : d;
+  }
+  function addDays(d, n){ const x = new Date(d.getTime()); x.setDate(x.getDate()+n); x.setHours(0,0,0,0); return x; }
+
   function renderScheduleCard(it){
     const seg = dispSeg(normSeg(it.segment||it.targetSegment||it.attendSegment||""));
     const titleLine = [seg, it.kind||"", it.title||""].filter(Boolean).join(" ");
@@ -2156,7 +2117,6 @@ async function onRegister(){
     </div>`;
   }
 
-  // 表示専用：リスト全体（他所からも使えるよう公開）
   window.renderSchedulesView = function(list){
     if (!Array.isArray(list) || list.length===0) {
       return `<div class="listEmpty">該当する予定はありません</div>`;
@@ -2164,12 +2124,10 @@ async function onRegister(){
     return list.map(renderScheduleCard).join("");
   };
 
-  // 区分フィルタの表示/非表示を更新
   function exposeSegFilterIfNeeded(){
     if (typeof updateSegFilterUI === "function") updateSegFilterUI();
   }
 
-  // 取得〜表示の本体
   window.renderSchedules = async function(initial=false){
     const box = $("#schedulesBox");
     box.innerHTML = `読み込み中… <span class="spinner"></span>`;
@@ -2177,11 +2135,11 @@ async function onRegister(){
     try{
       if (initial) exposeSegFilterIfNeeded();
 
-      const days = Number($("#selDays").value || 60);
-      const kind = $("#selKind").value || "";
-      const url = kind
-        ? `?schedules=1&days=${esc(days)}&kind=${esc(kind)}`
-        : `?schedules=1&days=${esc(days)}`;
+      const daysSel = Number($("#selDays").value || 60);
+      const kindSel = $("#selKind").value || "";
+      const url = kindSel
+        ? `?schedules=1&days=${esc(daysSel)}&kind=${esc(kindSel)}`
+        : `?schedules=1&days=${esc(daysSel)}`;
 
       const r = await api(url);
       if (r.status !== "ok" || !Array.isArray(r.schedules)) {
@@ -2189,14 +2147,31 @@ async function onRegister(){
         return;
       }
 
-      // ② ユーザー区分ベースのフィルタ
+      // 0) まずは取得結果をベースに
+      let arr = r.schedules.slice();
+
+      // 1) 表示期間（日数）フロントでも保障
+      const today = new Date(); today.setHours(0,0,0,0);
+      const until = addDays(today, daysSel);
+      arr = arr.filter(it=>{
+        const d = parseYmdStrictLocal(it.ymd || it.date);
+        if (!d) return false;
+        return (d >= today) && (d <= until);
+      });
+
+      // 2) 種別フィルタ（フロントでも保障）
+      if (kindSel){
+        arr = arr.filter(it => String(it.kind||"").trim() === kindSel);
+      }
+
+      // 3) ユーザー区分ベースのフィルタ
       const segSet = getMemberSegSet();
-      let arr = r.schedules.filter(it => {
+      arr = arr.filter(it => {
         const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
         return eventVisibleForUser(evSeg, segSet);
       });
 
-      // ③ 『両方所属』ユーザーだけ UI の区分フィルタを適用
+      // 4) 『両方所属』ユーザーだけ UI の区分フィルタを適用
       if (segSet && segSet.size > 0 && userHasBoth()){
         const uiSeg = $("#selSeg")?.value || "";
         if (uiSeg){
@@ -2212,10 +2187,8 @@ async function onRegister(){
     }
   };
 
-  // 互換ラッパ（外部から手動再読込したい場合）
   window.loadSchedules = function(){ renderSchedules(false); };
 
-  // （必要なら）ICS購読URLコピー
   window.copyIcsFeed = function(){
     const ipt = $("#icsFeedUrl");
     if (!ipt) return;
@@ -2224,7 +2197,8 @@ async function onRegister(){
     alert("購読URLをコピーしました");
   };
 })();
-/* ===== 今後の予定（Schedules） END ===== */
+</script>
+<!-- ===== 今後の予定（Schedules） v5 END ===== -->
 
 /* ===== 予定登録（管理者） ===== */
 // 種別変更に応じて UI を制御（練習=集合場所/配信フラグ/締切日も無効化）
