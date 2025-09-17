@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v2.9.8";
+  const FRONT_VERSION = "Front v2.9.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwxoW17g41EL37RiTamH17mg9M1BP0MDn6ZyfG2RMA30Doh1ZCwA9qw_g4-cB3VNZTB6w/exec";     // ←差し替え
 
@@ -2499,78 +2499,125 @@ async function adminSubmit(){
   }
 }
  async function adminListFetch(){
-   try{
-     const top = document.getElementById('adminListBoxTop');
-     if (top) top.innerHTML = `読み込み中… <span class="spinner"></span>`;
+  try{
+    const top = document.getElementById('adminListBoxTop');
+    if (top) top.innerHTML = `読み込み中… <span class="spinner"></span>`;
 
-     const days = Number($("#ad_days").value || 60);
-     const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
+    const days = Number($("#ad_days").value || 60);
+    const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
 
-     if (r.status !== "ok" || !Array.isArray(r.items)){
-       if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
-       return;
-     }
-     if (r.items.length === 0){
-       if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
-       return;
-     }
+    if (r.status !== "ok" || !Array.isArray(r.items)){
+      if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
+      return;
+    }
+    if (r.items.length === 0){
+      if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+      return;
+    }
 
-     // 正規化（★ここはそのまま）
-     const items = r.items.map(raw => ({
-       id: raw.id || "",
-       type: raw.type || "",
-       title: raw.title || "",
-       ymd: raw.ymd || "",
-       hm: raw.hm || "",
-       place: raw.place || "",
-       meetAt: raw.meetAt || "",
-       meetPlace: raw.meetPlace || "",
-       attendTarget: raw.attendTarget || "N",
-       deadline: raw.deadline || "",
-       publish: raw.publish || "No",
-       status: raw.status || "archived",
-       flag: raw.flag || "N",
-       segment: raw.segment || raw.targetSegment || raw.attendSegment || ""
-     }));
+    // 正規化して「生配列」を保持（ここではフィルタしない）
+    const raw = r.items.map(raw => ({
+      id: raw.id || "",
+      type: raw.type || "",
+      title: raw.title || "",
+      ymd: raw.ymd || "",
+      hm: raw.hm || "",
+      place: raw.place || "",
+      meetAt: raw.meetAt || "",
+      meetPlace: raw.meetPlace || "",
+      attendTarget: raw.attendTarget || "N",
+      deadline: raw.deadline || "",
+      publish: raw.publish || "No",
+      status: raw.status || "archived",
+      flag: raw.flag || "N",
+      segment: raw.segment || raw.targetSegment || raw.attendSegment || ""
+    }));
 
-    // ★ 生配列を保存（ここではフィルタしない）
-    state.adminItemsRaw = items;
-    // ★ 編集用マップは全件で作る（フィルタ後も編集できるように）
+    // ★ 生配列を保存（上書き禁止：この配列を常に基準にする）
+    state.adminItemsRaw = raw;
+
+    // 編集用マップは「全件」から作る（ローカル絞り込み後も編集できるように）
     adminItemsMap = {};
-    items.forEach(it => { adminItemsMap[String(it.id)] = it; });
-    // ★ 描画はローカル描画関数に任せる（現在のセレクト値で即反映）
+    raw.forEach(it => { adminItemsMap[String(it.id)] = it; });
+
+    // 現在のUI値でローカル描画
     adminListRenderLocal();
-   }catch(err){
-     const msg = `<span class="err">エラー：${err.message||err}</span>`;
-     const topEl = document.getElementById('adminListBoxTop');
-     if (topEl) topEl.innerHTML = msg;
-   }
- }
+
+  }catch(err){
+    const msg = `<span class="err">エラー：${err.message||err}</span>`;
+    const topEl = document.getElementById('adminListBoxTop');
+    if (topEl) topEl.innerHTML = msg;
+  }
+}
  function adminListRenderLocal(){
-   const top = document.getElementById('adminListBoxTop');
-   if (!top) return;
+  const top = document.getElementById('adminListBoxTop');
+  if (!top) return;
 
-   const days = Number($("#ad_days").value || 60);
-   const segFilter = $("#ad_seg_filter")?.value || "";
+  // まだfetchしてない場合のガード
+  const base = Array.isArray(state.adminItemsRaw) ? state.adminItemsRaw.slice() : [];
+  if (base.length === 0){
+    top.innerHTML = `<div class="listEmpty">読み込み待機中（「一覧を取得」を押してください）</div>`;
+    return;
+  }
 
-   // ...（中略：フィルタ＆ソートはそのまま）...
+  const days = Number($("#ad_days").value || 60);
+  const segFilter = $("#ad_seg_filter")?.value || "";
 
-   const html = items.length
-     ? items.map(it => `
-       <div class="card">
-         <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
-         <div class="small">${dispSeg(normSeg(it.segment||""))}｜${it.type||""}：${it.title||""}</div>
-         <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
-         <div class="row" style="margin-top:8px; justify-content:flex-end;">
-           <button class="btn btn-ghost btn-sm" type="button"
-                   onclick="adminEdit(adminItemsMap['${String(it.id)}'])">編集</button>
-         </div>
-       </div>
-     `).join("")
-     : `<div class="listEmpty">該当する予定はありません</div>`;
+  // 期間フィルタ（今日〜days）
+  const today = new Date(); today.setHours(0,0,0,0);
+  const until = new Date(today.getTime()); until.setDate(until.getDate()+days);
 
-   top.innerHTML = html;
- }
+  const ymdToDate = (s)=>{
+    const m = String(s||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+    if (!m) return null;
+    const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
+    return isNaN(d) ? null : d;
+  };
+
+  // ★ base を元にローカル絞り込み
+  let viewItems = base.filter(it=>{
+    const d = ymdToDate(it.ymd);
+    return d && d >= today && d <= until;
+  });
+
+  if (segFilter){
+    viewItems = viewItems.filter(it => normSeg(it.segment) === segFilter);
+  }
+
+  // 並び順（現行と同じキー）
+  const ymdKey = (s) => {
+    const t = String(s || "").replace(/-/g, "/");
+    const m = t.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+    return m ? `${m[1]}${m[2]}${m[3]}` : "99999999";
+  };
+  const hmKey = (s) => {
+    const m = String(s || "").match(/^(\d{1,2}):(\d{2})$/);
+    return m ? `${String(m[1]).padStart(2,'0')}${m[2]}` : "9999";
+  };
+  viewItems.sort((a,b)=>
+    ymdKey(a.ymd).localeCompare(ymdKey(b.ymd)) ||
+    hmKey(a.hm).localeCompare(hmKey(b.hm)) ||
+    String(a.title||"").localeCompare(String(b.title||"")) ||
+    String(a.id||"").localeCompare(String(b.id||""))
+  );
+
+  // HTML（adminItemsMap は全件分が入っているのでそのまま使える）
+  const html = viewItems.length
+    ? viewItems.map(it => `
+      <div class="card">
+        <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
+        <div class="small">${dispSeg(normSeg(it.segment||""))}｜${it.type||""}：${it.title||""}</div>
+        <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
+        <div class="row" style="margin-top:8px; justify-content:flex-end;">
+          <button class="btn btn-ghost btn-sm" type="button"
+                  onclick="adminEdit(adminItemsMap['${String(it.id)}'])">編集</button>
+        </div>
+      </div>
+    `).join("")
+    : `<div class="listEmpty">該当する予定はありません</div>`;
+
+  top.innerHTML = html;
+}
 function adminEdit(obj){
   // （アコーディオンを閉じる）
   document.getElementById('adminListAcc')?.classList.remove('open');
