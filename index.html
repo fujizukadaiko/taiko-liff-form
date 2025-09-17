@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.0.3";
+  const FRONT_VERSION = "Front v3.0.4";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwxoW17g41EL37RiTamH17mg9M1BP0MDn6ZyfG2RMA30Doh1ZCwA9qw_g4-cB3VNZTB6w/exec";     // ←差し替え
 
@@ -841,7 +841,10 @@
       <div class="card">
         <label for="regInputName">入力者氏名（あなたの名前）</label>
         <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
-
+        <label class="row" style="gap:6px; align-items:center; margin-top:6px;">
+          <input type="checkbox" id="regNotify" />
+          <span class="small">このアカウント宛てに通知（配信・リマインド）を送る</span>
+        </label>
         <div class="line"></div>
         <div class="line"></div>
 
@@ -1377,6 +1380,7 @@ let state = {
   schedulesRaw: [],   // ← API生データを保持（ローカル再描画で使用）
   adminItemsRaw: [],  // ← 一覧の生データ
   submitting: false  
+  notify: true        // ★ 追加：既定は ON
 };
 
 let registerMode = "create"; // "create" | "edit"
@@ -1564,35 +1568,39 @@ function updateSegFilterUI(){
     sel.value = '';
   }
 }
-// 修正後：ユーザー区分が1つも無いときは「全表示」にフォールバック
-function eventVisibleForUser(eventSegRaw, userSegSet){
-  // フォールバック：ユーザー側の区分情報が無い → 絞り込まず表示する
+// 修正後：includeBoth で “両方” を含めるか選べるように
+function eventVisibleForUser(eventSegRaw, userSegSet, includeBoth=false){
+  // ユーザー区分情報がない → 全表示
   if (!userSegSet || userSegSet.size === 0) return true;
 
   const e = normSeg(eventSegRaw);
 
-  // 両方所属ユーザー：大人/子ども（必要に応じ both も）表示
+  // 両方所属ユーザー
   if (userSegSet.has("adult") && userSegSet.has("child")){
-    return (e==="adult" || e==="child") || (INCLUDE_BOTH_FOR_ALL && e==="both");
+    if (e === "adult" || e === "child") return true;
+    if (includeBoth && e === "both")     return true;
+    return false;
   }
+  // 片側所属ユーザー
   if (userSegSet.has("adult")){
-    return (e==="adult") || (INCLUDE_BOTH_FOR_ALL && e==="both");
+    return (e === "adult") || (includeBoth && e === "both");
   }
   if (userSegSet.has("child")){
-    return (e==="child") || (INCLUDE_BOTH_FOR_ALL && e==="both");
+    return (e === "child") || (includeBoth && e === "both");
   }
-  // 念のための保険（ここに来るのは稀）
   return true;
 }
 function buildNameSegMap(){
-  const map = {};
-  (state.members||[]).forEach(m=>{
-    const n = (m.performerName||"").trim();
-    const s = normSeg(m.segment || m.区分);
-    if (n && s) map[n] = s; // name -> 'adult' / 'child'
-  });
-  return map;
-}
+   const map = {};
+   (state.members||[]).forEach(m=>{
+     const n = (m.performerName||"").trim();
+     const s = normSeg(m.segment || m.区分);
+     if (!n || !s) return;
+     if (!map[n]) { map[n] = s; }
+     else if (map[n] !== s) { map[n] = 'both'; } // 子と大が混在 → both
+   });
+   return map;
+ }
 // 厳密に日付文字列をパース
 function parseYmdStrict(s){
   const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
@@ -1803,7 +1811,7 @@ function bootHomeQuickRender(){
 
   const filteredEvents = (state.events||[]).filter(e=>{
     const evSeg = e.segment || e.targetSegment || e.attendSegment || e.segmentRaw || "";
-    return eventVisibleForUser(evSeg, userSegSet);
+    return eventVisibleForUser(evSeg, userSegSet, /* includeBoth */ true);
   });
 
   // performers（家族名）は会員情報がまだ無くても空配列でOK
@@ -1892,6 +1900,9 @@ async function refreshData(){
 
   state.events  = (eventsResp?.status==="ok" && Array.isArray(eventsResp.events)) ? eventsResp.events : (state.events||[]);
   state.members = (whoResp?.status==="ok" ? (whoResp.members||[]) : (state.members||[]));
+  // ★ notify を同期（値が無い時は true を既定に）
+ state.notify  = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
+                 ? whoResp.notify : (typeof state.notify === "boolean" ? state.notify : true);
   updateSegFilterUI();
 
   // 3-α) 取得できた段階で一旦「イベントだけ」再描画して体感を上げる
@@ -1999,15 +2010,15 @@ function renderAttendSelectHTML(evId, name, current){
     const segBadgeCls = evSegNorm==="adult" ? "seg-adult" : evSegNorm==="child" ? "seg-child" : "seg-both";
 
     // 表示対象の演奏者を決定（ユーザー/名前側の区分が欠落していれば除外しない＝全表示）
-    const performers = (ctx.uniqueNamesAll||[]).filter(n=>{
-      const ms = ctx.nameSegMap[n]; // 'adult'/'child'/undefined
-      if (!ctx.userSegSet || ctx.userSegSet.size===0) return true; // フォールバック：全員表示
-      if (!ms) return true; // 名前側の区分が未知 → 除外しない
-      if (evSegNorm==="adult") return ms==="adult";
-      if (evSegNorm==="child") return ms==="child";
-      if (evSegNorm==="both")  return (ms==="adult" || ms==="child");
-      return true;
-    });
+     const performers = (ctx.uniqueNamesAll||[]).filter(n=>{
+       const ms = ctx.nameSegMap[n]; // 'adult'|'child'|'both'|undefined
+       if (!ctx.userSegSet || ctx.userSegSet.size===0) return true; // フォールバック全表示
+       if (!ms) return true; // 名前側が不明なら除外しない
+       if (evSegNorm==="adult") return (ms==="adult" || ms==="both");
+       if (evSegNorm==="child") return (ms==="child" || ms==="both");
+       if (evSegNorm==="both")  return (ms==="adult" || ms==="child" || ms==="both");
+       return true;
+     });
 
     // 未保存バッジ判定
     const dblock = (draft.byEvent||{})[String(ev.eventId)];
@@ -2198,8 +2209,6 @@ async function onSubmit(){
                 + `&lineId=${esc(state.lineId)}`
                 + `&merge=1`                        // ★ マージ更新を有効化
                 + `&bulk=${esc(JSON.stringify(bulk))}`;
-
-      const r = await fetch(url);
       const j = await r.json();
       if (j.status !== "ok") throw new Error(`送信失敗（${eventId}）: ${j.message||"unknown"}`);
     }
@@ -2226,23 +2235,23 @@ function resetRegisterForm(){
   $("#regInputName").value = state.name || "";
   $("#perfList").innerHTML = "";
   addPerformerField("");
+  $("#regNotify").checked = (state.notify !== false); // ★ 追加：初期値
 }
 function buildRegisterFormFromMembers(){
   const inputName = (state.members[0]?.inputName || state.name || "");
   $("#regInputName").value = inputName;
   $("#perfList").innerHTML = "";
-  const byName = new Map();
- (state.members||[]).forEach(m=>{
-   if (!m.performerName) return;
-   byName.set(m.performerName, m.segment || m?.区分 || "子どもの部");
- });
- if (byName.size===0) {
-   addPerformerField("", "子どもの部");
- } else {
-   for (const [nm, seg] of byName.entries()){
-     addPerformerField(nm, seg);
+  // 保存されている行をそのまま展開（同名でも子/大は別行）
+   const list = (state.members||[]).map(m => ({
+     name: (m.performerName||"").trim(),
+     seg : (m.segment || m?.区分 || "子どもの部")
+   })).filter(x => x.name);
+   if (list.length===0){
+     addPerformerField("", "子どもの部");
+   } else {
+     list.forEach(x => addPerformerField(x.name, x.seg));
    }
- }
+    $("#regNotify").checked = (state.notify !== false); // ★ 追加：初期値
 }
 function addPerformerField(value="", segValue="子どもの部"){
   const id = "perf_" + Math.random().toString(36).slice(2);
@@ -2269,7 +2278,7 @@ async function onRegister(){
     logReg("");
     const inputName = $("#regInputName").value.trim();
     if (!inputName) throw new Error("入力者氏名を入力してください");
-
+   const notify = !!$("#regNotify")?.checked;            // ★ 追加
     // {name, segment} の配列にまとめる
    const items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
      const name = row.querySelector(".regPerf")?.value.trim();
@@ -2277,19 +2286,19 @@ async function onRegister(){
     return name ? { name, segment: seg } : null;
    }).filter(Boolean);
    if (items.length === 0) throw new Error("演奏者を1名以上入力してください");
-
+    const notify = !!$("#regNotify")?.checked;   // ★ 追加
     $("#btnRegister").disabled = true; $("#btnRegister").textContent = (registerMode==="edit" ? "保存中…" : "登録中…");
 
     let url = "";
     if (registerMode === "edit") {
-      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list2=${esc(JSON.stringify(items))}&purge=0`;
+      url = `${API_ENDPOINT}?replaceMembers=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list2=${esc(JSON.stringify(items))}&purge=0&notify=${notify?1:0}`;
     } else {
-      url = `${API_ENDPOINT}?registerBulk=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list2=${esc(JSON.stringify(items))}`;
+      url = `${API_ENDPOINT}?registerBulk=1&lineId=${esc(state.lineId)}&inputName=${esc(inputName)}&list2=${esc(JSON.stringify(items))}&notify=${notify?1:0}`;
     }
 
     const r = await fetch(url); const j = await r.json();
     if (j.status !== "ok") throw new Error(j.message || "登録に失敗しました");
-
+    state.notify = notify; // ★ サーバ保存成功でローカル状態も更新
     alert(registerMode==="edit" ? "氏名を保存しました" : "初回登録が完了しました");
     show("#view-home");
     logHome("更新中…");
@@ -2376,7 +2385,7 @@ async function onRegister(){
   const segSet = getMemberSegSet();
   arr = arr.filter(it => {
     const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
-    return eventVisibleForUser(evSeg, segSet);
+    return eventVisibleForUser(evSeg, segSet, /* includeBoth */ true);
   });
 
   // 4) 両方所属ユーザーのみ、UI区分フィルタ
@@ -2901,14 +2910,23 @@ function renderReport(){
   const notAnsweredNames = roster.filter(n => !ansMap.has(String(n)));
 
   const group = { "参加":[], "未定":[], "未回答":[], "欠席":[] };
+  // 大人判定用（name -> 'adult'/'child'）
+  const segLookup = state.memberSegMap || {};
+  const withPrefix = (name) => {
+    const seg = segLookup[name];
+    return (seg === "adult") ? `【大人の部】${name}` : name;
+  };
   rows.forEach(r => {
     const att = (r.attend||"").trim();
-    if (att==="参加") group["参加"].push(r);
-    else if (att==="欠席") group["欠席"].push(r);
-    else if (att==="未定") group["未定"].push(r);
-    else group["未回答"].push({ name:r.name, attend:"未回答" });
+    const row = { ...r, _dispName: withPrefix(r.name) };
+   if (att==="参加") group["参加"].push(row);
+   else if (att==="欠席") group["欠席"].push(row);
+   else if (att==="未定") group["未定"].push(row);
+   else group["未回答"].push({ name:r.name, _dispName: withPrefix(r.name), attend:"未回答" });
   });
-  notAnsweredNames.forEach(n => { group["未回答"].push({ name:n, attend:"未回答" }); });
+  notAnsweredNames.forEach(n => {
+   group["未回答"].push({ name:n, _dispName: withPrefix(n), attend:"未回答" });
+ });
 
   const showKeys = fAtt ? [fAtt] : ["参加","未定","未回答","欠席"];
   const byName = (a,b) => String(a.name||"").localeCompare(String(b.name||""));
@@ -2934,8 +2952,7 @@ function renderReport(){
         <span class="pill sm ${badgeCls(k)}">${k}</span>
         <div style="margin-top:6px;">
           ${list.map(r => {
-            const seg = segLookup[r.name];
-            const dispName = (seg==="adult") ? `${r.name}【大人の部】` : r.name;
+            const dispName = r._dispName || r.name;
             return `
               <div class="row" style="justify-content:space-between; margin:6px 0;">
                 <div>${dispName||""}</div>
