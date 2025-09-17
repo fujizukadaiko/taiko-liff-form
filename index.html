@@ -2944,35 +2944,38 @@ async function reportReload(){
 }
 
   // --- ② バックグラウンドで最新取得（来たら差し替え） ---
-  try{
-    const [repRes, memRes] = await Promise.allSettled([
-      api(`?attendanceReport=1&lineId=${esc(state.lineId)}`),
-      api(`?membersAll=1`)
-    ]);
-
-    if (repRes.status==="fulfilled" && repRes.value?.status==="ok" && Array.isArray(repRes.value.list)){
-      state.report = repRes.value.list;
-      cacheSet(CKEY_REPORT, state.report);
-    }
-    // 会員セグメント（name -> 'adult'|'child'）
-    function normalizeNameKey(s){
-      return String(s||"")
-        .replace(/\u3000/g, " ")   // 全角→半角スペース
-        .replace(/\s+/g, " ")      // 連続スペース圧縮
-        .trim();
-    }
-    state.memberSegMap = {};
-    if (memRes.status==="fulfilled" && memRes.value?.status==="ok" && Array.isArray(memRes.value.list)){
-      memRes.value.list.forEach(m=>{
-        const rawName = (m.name || m.performerName || "");
-        const seg = normSeg(m.segment || m.区分 || "");
-        const key = normalizeNameKey(rawName);
-        if (key && seg) state.memberSegMap[key] = seg;  // ← 正規化キーで格納
-      });
-      cacheSet(CKEY_MEMBERS, state.memberSegMap);
-    } else if (cachedMembers) {
-      state.memberSegMap = cachedMembers;
-    }
+  (() => {
+    (async () => {
+      try {
+        const [repRes, memRes] = await Promise.allSettled([
+          api(`?attendanceReport=1&lineId=${esc(state.lineId)}`),
+          api(`?membersAll=1`)
+        ]);
+  
+        if (repRes.status==="fulfilled" && repRes.value?.status==="ok" && Array.isArray(repRes.value.list)){
+          state.report = repRes.value.list;
+          cacheSet(CKEY_REPORT, state.report);
+        }
+  
+        function normalizeNameKey(s){
+          return String(s||"").replace(/\u3000/g," ").replace(/\s+/g," ").trim();
+        }
+  
+        state.memberSegMap = {};
+        if (memRes.status==="fulfilled" && memRes.value?.status==="ok" && Array.isArray(memRes.value.list)){
+          memRes.value.list.forEach(m=>{
+            const rawName = (m.name || m.performerName || "");
+            const seg = normSeg(m.segment || m.区分 || "");
+            const key = normalizeNameKey(rawName);
+            if (key && seg) state.memberSegMap[key] = seg;
+          });
+          cacheSet(CKEY_MEMBERS, state.memberSegMap);
+        } else if (cachedMembers) {
+          state.memberSegMap = cachedMembers;
+        }
+      } catch (_) { /* noop */ }
+    })();
+  })();
 
     // イベントセレクトを上書き（初回キャッシュが無い時用）
     if (selEvent && selEvent.disabled){
