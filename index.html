@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.0.4";
+  const FRONT_VERSION = "Front v3.0.5";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlzylg_VdTL30u6NQwB1o8uf5cgykF-HJVBCRBJA566aqlNDJF5azTN1lm2hGD1oB_aQ/exec";     // ←差し替え
 
@@ -411,41 +411,44 @@
       color: var(--c-muted);
     }
     /* ===== 演奏者行（ラベルは1行、下段で入力と削除を2列に並べる） ===== */
+    /* ===== 演奏者行：名前 7 / 右カラム 3（区分+削除） ===== */
     .perfRow{
       display: grid;
-      grid-template-columns: 1fr auto;  /* 入力 1fr | 削除 auto */
-      grid-template-rows: auto auto;    /* 1段目: ラベル / 2段目: 入力＋削除 */
+      grid-template-columns: 7fr 3fr;     /* ← 7:3 */
+      grid-auto-rows: auto;
       column-gap: 12px;
-      row-gap: 6px;
+      row-gap: 8px;
       margin: 10px 0;
       align-items: center;
     }
-    
-    .perfRow .perfLabel{                 /* ラベルは2カラムぶち抜き */
-      grid-column: 1 / -1;
+    .perfRow .perfLabel{
+      grid-column: 1 / -1;               /* ラベルは2列ぶち抜き */
       font-size: 12px;
       color: var(--c-muted);
     }
-    
-    .perfRow .regPerf{                   /* 入力欄 */
-      grid-column: 1 / 2;
+    .perfRow .regPerf{
+      grid-column: 1 / 2;                /* 左：名前 */
       width: 100%;
-      height: 44px;                      /* 入力の高さを固定 */
-    }
-    
-    .perfRow .btn-remove{                /* 削除ボタンを入力の高さに合わせる */
-      grid-column: 2 / 3;
-      min-height: 44px;
       height: 44px;
-      padding: 0 14px;
-      border-radius: 12px;
-      align-self: end;                   /* 下段のベースラインに揃える */
     }
-    
-    /* 画面が狭いときの左右パディング微調整（任意） */
+    .perfRow .regPerfSeg{
+      grid-column: 2 / 3;                /* 右（上段）：区分セレクト */
+      width: 100%;
+      height: 44px;
+    }
+    .perfRow .btn-remove{
+      grid-column: 2 / 3;                /* 右（下段）：削除ボタン */
+      width: 100%;
+      min-height: 40px;
+      height: 44px;
+      padding: 0 12px;
+      border-radius: 12px;
+      justify-self: stretch;
+      align-self: end;
+    }
+    /* 狭い端末でも維持（必要なら 1列化にもできます） */
     @media (max-width: 420px){
       .perfRow{ column-gap: 10px; }
-      .perfRow .btn-remove{ padding: 0 12px; }
     }
     /* 無効（disabled）の見た目を統一：集合場所・出欠対象・締切日・配信フラグなど */
     .selectBtn:disabled,
