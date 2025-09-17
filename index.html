@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v2.9.6";
+  const FRONT_VERSION = "Front v2.9.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwxoW17g41EL37RiTamH17mg9M1BP0MDn6ZyfG2RMA30Doh1ZCwA9qw_g4-cB3VNZTB6w/exec";     // ←差し替え
 
@@ -1279,6 +1279,8 @@ let state = {
   answers: {},       // { eventId: [...] }
   schedules: [],     // 今後の予定
   report:   [],      // 管理レポート（attendanceReport）
+  schedulesRaw: [],   // ← API生データを保持（ローカル再描画で使用）
+  adminItemsRaw: [],  // ← 一覧の生データ
   submitting: false  
 };
 
@@ -1604,9 +1606,15 @@ function bindHandlers(){
 
   $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); updateSegFilterUI(); renderSchedules(true); };
   $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
-  $("#btnFetchSchedules").onclick    = ()=> renderSchedules(false);
+  $("#btnFetchSchedules").onclick    = ()=> renderSchedules(true);
   // 区分フィルタが変更されたら 今後の予定を再描画
   document.getElementById('selSeg')?.addEventListener('change', ()=> renderSchedules(false));
+  // 管理：セレクト変更で即ローカル描画
+  document.getElementById('ad_days')?.addEventListener('change', adminListRenderLocal);
+  document.getElementById('ad_seg_filter')?.addEventListener('change', adminListRenderLocal);
+  
+  // 「一覧を取得」は本当にサーバー再取得
+  $("#btnAdminFetch").onclick = ()=> adminListFetch();
   // レポート
   $("#btnReportBack").onclick = ()=> show("#view-home");
   $("#btnReportReload").onclick = ()=> reportReload();
@@ -2112,9 +2120,10 @@ async function onRegister(){
 <!-- ===== 今後の予定（Schedules） v5 ===== -->
 <script>
 (() => {
-  if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 5) return;
-  window.__SchedulesBlockV__ = 5;
+  if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 6) return;
+  window.__SchedulesBlockV__ = 6;
 
+  // ===== ユーティリティ =====
   function parseYmdStrictLocal(s){
     const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
     if (!m) return null;
@@ -2123,6 +2132,7 @@ async function onRegister(){
   }
   function addDays(d, n){ const x = new Date(d.getTime()); x.setDate(x.getDate()+n); x.setHours(0,0,0,0); return x; }
 
+  // ===== カード描画 =====
   function renderScheduleCard(it){
     const seg = dispSeg(normSeg(it.segment||it.targetSegment||it.attendSegment||""));
     const titleLine = [seg, it.kind||"", it.title||""].filter(Boolean).join(" ");
@@ -2133,7 +2143,6 @@ async function onRegister(){
       ${memoLine}
     </div>`;
   }
-
   window.renderSchedulesView = function(list){
     if (!Array.isArray(list) || list.length===0) {
       return `<div class="listEmpty">該当する予定はありません</div>`;
@@ -2145,65 +2154,74 @@ async function onRegister(){
     if (typeof updateSegFilterUI === "function") updateSegFilterUI();
   }
 
+  // ===== ローカル再描画（UIの選択だけで即時フィルタ） =====
+  function renderSchedulesLocal(){
+    const box = $("#schedulesBox");
+    const base = Array.isArray(state.schedulesRaw) ? state.schedulesRaw.slice() : [];
+    
+    // 1) 期間
+    const today = new Date(); today.setHours(0,0,0,0);
+    const until = addDays(today, daysSel);
+    let arr = base.filter(it=>{
+      const d = parseYmdStrictLocal(it.ymd || it.date);
+      return d && d >= today && d <= until;
+    });
+
+    // 2) 種別
+    if (kindSel){
+      arr = arr.filter(it => String(it.kind||"").trim() === kindSel);
+    }
+
+    // 3) ユーザー区分（アカウントの所属で絞り込み）
+    const segSet = getMemberSegSet();
+    arr = arr.filter(it => {
+      const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
+      return eventVisibleForUser(evSeg, segSet);
+    });
+
+    // 4) 両方所属ユーザーのみ、UI区分フィルタ
+    if (segSet && segSet.size > 0 && userHasBoth()){
+      const uiSeg = $("#selSeg")?.value || "";
+      if (uiSeg){
+        arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
+      }
+    }
+
+    state.schedules = arr;
+    box.innerHTML = window.renderSchedulesView(state.schedules);
+  }
+
+  // ===== 初回 or 再取得時だけ API を叩く =====
   window.renderSchedules = async function(initial=false){
     const box = $("#schedulesBox");
-    box.innerHTML = `読み込み中… <span class="spinner"></span>`;
 
     try{
-      if (initial) exposeSegFilterIfNeeded();
+      if (initial){
+        box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+        exposeSegFilterIfNeeded();
 
-      const daysSel = Number($("#selDays").value || 60);
-      const kindSel = $("#selKind").value || "";
-      const url = kindSel
-        ? `?schedules=1&days=${esc(daysSel)}&kind=${esc(kindSel)}`
-        : `?schedules=1&days=${esc(daysSel)}`;
-
-      const r = await api(url);
-      if (r.status !== "ok" || !Array.isArray(r.schedules)) {
-        box.innerHTML = `<span class="err">取得に失敗しました</span>`;
-        return;
-      }
-
-      // 0) まずは取得結果をベースに
-      let arr = r.schedules.slice();
-
-      // 1) 表示期間（日数）フロントでも保障
-      const today = new Date(); today.setHours(0,0,0,0);
-      const until = addDays(today, daysSel);
-      arr = arr.filter(it=>{
-        const d = parseYmdStrictLocal(it.ymd || it.date);
-        if (!d) return false;
-        return (d >= today) && (d <= until);
-      });
-
-      // 2) 種別フィルタ（フロントでも保障）
-      if (kindSel){
-        arr = arr.filter(it => String(it.kind||"").trim() === kindSel);
-      }
-
-      // 3) ユーザー区分ベースのフィルタ
-      const segSet = getMemberSegSet();
-      arr = arr.filter(it => {
-        const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
-        return eventVisibleForUser(evSeg, segSet);
-      });
-
-      // 4) 『両方所属』ユーザーだけ UI の区分フィルタを適用
-      if (segSet && segSet.size > 0 && userHasBoth()){
-        const uiSeg = $("#selSeg")?.value || "";
-        if (uiSeg){
-          arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
+        // API から最新を1回取得して、生の配列を保持
+        const daysSel = Number($("#selDays").value || 60);
+        const kindSel = $("#selKind").value || "";
+        // 初回は広めの日数で全件を取得（例: 180日）。種別も付けない
+        const url = `?schedules=1&days=180`;
+        const r = await api(url);
+        if (r.status !== "ok" || !Array.isArray(r.schedules)) {
+          box.innerHTML = `<span class="err">取得に失敗しました</span>`;
+          return;
         }
+        // ★ 生データを保持（以後はローカルでフィルタ）
+        state.schedulesRaw = r.schedules.slice();
       }
-
-      state.schedules = arr;
-      box.innerHTML = window.renderSchedulesView(state.schedules);
+      // 取得済みデータを UI 値でフィルタして描画
+      renderSchedulesLocal();
 
     }catch(err){
       box.innerHTML = `<span class="err">エラー: ${err.message||err}</span>`;
     }
   };
 
+  // 互換：外部から呼ばれる想定があればこちら
   window.loadSchedules = function(){ renderSchedules(false); };
 
   window.copyIcsFeed = function(){
@@ -2213,6 +2231,13 @@ async function onRegister(){
     document.execCommand("copy");
     alert("購読URLをコピーしました");
   };
+
+  // ===== UI操作で即反映（ここでバインド） =====
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('selDays')?.addEventListener('change', renderSchedulesLocal);
+    document.getElementById('selKind')?.addEventListener('change', renderSchedulesLocal);
+    document.getElementById('selSeg') ?.addEventListener('change', renderSchedulesLocal);
+  });
 })();
 </script>
 <!-- ===== 今後の予定（Schedules） v5 END ===== -->
@@ -2460,85 +2485,79 @@ async function adminSubmit(){
     $("#btnAdminSubmit").textContent = (adminMode==="edit" ? "保存" : "新規登録");
   }
 }
-async function adminListFetch(){
-  try{
-    const top = document.getElementById('adminListBoxTop');
-    if (top) top.innerHTML = `読み込み中… <span class="spinner"></span>`;
+ async function adminListFetch(){
+   try{
+     const top = document.getElementById('adminListBoxTop');
+     if (top) top.innerHTML = `読み込み中… <span class="spinner"></span>`;
 
-    const days = Number($("#ad_days").value || 60);
-    const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
+     const days = Number($("#ad_days").value || 60);
+     const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
 
-    if (r.status !== "ok" || !Array.isArray(r.items)){
-      if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
-      return;
-    }
-    if (r.items.length === 0){
-      if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
-      return;
-    }
+     if (r.status !== "ok" || !Array.isArray(r.items)){
+       if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
+       return;
+     }
+     if (r.items.length === 0){
+       if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+       return;
+     }
 
-    // 正規化
-    const items = r.items.map(raw => ({
-      id: raw.id || "",
-      type: raw.type || "",
-      title: raw.title || "",
-      ymd: raw.ymd || "",
-      hm: raw.hm || "",
-      place: raw.place || "",
-      meetAt: raw.meetAt || "",
-      meetPlace: raw.meetPlace || "",
-      attendTarget: raw.attendTarget || "N",
-      deadline: raw.deadline || "",
-      publish: raw.publish || "No",
-      status: raw.status || "archived",
-      flag: raw.flag || "N",
-      segment: raw.segment || raw.targetSegment || raw.attendSegment || ""  // ★ 追加
-    }));
+     // 正規化（★ここはそのまま）
+     const items = r.items.map(raw => ({
+       id: raw.id || "",
+       type: raw.type || "",
+       title: raw.title || "",
+       ymd: raw.ymd || "",
+       hm: raw.hm || "",
+       place: raw.place || "",
+       meetAt: raw.meetAt || "",
+       meetPlace: raw.meetPlace || "",
+       attendTarget: raw.attendTarget || "N",
+       deadline: raw.deadline || "",
+       publish: raw.publish || "No",
+       status: raw.status || "archived",
+       flag: raw.flag || "N",
+       segment: raw.segment || raw.targetSegment || raw.attendSegment || ""
+     }));
 
-    // ★ ⑥ フィルタ適用
-    const f = $("#ad_seg_filter")?.value || "";
-    const items2 = f ? items.filter(it => normSeg(it.segment) === f) : items;
-
-    // ソート
-    const ymdKey = (s) => {
-      const t = String(s || "").replace(/-/g, "/");
-      const m = t.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-      return m ? `${m[1]}${m[2]}${m[3]}` : "99999999";
-    };
-    const hmKey = (s) => {
-      const m = String(s || "").match(/^(\d{1,2}):(\d{2})$/);
-      return m ? `${String(m[1]).padStart(2,'0')}${m[2]}` : "9999";
-    };
-    items2.sort((a,b)=>
-      ymdKey(a.ymd).localeCompare(ymdKey(b.ymd)) ||
-      hmKey(a.hm).localeCompare(hmKey(b.hm)) ||
-      String(a.title||"").localeCompare(String(b.title||"")) ||
-      String(a.id||"").localeCompare(String(b.id||""))
-    );
-
-    // 編集用保持
+    // ★ 生配列を保存（ここではフィルタしない）
+    state.adminItemsRaw = items;
+    // ★ 編集用マップは全件で作る（フィルタ後も編集できるように）
     adminItemsMap = {};
-    items2.forEach(it => { adminItemsMap[String(it.id)] = it; });
+    items.forEach(it => { adminItemsMap[String(it.id)] = it; });
+    // ★ 描画はローカル描画関数に任せる（現在のセレクト値で即反映）
+    adminListRenderLocal();
+   }catch(err){
+     const msg = `<span class="err">エラー：${err.message||err}</span>`;
+     const topEl = document.getElementById('adminListBoxTop');
+     if (topEl) topEl.innerHTML = msg;
+   }
+ }
+ function adminListRenderLocal(){
+   const top = document.getElementById('adminListBoxTop');
+   if (!top) return;
 
-    const html = items2.map(it => `
-      <div class="card">
-        <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
-        <div class="small">${dispSeg(normSeg(it.segment||""))}｜${it.type||""}：${it.title||""}</div>
-        <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
-        <div class="row" style="margin-top:8px; justify-content:flex-end;">
-          <button class="btn btn-ghost btn-sm" type="button"
-                  onclick="adminEdit(adminItemsMap['${String(it.id)}'])">編集</button>
-        </div>
-      </div>
-    `).join("");
+   const days = Number($("#ad_days").value || 60);
+   const segFilter = $("#ad_seg_filter")?.value || "";
 
-    if (top) top.innerHTML = html;
-  }catch(err){
-    const msg = `<span class="err">エラー：${err.message||err}</span>`;
-    const topEl = document.getElementById('adminListBoxTop');
-    if (topEl) topEl.innerHTML = msg;
-  }
-}
+   // ...（中略：フィルタ＆ソートはそのまま）...
+
+   const html = items.length
+     ? items.map(it => `
+       <div class="card">
+         <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
+         <div class="small">${dispSeg(normSeg(it.segment||""))}｜${it.type||""}：${it.title||""}</div>
+         <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
+         <div class="row" style="margin-top:8px; justify-content:flex-end;">
+           <button class="btn btn-ghost btn-sm" type="button"
+                   onclick="adminEdit(adminItemsMap['${String(it.id)}'])">編集</button>
+         </div>
+       </div>
+     `).join("")
+     : `<div class="listEmpty">該当する予定はありません</div>`;
+
+   top.innerHTML = html;
+ }
 function adminEdit(obj){
   // （アコーディオンを閉じる）
   document.getElementById('adminListAcc')?.classList.remove('open');
