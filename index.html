@@ -2936,8 +2936,6 @@ function renderReport(){
   Object.keys(group).forEach(k => group[k].sort(byName));
   const badgeCls = (k) => k==="参加" ? "stat-ok" : k==="欠席" ? "stat-ng" : k==="未定" ? "stat-pd" : "stat-na";
 
-  const segLookup = state.memberSegMap || {};
-
   let html = `
     <div class="card">
       <div class="row-space">
