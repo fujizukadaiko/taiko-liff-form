@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.0.8";
+  const FRONT_VERSION = "Front v3.0.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlzylg_VdTL30u6NQwB1o8uf5cgykF-HJVBCRBJA566aqlNDJF5azTN1lm2hGD1oB_aQ/exec";     // ←差し替え
 
@@ -2995,26 +2995,38 @@ function renderReport(){
   const ev = state.report.find(x => String(x.id) === String(selId));
   if (!ev){ box.innerHTML = `<div class="listEmpty">選択した公演が見つかりません</div>`; return; }
 
+  // === ここから共通ヘルパー ===
   const segLookup = state.memberSegMap || {};
+  function normalizeNameKey(s){
+    return String(s||"")
+      .replace(/\u3000/g, " ")  // 全角→半角スペース
+      .replace(/\s+/g, " ")     // スペース畳み込み
+      .trim();
+  }
+  const withPrefix = (name) => {
+    const key = normalizeNameKey(name);
+    const seg = segLookup[key];
+    return (seg === "adult") ? `【大人の部】${name}` : name;
+  };
+  // === ここまで共通ヘルパー ===
 
-  // イベントの区分を決定（APIが segment/segmentCode を返す前提。無いときはタイトルで推定）
+  // イベントの区分（API, なければタイトルで推定）
   let evSeg = normSeg(ev.segment || ev.segmentCode || ev.targetSegment || "");
-  if (!evSeg && typeof ev.title === "string" && ev.title.includes("【大人の部】")) evSeg = "adult"; // フォールバック
+  if (!evSeg && typeof ev.title === "string" && ev.title.includes("【大人の部】")) evSeg = "adult";
 
   // 対象判定：evSeg==='both' は全員、それ以外は一致する人だけ
   const eligible = (name) => {
     if (!name) return false;
     if (!evSeg || evSeg === "both") return true;
     const key = normalizeNameKey(name);
-    return (segLookup[name] === evSeg);
+    return (segLookup[key] === evSeg);   // ← 正規化キーで照合
   };
 
-  // rows/roster をイベント区分で絞る
+  // rows/roster をイベント区分で絞り込む
   const allRows   = Array.isArray(ev.rows)   ? ev.rows   : [];
   const allRoster = Array.isArray(ev.roster) ? ev.roster : [];
-
-  const rows   = allRows.filter(r => eligible(r?.name));
-  const roster = allRoster.filter(nm => eligible(nm));
+  const rows      = allRows.filter(r => eligible(r?.name));
+  const roster    = allRoster.filter(nm => eligible(nm));
 
   const dateDisp = `${ev.ymd || ""}${ev.time ? " " + ev.time : ""}`;
 
@@ -3023,21 +3035,7 @@ function renderReport(){
   rows.forEach(r => { if (r?.name) ansMap.set(String(r.name), r); });
   const notAnsweredNames = roster.filter(n => !ansMap.has(String(n)));
 
-  // 表示名：大人の部のみ接頭辞
-  function normalizeNameKey(s){
-    return String(s||"")
-      .replace(/\u3000/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-  
-  const segLookup = state.memberSegMap || {};
-  const withPrefix = (name) => {
-    const key = normalizeNameKey(name);
-    const seg = segLookup[key];               // 正規化キーで照合
-    return (seg === "adult") ? `【大人の部】${name}` : name;
-  };
-
+  // グループ分け & 表示名（大人は接頭辞）
   const group = { "参加":[], "未定":[], "未回答":[], "欠席":[] };
   rows.forEach(r => {
     const att = (r.attend||"").trim();
