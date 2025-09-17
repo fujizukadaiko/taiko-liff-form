@@ -2884,7 +2884,6 @@ function adminEdit(obj){
 }
 
 <!-- ここから置き換え -->
-<script>
   /* ========= 管理者レポート：軽量メタ→選択時に詳細取得 ========= */
   // 追加の状態（既存 state は触らない）
   state.reportMeta = [];     // 軽量一覧（rows無し）
@@ -2967,7 +2966,6 @@ function adminEdit(obj){
     const box = document.querySelector("#repBox");
     if (box) box.textContent = "公演を選択してください";
   }
-</script>
 <!-- ここまで置き換え -->
 
   // --- ヘルパー：state.report からセレクトを全面再描画 ---
