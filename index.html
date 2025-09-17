@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.1.0";
+  const FRONT_VERSION = "Front v3.1.1";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQuUUIqlL2VE054HZ8i9GQ2067_Qj9WqIniSYW7eY1EJ0joYHB3XQfR8-sSSl0wZNxRQ/exec";     // ←差し替え
 
@@ -2884,96 +2884,69 @@ function adminEdit(obj){
 }
 
 /* ===== 出欠結果一覧（管理者） ===== */
-/* 出欠結果一覧（管理者） */
 async function reportReload(){
   const box = $("#repBox");
-  box.innerHTML = `読み込み中… <span class="spinner"></span>`;
-
   const selEvent = $("#repEvent");
+
+  // 0) 初期表示
+  box.innerHTML = `読み込み中… <span class="spinner"></span>`;
   if (selEvent){
     selEvent.classList.add('selectBtn');
     selEvent.disabled = true;
     selEvent.innerHTML = `<option value="">読み込み中…</option>`;
   }
 
-  // ---- 0) キャッシュキー ----
+  // 1) キャッシュで即描画（あれば）
   const CKEY_REPORT  = "liff:adminReport";
   const CKEY_MEMBERS = "liff:memberSegMap";
-
-  // ---- 1) キャッシュがあれば即描画用に使う（体感高速化） ----
   const cachedReport  = cacheGet(CKEY_REPORT);
   const cachedMembers = cacheGet(CKEY_MEMBERS);
 
-  if (cachedReport && Array.isArray(cachedReport)) {
-    state.report = cachedReport;
-  }
   if (cachedMembers && typeof cachedMembers === "object") {
     state.memberSegMap = cachedMembers;
   }
 
-  // イベントセレクトを（キャッシュで）一旦埋める
-  if (selEvent){
-    selEvent.innerHTML = `<option value="">（選択してください）</option>`;
-    const items = [...(state.report || [])].sort((a,b)=>
-      String(a.ymd||"").localeCompare(b.ymd||"") ||
-      String(a.time||"").localeCompare(b.time||"") ||
-      String(a.title||"").localeCompare(b.title||"")
-    );
-    for (const e of items){
-      const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
-      const opt = document.createElement("option");
-      opt.value = String(e.id);
-      opt.textContent = label;
-      selEvent.appendChild(opt);
+  if (Array.isArray(cachedReport) && cachedReport.length){
+    state.report = cachedReport.slice();
+    // セレクト即描画
+    if (selEvent){
+      selEvent.innerHTML = `<option value="">（選択してください）</option>`;
+      const items = state.report.slice().sort((a,b)=>
+        String(a.ymd||"").localeCompare(b.ymd||"") ||
+        String(a.time||"").localeCompare(b.time||"") ||
+        String(a.title||"").localeCompare(b.title||"")
+      );
+      for (const e of items){
+        const opt = document.createElement("option");
+        opt.value = String(e.id);
+        opt.textContent = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
+        selEvent.appendChild(opt);
+      }
+      selEvent.disabled = false;
+      box.innerHTML = `公演を選択してください`;
     }
-    selEvent.disabled = false;
   }
 
-  box.innerHTML = (state.report && state.report.length)
-    ? `公演を選択してください`
-    : `読み込み中… <span class="spinner"></span>`;
-
-  // ---- 2) バックグラウンドで最新取得（来たら差し替え） ----
+  // 2) バックグラウンドで最新データ取得 → 必ず上書き描画
   Promise.allSettled([
     api(`?attendanceReport=1&lineId=${esc(state.lineId)}`),
     api(`?membersAll=1`)
   ])
   .then(([repRes, memRes]) => {
-    // 2-1) レポート
+    // 2-1) レポート更新
     if (repRes.status === "fulfilled" &&
-        repRes.value?.status === "ok" &&
+        repRes.value && repRes.value.status === "ok" &&
         Array.isArray(repRes.value.list)) {
-      state.report = repRes.value.list;
+      state.report = repRes.value.list.slice();
       cacheSet(CKEY_REPORT, state.report);
-
-      // セレクトが空 or 「読み込み中…」のままなら差し替え
-      if (selEvent && selEvent.options.length <= 1) {
-        selEvent.innerHTML = `<option value="">（選択してください）</option>`;
-        const items = [...state.report].sort((a,b)=>
-          String(a.ymd||"").localeCompare(b.ymd||"") ||
-          String(a.time||"").localeCompare(b.time||"") ||
-          String(a.title||"").localeCompare(b.title||"")
-        );
-        for (const e of items){
-          const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
-          const opt = document.createElement("option");
-          opt.value = String(e.id);
-          opt.textContent = label;
-          selEvent.appendChild(opt);
-        }
-        selEvent.disabled = false;
-        box.innerHTML = `公演を選択してください`;
-      }
     }
 
-    // 2-2) 会員セグメント（name -> 'adult'|'child'）
-    function normalizeNameKey(s){
-      return String(s||"").replace(/\u3000/g, " ").replace(/\s+/g, " ").trim();
-    }
+    // 2-2) メンバー区分マップ更新（name -> 'adult'|'child'）
     if (memRes.status === "fulfilled" &&
-        memRes.value?.status === "ok" &&
+        memRes.value && memRes.value.status === "ok" &&
         Array.isArray(memRes.value.list)) {
       const map = {};
+      const normalizeNameKey = (s)=> String(s||"").replace(/\u3000/g," ").replace(/\s+/g," ").trim();
       memRes.value.list.forEach(m=>{
         const rawName = (m.name || m.performerName || "");
         const seg = normSeg(m.segment || m.区分 || "");
@@ -2983,9 +2956,38 @@ async function reportReload(){
       state.memberSegMap = map;
       cacheSet(CKEY_MEMBERS, state.memberSegMap);
     }
+
+    // 2-3) セレクトは無条件で全面再描画
+    if (selEvent){
+      selEvent.innerHTML = `<option value="">（選択してください）</option>`;
+      const items = (state.report || []).slice().sort((a,b)=>
+        String(a.ymd||"").localeCompare(b.ymd||"") ||
+        String(a.time||"").localeCompare(b.time||"") ||
+        String(a.title||"").localeCompare(b.title||"")
+      );
+      for (const e of items){
+        const opt = document.createElement("option");
+        opt.value = String(e.id);
+        opt.textContent = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
+        selEvent.appendChild(opt);
+      }
+      selEvent.disabled = false;
+    }
+
+    // 2-4) メッセージ更新
+    box.innerHTML = (state.report && state.report.length)
+      ? `公演を選択してください`
+      : `<div class="listEmpty">該当する公演がありません</div>`;
   })
   .catch(() => {
-    // サイレント失敗（初回はキャッシュ表示済み、無ければユーザーに見えるのは既存のエラーハンドリング）
+    // ネット失敗時：キャッシュが無ければエラー表示
+    if (!state.report || !state.report.length) {
+      box.innerHTML = `<span class="err">取得に失敗しました</span>`;
+      if (selEvent){
+        selEvent.innerHTML = `<option value="">取得エラー</option>`;
+        selEvent.disabled = false;
+      }
+    }
   });
 }
 
