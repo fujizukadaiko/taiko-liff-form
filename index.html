@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.1.7";
+  const FRONT_VERSION = "Front v3.1.8";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwSITJbfK_2d5RWAQKIh83TptKcsMvhCO2rQLBYiLZPBrcvEsHAIzsJ9KQ0WP-9TT3GDg/exec";     // ←差し替え
 
@@ -2917,7 +2917,13 @@ function adminEdit(obj){
         sel.disabled = false;
       }
     },
-
+    
+    // 既存のメニューやボタンから呼ばれるエイリアス（グローバル）
+    function reportReload(){
+      // 新フロー（メタ→詳細）に一本化
+      initAdminReportPage();
+    }
+    
     // ② セレクト変更→その1件だけ詳細取得→renderReport を呼ぶ
     async onChange(){
       const id = document.querySelector("#repEvent")?.value || "";
