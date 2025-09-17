@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.1.5";
+  const FRONT_VERSION = "Front v3.1.6";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyN4eeCMC90ENmimUGG_axLTFdc0ixtZsoRF452V-KrM79ZO7ApnTbdI8gcZp8IncXuUA/exec";     // ←差し替え
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzpMmDn5euPYoMidKkncKBKARiReP_-NbA0IL2ZSNDqiK01dkeWyVFwxHou7fo6wJzvPA/exec";     // ←差し替え
 
   // （オプション）設定チェック：重複定義や未設定を早期に気づけます
   (function(){
@@ -2883,101 +2883,92 @@ function adminEdit(obj){
   window.scrollTo({ top:0, behavior:"smooth" });
 }
 
-/* ===== 出欠結果一覧（管理者） ===== */
-/* 出欠結果一覧（管理者） */
-/* 出欠結果一覧（管理者） */
-async function reportReload(){
-  const box = $("#repBox");
-  const selEvent = $("#repEvent");
+<!-- ここから置き換え -->
+<script>
+  /* ========= 管理者レポート：軽量メタ→選択時に詳細取得 ========= */
+  // 追加の状態（既存 state は触らない）
+  state.reportMeta = [];     // 軽量一覧（rows無し）
+  state.reportCache = {};    // id -> 詳細キャッシュ
 
-  // 初期UI
-  box.innerHTML = `読み込み中… <span class="spinner"></span>`;
-  if (selEvent){
-    selEvent.classList.add('selectBtn');
-    selEvent.disabled = true;
-    selEvent.innerHTML = `<option value="">読み込み中…</option>`;
-  }
+  const adminReport = {
+    mounted: false,
 
-  // キャッシュキー
-  const CKEY_REPORT  = "liff:adminReport";
-  const CKEY_MEMBERS = "liff:memberSegMap";
+    // ① メタ（一覧だけ）取得してセレクトに流し込む
+    async loadMeta(){
+      const sel = document.querySelector("#repEvent");
+      if (!sel) return;
 
-  // 先にキャッシュがあれば即反映
-  const cachedReport  = cacheGet(CKEY_REPORT);
-  const cachedMembers = cacheGet(CKEY_MEMBERS);
-  if (cachedMembers && typeof cachedMembers === "object") state.memberSegMap = cachedMembers;
-  if (Array.isArray(cachedReport) && cachedReport.length){
-    state.report = cachedReport.slice();
-    drawEventSelectFromReport();
-    box.innerHTML = `公演を選択してください`;
-  }
-
-  // ---- 非同期で最新取得（完了後に上書き描画）----
-  try{
-    const [repRes, memRes] = await Promise.allSettled([
-      api(`?attendanceReport=1&lineId=${esc(state.lineId)}`),
-      api(`?membersAll=1`)
-    ]);
-
-    // === 出欠レポート ===
-    if (repRes.status === "fulfilled" && repRes.value){
-      const v = repRes.value;
-
-      // ★ エラーをUIに表示（not admin など）
-      if (v.status !== "ok"){
-        const msg = v.message || "unknown error";
-        box.innerHTML = `<span class="err">取得失敗：${msg}</span>`;
-        if (selEvent){
-          selEvent.innerHTML = `<option value="">取得失敗：${msg}</option>`;
-          selEvent.disabled = false;
+      sel.disabled = true;
+      sel.innerHTML = `<option value="">（読み込み中…）</option>`;
+      try{
+        const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}`);
+        if (r.status==="ok" && Array.isArray(r.list)){
+          state.reportMeta = r.list;
+          // セレクトを上書き
+          sel.innerHTML = `<option value="">（選択してください）</option>` +
+            r.list.map(e=>{
+              const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
+              return `<option value="${e.id}">${label}</option>`;
+            }).join("");
+        } else {
+          sel.innerHTML = `<option value="">取得エラー</option>`;
         }
+      } catch(err){
+        sel.innerHTML = `<option value="">取得エラー</option>`;
+        console.error(err);
+      } finally {
+        sel.disabled = false;
+      }
+    },
+
+    // ② 公演を選んだら、その1件の詳細だけ取得 → 既存 renderReport() を呼ぶ
+    async onChange(){
+      const id = document.querySelector("#repEvent")?.value || "";
+      const box = document.querySelector("#repBox");
+      if (!id){ if(box) box.textContent = "公演を選択してください"; return; }
+
+      // キャッシュがあればそれを使う
+      if (state.reportCache[id]) {
+        state.report = [ state.reportCache[id] ]; // 既存 renderReport() は配列を期待
+        renderReport();
         return;
       }
 
-      // ★ list / items / reports / data どれでも受け取る
-      const arr = Array.isArray(v.list) ? v.list
-                : Array.isArray(v.items) ? v.items
-                : Array.isArray(v.reports) ? v.reports
-                : Array.isArray(v.data) ? v.data
-                : [];
-
-      // 何らかの形で空配列なら空として扱う（キー名違いで落ちない）
-      state.report = arr.slice();
-      cacheSet(CKEY_REPORT, state.report);
-    }
-
-    // === 会員セグメント ===
-    if (memRes.status === "fulfilled" && memRes.value && memRes.value.status === "ok"){
-      const src = Array.isArray(memRes.value.list) ? memRes.value.list
-                : Array.isArray(memRes.value.items) ? memRes.value.items : [];
-      const normalize = (s)=> String(s||"").replace(/\u3000/g," ").replace(/\s+/g," ").trim();
-      const map = {};
-      src.forEach(m=>{
-        const nm  = normalize(m.name || m.performerName || "");
-        const seg = normSeg(m.segment || m.区分 || "");
-        if (nm && seg) map[nm] = seg;
-      });
-      state.memberSegMap = map;
-      cacheSet(CKEY_MEMBERS, state.memberSegMap);
-    }
-
-    // セレクト描画（無条件上書き）
-    drawEventSelectFromReport();
-    box.innerHTML = (state.report && state.report.length)
-      ? `公演を選択してください`
-      : `<div class="listEmpty">該当する公演がありません</div>`;
-
-  }catch(err){
-    // 通信例外：キャッシュも無ければエラー表示
-    if (!state.report || !state.report.length){
-      const msg = err?.message || String(err);
-      box.innerHTML = `<span class="err">取得エラー：${msg}</span>`;
-      if (selEvent){
-        selEvent.innerHTML = `<option value="">取得エラー</option>`;
-        selEvent.disabled = false;
+      if (box) box.textContent = "読み込み中…";
+      try{
+        const r = await api(`?attendanceReport=1&eventId=${esc(id)}&lineId=${esc(state.lineId)}`);
+        if (r.status==="ok" && r.id){
+          state.reportCache[id] = r;  // キャッシュ
+          state.report = [ r ];       // renderReport() 互換
+          renderReport();
+        } else {
+          if (box) box.textContent = "取得に失敗しました";
+        }
+      } catch(err){
+        if (box) box.textContent = "エラー：" + (err.message||err);
+        console.error(err);
       }
+    },
+
+    // 初期配線
+    mount(){
+      if (this.mounted) return;
+      this.mounted = true;
+      document.querySelector("#repEvent")?.addEventListener("change", ()=>this.onChange());
+      // 「再取得」ボタンがあるなら id="repReload" にしておくとここで配線されます
+      document.querySelector("#repReload")?.addEventListener("click", ()=>this.loadMeta());
     }
+  };
+
+  // 画面を開いたときにこれを呼ぶ
+  async function initAdminReportPage(){
+    adminReport.mount();
+    await adminReport.loadMeta();               // まずはメタだけ
+    const box = document.querySelector("#repBox");
+    if (box) box.textContent = "公演を選択してください";
   }
+</script>
+<!-- ここまで置き換え -->
 
   // --- ヘルパー：state.report からセレクトを全面再描画 ---
   function drawEventSelectFromReport(){
@@ -3094,7 +3085,91 @@ async function renderReport(){
   html += `</div>`;
   box.innerHTML = html;
 }
+  /* ========= 管理者レポート：軽量メタ→選択時に詳細取得 ========= */
+// 追加の状態
+state.reportMeta = [];     // 軽量一覧（rows無し）
+state.reportCache = {};    // id -> 詳細キャッシュ（任意）
+/* 既存の state.report は renderReport() が参照するので触らない */
+
+const adminReport = {
+  mounted: false,
+
+  // ① メタ（一覧だけ）を取ってセレクトに流し込む
+  async loadMeta(){
+    const sel = document.querySelector("#repEvent");
+    if (!sel) return;
+
+    sel.disabled = true;
+    sel.innerHTML = `<option value="">（読み込み中…）</option>`;
+    try{
+      const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}`);
+      if (r.status==="ok" && Array.isArray(r.list)){
+        state.reportMeta = r.list;
+        // セレクトを上書き
+        sel.innerHTML = `<option value="">（選択してください）</option>` +
+          r.list.map(e=>{
+            const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
+            return `<option value="${e.id}">${label}</option>`;
+          }).join("");
+      } else {
+        sel.innerHTML = `<option value="">取得エラー</option>`;
+      }
+    } catch(err){
+      sel.innerHTML = `<option value="">取得エラー</option>`;
+      console.error(err);
+    } finally {
+      sel.disabled = false;
+    }
+  },
+
+  // ② 公演セレクト変更時：詳細を取得して既存 renderReport() を呼ぶ
+  async onChange(){
+    const id = document.querySelector("#repEvent")?.value || "";
+    const box = document.querySelector("#repBox");
+    if (!id){ if(box) box.textContent = "公演を選択してください"; return; }
+
+    // キャッシュがあればそれを使う
+    if (state.reportCache[id]) {
+      state.report = [ state.reportCache[id] ]; // ← 既存 renderReport() 用に配列で
+      renderReport();
+      return;
+    }
+
+    if (box) box.textContent = "読み込み中…";
+    try{
+      const r = await api(`?attendanceReport=1&eventId=${esc(id)}&lineId=${esc(state.lineId)}`);
+      if (r.status==="ok" && r.id){
+        state.reportCache[id] = r;  // キャッシュ
+        state.report = [ r ];       // ← 既存 renderReport() がそのまま動く
+        renderReport();
+      } else {
+        if (box) box.textContent = "取得に失敗しました";
+      }
+    } catch(err){
+      if (box) box.textContent = "エラー：" + (err.message||err);
+      console.error(err);
+    }
+  },
+
+  // 初期配線
+  mount(){
+    if (this.mounted) return;
+    this.mounted = true;
+    document.querySelector("#repEvent")?.addEventListener("change", ()=>this.onChange());
+    // 「再取得」ボタンがある場合は id を #repReload にしておくと配線されます
+    document.querySelector("#repReload")?.addEventListener("click", ()=>this.loadMeta());
+  }
+};
+
+// 画面を開いたときにこれを呼ぶだけ
+async function initAdminReportPage(){
+  adminReport.mount();
+  await adminReport.loadMeta();               // まずはメタだけ
+  const box = document.querySelector("#repBox");
+  if (box) box.textContent = "公演を選択してください";
+}
 </script> 
+  
 <script>
 // ===== 起動 =====
 document.addEventListener('DOMContentLoaded', () => {
