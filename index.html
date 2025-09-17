@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.0.7";
+  const FRONT_VERSION = "Front v3.0.8";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwlzylg_VdTL30u6NQwB1o8uf5cgykF-HJVBCRBJA566aqlNDJF5azTN1lm2hGD1oB_aQ/exec";     // ←差し替え
 
@@ -2934,12 +2934,19 @@ async function reportReload(){
       cacheSet(CKEY_REPORT, state.report);
     }
     // 会員セグメント（name -> 'adult'|'child'）
+    function normalizeNameKey(s){
+      return String(s||"")
+        .replace(/\u3000/g, " ")   // 全角→半角スペース
+        .replace(/\s+/g, " ")      // 連続スペース圧縮
+        .trim();
+    }
     state.memberSegMap = {};
     if (memRes.status==="fulfilled" && memRes.value?.status==="ok" && Array.isArray(memRes.value.list)){
       memRes.value.list.forEach(m=>{
-        const n = (m.name || m.performerName || "").trim();
-        const s = normSeg(m.segment || m.区分 || "");
-        if (n && s) state.memberSegMap[n] = s;
+        const rawName = (m.name || m.performerName || "");
+        const seg = normSeg(m.segment || m.区分 || "");
+        const key = normalizeNameKey(rawName);
+        if (key && seg) state.memberSegMap[key] = seg;  // ← 正規化キーで格納
       });
       cacheSet(CKEY_MEMBERS, state.memberSegMap);
     } else if (cachedMembers) {
@@ -2998,6 +3005,7 @@ function renderReport(){
   const eligible = (name) => {
     if (!name) return false;
     if (!evSeg || evSeg === "both") return true;
+    const key = normalizeNameKey(name);
     return (segLookup[name] === evSeg);
   };
 
@@ -3016,7 +3024,19 @@ function renderReport(){
   const notAnsweredNames = roster.filter(n => !ansMap.has(String(n)));
 
   // 表示名：大人の部のみ接頭辞
-  const withPrefix = (name) => (segLookup[name]==='adult' ? `【大人の部】${name}` : name);
+  function normalizeNameKey(s){
+    return String(s||"")
+      .replace(/\u3000/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  
+  const segLookup = state.memberSegMap || {};
+  const withPrefix = (name) => {
+    const key = normalizeNameKey(name);
+    const seg = segLookup[key];               // 正規化キーで照合
+    return (seg === "adult") ? `【大人の部】${name}` : name;
+  };
 
   const group = { "参加":[], "未定":[], "未回答":[], "欠席":[] };
   rows.forEach(r => {
