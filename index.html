@@ -2917,13 +2917,7 @@ function adminEdit(obj){
         sel.disabled = false;
       }
     },
-    
-    // 既存のメニューやボタンから呼ばれるエイリアス（グローバル）
-    function reportReload(){
-      // 新フロー（メタ→詳細）に一本化
-      initAdminReportPage();
-    }
-    
+       
     // ② セレクト変更→その1件だけ詳細取得→renderReport を呼ぶ
     async onChange(){
       const id = document.querySelector("#repEvent")?.value || "";
@@ -2970,7 +2964,10 @@ function adminEdit(obj){
     if (box) box.textContent = "公演を選択してください";
   }
 <!-- ここまで置き換え -->
-
+  
+// ===== 管理レポート再読込（互換エイリアス） =====
+window.reportReload = function(){ initAdminReportPage(); };
+  
   // --- ヘルパー：state.report からセレクトを全面再描画 ---
   function drawEventSelectFromReport(){
     if (!selEvent) return;
