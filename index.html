@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.0.2";
+  const FRONT_VERSION = "Front v3.0.3";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwxoW17g41EL37RiTamH17mg9M1BP0MDn6ZyfG2RMA30Doh1ZCwA9qw_g4-cB3VNZTB6w/exec";     // ←差し替え
 
@@ -696,6 +696,42 @@
     .fEvent[data-seg="child"].open .fHead { background:#ffecec !important; } /* 子ども=淡赤 */
     .fEvent[data-seg="adult"].open .fHead { background:#e6f0ff !important; } /* 大人=淡青 */
     .fEvent[data-seg="both"].open  .fHead { background:#efe7ff !important; } /* 両方=既存(紫) */
+    /* ===== ① アコーディオン色：閉じた時/ホバー時/開いた時を区分別に統一 ===== */
+    /* デフォルト（閉じている時）は透明にして枠色だけ見せる */
+    .fEvent[data-seg] .fHead{
+      background: transparent !important;
+    }
+    
+    /* ホバー時 */
+    .fEvent[data-seg="child"] .fHead:hover { background:#fff5f5 !important; } /* 淡い赤 */
+    .fEvent[data-seg="adult"] .fHead:hover { background:#f2f7ff !important; } /* 淡い青 */
+    .fEvent[data-seg="both"]  .fHead:hover { background:#f5efff !important; } /* 既存の淡紫 */
+    
+    /* 開いた時（既に設定済みでもOK。ここで最終上書き） */
+    .fEvent[data-seg="child"].open .fHead { background:#ffecec !important; }
+    .fEvent[data-seg="adult"].open .fHead { background:#e6f0ff !important; }
+    .fEvent[data-seg="both"].open  .fHead { background:#efe7ff !important; }
+    
+    /* ===== ② 角のはみ出し対策（背景を枠内で丸めてクリップ） ===== */
+    .fEvent{
+      overflow: hidden;                 /* 子要素の背景が枠外へ出ないように */
+    }
+    .fEvent .fHead{
+      border-top-left-radius:  inherit; /* コンテナの角丸に合わせる */
+      border-top-right-radius: inherit;
+      background-clip: padding-box;     /* Safari等のにじみ対策 */
+    }
+    
+    /* ===== ③ 欠席バッジ：水色系に変更（未回答と差別化） ===== */
+    .stat-ng{
+      background:#e6f2ff !important;   /* 淡い水色 */
+      border:1px solid #bad7ff !important;
+      color:#1e3a8a !important;        /* やや深い青文字 */
+    }
+    
+    /* 未回答（現状グレー）のままでOK。必要ならここで微調整できます
+    .stat-na{ ... }
+    */
   </style>
   
   <!-- LIFF SDK -->
