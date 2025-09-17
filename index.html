@@ -2278,7 +2278,9 @@ async function onRegister(){
     logReg("");
     const inputName = $("#regInputName").value.trim();
     if (!inputName) throw new Error("入力者氏名を入力してください");
-   const notify = !!$("#regNotify")?.checked;            // ★ 追加
+    
+    const notify = !!$("#regNotify")?.checked;            // ★ 追加
+    
     // {name, segment} の配列にまとめる
    const items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
      const name = row.querySelector(".regPerf")?.value.trim();
@@ -2286,7 +2288,8 @@ async function onRegister(){
     return name ? { name, segment: seg } : null;
    }).filter(Boolean);
    if (items.length === 0) throw new Error("演奏者を1名以上入力してください");
-    const notify = !!$("#regNotify")?.checked;   // ★ 追加
+    
+    $("#btnRegister").disabled = true;
     $("#btnRegister").disabled = true; $("#btnRegister").textContent = (registerMode==="edit" ? "保存中…" : "登録中…");
 
     let url = "";
