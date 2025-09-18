@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.1.9";
+  const FRONT_VERSION = "Front v3.2.0";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwSITJbfK_2d5RWAQKIh83TptKcsMvhCO2rQLBYiLZPBrcvEsHAIzsJ9KQ0WP-9TT3GDg/exec";     // ←差し替え
 
@@ -3014,17 +3014,17 @@ window.reportReload = function(){ initAdminReportPage(); };
 async function renderReport(){
   const box = document.querySelector("#repBox");
   const selId = document.querySelector("#repEvent")?.value || "";
-  const fAtt  = document.querySelector("#repAttend")?.value || "";
+  const fAtt  = document.querySelector("#repAttend")?.value || ""; // （すべて/参加/欠席/未定/未回答）
 
   if (!selId){
-    if (box) box.innerHTML = `公演を選択してください`;
+    box.innerHTML = `公演を選択してください`;
     return;
   }
 
-  // 既存キャッシュを使う（無ければ1件読み）
+  // 詳細キャッシュ → 無ければAPI取得
   let ev = state.reportDetailMap?.[selId];
   if (!ev){
-    if (box) box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+    box.innerHTML = `読み込み中… <span class="spinner"></span>`;
     const r = await api(`?attendanceReport=1&lineId=${esc(state.lineId)}&eventId=${esc(selId)}`);
     if (r.status !== "ok"){ box.innerHTML = `<span class="err">取得に失敗しました</span>`; return; }
     ev = {
@@ -3036,56 +3036,81 @@ async function renderReport(){
     state.reportDetailMap[selId] = ev;
   }
 
-  // rows（回答あり）と roster（対象者）から「未回答」を算出
-  const rows = Array.isArray(ev.rows) ? ev.rows : [];
+  // rows は displayName 済み（大人プレフィックス付与済）、roster は対象区分でサーバ側フィルタ済
+  const rows   = Array.isArray(ev.rows) ? ev.rows : [];
   const roster = Array.isArray(ev.roster) ? ev.roster : [];
 
+  // 回答マップ & 未回答
   const ansMap = new Map();
   rows.forEach(r => { if (r?.name) ansMap.set(String(r.name), r); });
   const notAnswered = roster.filter(n => !ansMap.has(String(n)));
 
-  // 出欠フィルタ（「未回答」は rows には含まれない点に注意）
-  const pickedRows = rows.filter(r => {
-    if (!fAtt) return true;
-    if (fAtt === "未回答") return false;
-    return String(r.attend||"") === fAtt;
-  });
+  // 参加/欠席/未定 でグルーピング
+  const groups = { "参加": [], "欠席": [], "未定": [] };
+  for (const r of rows){
+    const k = (r.attend==="参加" || r.attend==="欠席" || r.attend==="未定") ? r.attend : "未定";
+    groups[k].push(r);
+  }
 
-  // バッジ用クラス
-  const attClass = (a)=>{
-    if (a === "参加") return "yes";
-    if (a === "欠席") return "no";
-    if (a === "未定") return "maybe";
-    return "na";
+  // セクション描画ヘルパ
+  const section = (label, cls, list) => {
+    if (!list.length) return "";
+    // フィルタ適用（「未回答」は rows に含まれないので別処理）
+    if (fAtt && fAtt !== label) return "";
+    return `
+      <div class="card" style="margin:8px 0;">
+        <div class="row" style="gap:8px; align-items:center; margin-bottom:6px;">
+          <span class="pill sm ${cls}">${label}</span>
+          <span class="small muted">${list.length}名</span>
+        </div>
+        ${list.map(r=>`
+          <div class="row" style="justify-content:space-between; margin:4px 0;">
+            <div class="repName">${r.displayName || r.name}</div>
+            <div class="small muted">回答：${r.answeredAt || ""}</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
   };
 
-  // ヘッダ（タイトル行＋受付タグ）
-  const headHtml = `
-    <div class="repHead">
-      <div class="repTitle">${ev.ymd || ""} ${ev.time || ""}　${ev.title || ""}</div>
-      <span class="tag ${ev.accepting==="open"?"open":"closed"}">
-        ${ev.accepting==="open"?"受付中":"受付終了"}
-      </span>
+  // 未回答セクション
+  const naSection = (() => {
+    if (!notAnswered.length) return "";
+    if (fAtt && fAtt !== "未回答") return "";
+    return `
+      <div class="card" style="margin:8px 0;">
+        <div class="row" style="gap:8px; align-items:center; margin-bottom:6px;">
+          <span class="pill sm stat-na">未回答</span>
+          <span class="small muted">${notAnswered.length}名</span>
+        </div>
+        ${notAnswered.map(n=>`
+          <div class="row" style="justify-content:space-between; margin:4px 0;">
+            <div class="repName">${n}</div>
+            <div class="small muted">回答：—</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  })();
+
+  // ヘッダ（イベント情報）
+  const head = `
+    <div class="repInfo">
+      <div><b>${ev.ymd || ""} ${ev.time || ""}</b>　${ev.title || ""}</div>
+      <div>場所：${ev.place || ""}　対象：${ev.segment || ""}</div>
+      <div>受付：${ev.accepting==="open"?"受付中":"受付終了"}</div>
     </div>
-    <div class="repSub">場所：${ev.place || ""}　対象：${ev.segment || ""}</div>
   `;
 
-  // 回答行
-  const rowsHtml = pickedRows.map(r=>`
-    <div class="repRow">
-      <div class="repName">${r.displayName || r.name}</div>
-      <span class="badge-att ${attClass(r.attend)}">${r.attend || ""}</span>
-      <div class="repAt">${r.answeredAt || ""}</div>
-    </div>
-  `).join("");
+  // 表示順：参加 → 未回答 → 欠席 → 未定（ご要望の順）
+  const html =
+    head +
+    section("参加", "stat-ok", groups["参加"]) +
+    naSection +
+    section("欠席", "stat-ng", groups["欠席"]) +
+    section("未定", "stat-pd", groups["未定"]);
 
-  // 未回答
-  const naHtml = (fAtt==="" || fAtt==="未回答")
-    ? (`<div class="repNA"><b>未回答</b>：${notAnswered.length ? notAnswered.join("、") : "なし"}</div>`)
-    : "";
-
-  // まとめて描画（カード風に）
-  box.innerHTML = `<div class="repCard">${headHtml}${rowsHtml}${naHtml}</div>`;
+  box.innerHTML = html;
 }
 </script> 
   
