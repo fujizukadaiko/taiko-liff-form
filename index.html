@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.6";
+  const FRONT_VERSION = "Front v3.3.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxkVMUfLkSP_6wqoVEJr6vsPzlCHl3M9UNyVFMqQr2UOQhsqS75GcZ0ZUHN71_Exahr/exec";     // ←差し替え
 
@@ -2453,67 +2453,99 @@ window.copyIcsFeed = function(){
 };
 
   // --- Schedules API のURLを作る ---
+// --- PATCH: /schedules 用の URL を生成（days / kind / segment） ---
 function buildSchedulesUrl(){
-  const days = Number(document.getElementById('selDays')?.value || 60) || 60;
-  const type = document.getElementById('selKind')?.value || "";   // "", "発表" など
-  const seg  = document.getElementById('selSeg') ?.value || "";   // "", "adult", "child"
+  // API_ENDPOINT が末尾スラッシュでも OK にする
+  const base = (API_ENDPOINT || '').replace(/\/+$/, '') + '/schedules';
+
+  const days   = Number(document.getElementById('selDays')?.value || 60) || 60;
+  const kind   = document.getElementById('selKind')?.value || "";   // "発表" / "練習" / "その他" / ""
+  const seg    = document.getElementById('selSeg') ?.value || "";   // "adult" / "child" / ""
 
   const p = new URLSearchParams();
-  p.set('period', String(days));       // 30/60/90 など日数でOK
-  if (type) p.set('type', type);
-  if (seg)  p.set('seg',  seg);
-// まずは GAS 互換のクエリ型に（GASが未実装でも次のフォールバックが効く）
- p.set('schedules', '1');     // ← バックエンドで未対応でも害はありません
- p.set('period', String(days));
- if (type) p.set('type', type);
- if (seg)  p.set('seg',  seg);
- const u = `${API_ENDPOINT}?${p.toString()}`;
-console.log("[schedules] fetch:", u);
-return u;
-  return `${API_ENDPOINT}/schedules?${p.toString()}`;
+  p.set('days', String(days));          // ← サーバ実装に合わせて days
+  if (kind) p.set('kind',    kind);     // ← "発表" 等の日本語OK
+  if (seg)  p.set('segment', seg);      // ← "adult" | "child"
+
+  const url = `${base}?${p.toString()}`;
+  console.log('[schedules] fetch:', url);
+  return url;
 }
 
 // --- 取得してローカル描画に流し込む ---
+// --- PATCH: 取得してローカル描画（/schedules を優先、失敗時は互換フォールバック） ---
 async function fetchSchedulesAndRender(){
   const box = document.getElementById('schedulesBox');
   if (box) box.textContent = "読み込み中…";
+
+  // UI 値をここで拾っておく（フォールバックURL生成に使う）
+  const days = Number(document.getElementById('selDays')?.value || 60) || 60;
+  const kind = document.getElementById('selKind')?.value || "";
+  const seg  = document.getElementById('selSeg') ?.value || "";
+
+  // ① 正式エンドポイント（/schedules?...）を叩く
   try{
-    const res = await fetch(buildSchedulesUrl(), { method:'GET' });
+    const res = await fetch(buildSchedulesUrl(), { method:'GET' }); // 余計なヘッダは付けない
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
 
-    // API側が { items:[...] } でも [...] でも受けられるように吸収
     state.schedulesRaw = Array.isArray(json?.items) ? json.items
-                     : Array.isArray(json)         ? json
-                     : [];
-    renderSchedulesLocal();   // ← 既存のローカル再描画をそのまま活用
+                      : Array.isArray(json)         ? json
+                      : [];
+    renderSchedulesLocal();
+    return;
   }catch(err){
-    console.warn('[schedules] primary fetch failed, fallback to ?events=1', err);
-   try {
-     // 既に state.events があればそれを使う。無ければ ?events=1 を取る
-     let base = state.events;
-     if (!Array.isArray(base) || base.length === 0){
-       const r = await fetch(API_ENDPOINT + '?events=1');
-       const j = await r.json();
-       base = Array.isArray(j?.events) ? j.events : [];
-     }
-     // 表示用に最小項目へ変換
-     state.schedulesRaw = (base || []).map(e => ({
-       id: e.eventId || e.id,
-       title: e.title || e.name || '',
-       kind: e.type || e.kind || '発表',
-       segment: e.segment || e.targetSegment || e.attendSegment || '',
-       ymd: e.date || e.ymd || '',
-       hm: e.time || e.hm || '',
-       place: e.place || e.venue || '',
-       memo: e.memo || ''
-     }));
-     renderSchedulesLocal();
-   } catch (e2){
-     console.error(e2);
-     if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
-   }
+    console.warn('[schedules] primary fetch failed:', err);
   }
+
+  // ② 互換フォールバック（旧: ?schedules=1&period=...&kind=...&segment=...）
+  try{
+    const params = new URLSearchParams();
+    params.set('schedules', '1');
+    params.set('period', String(days));         // 旧パラメータ名
+    if (kind) params.set('kind', kind);
+    if (seg)  params.set('segment', seg);
+
+    const url2 = `${API_ENDPOINT}?${params.toString()}`;
+    console.log('[schedules] fallback fetch:', url2);
+
+    const res2 = await fetch(url2, { method:'GET' });
+    if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
+    const json2 = await res2.json();
+
+    state.schedulesRaw = Array.isArray(json2?.items) ? json2.items
+                      : Array.isArray(json2)         ? json2
+                      : [];
+    renderSchedulesLocal();
+    return;
+  }catch(err2){
+    console.warn('[schedules] fallback (?schedules=1) also failed:', err2);
+  }
+
+  // ③ 最終手段：?events=1 から最低限の表示情報を合成
+  try{
+    let base = state.events;
+    if (!Array.isArray(base) || base.length === 0){
+      const r = await fetch(API_ENDPOINT + '?events=1');
+      const j = await r.json();
+      base = Array.isArray(j?.events) ? j.events : [];
+    }
+    state.schedulesRaw = (base || []).map(e => ({
+      id: e.eventId || e.id,
+      title: e.title || e.name || '',
+      kind: e.type || e.kind || '発表',
+      segment: e.segment || e.targetSegment || e.attendSegment || '',
+      ymd: e.date || e.ymd || '',
+      hm: e.time || e.hm || '',
+      place: e.place || e.venue || '',
+      memo: e.memo || ''
+    }));
+    renderSchedulesLocal();
+  } catch (e3){
+    console.error(e3);
+    if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
+  }
+}
 }
   window.fetchSchedulesAndRender = fetchSchedulesAndRender;
 // state が無ければ作る（重複定義ガード付き）
