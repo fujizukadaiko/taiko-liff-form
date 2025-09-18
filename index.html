@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.0";
+  const FRONT_VERSION = "Front v3.3.1";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxBEF7quF4QJ8hrFhqPTEamBsz_jqtmAj5ePdOD1E535zGd9yoxdVOu1uMfSCTorCJMoA/exec";     // ←差し替え
 
@@ -1606,7 +1606,7 @@ function bindHandlers(){
   $("#btnAddPerf").onclick     = ()=> addPerformerField("");
   $("#btnRegister").onclick    = onRegister;
 
-  $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); updateSegFilterUI(); fetchSchedulesAndRender(); };
+  $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); updateSegFilterUI(); window.fetchSchedulesAndRender && window.fetchSchedulesAndRender(); };
   $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
   $("#btnFetchSchedules").onclick    = ()=> renderSchedules(true);
   // 区分フィルタが変更されたら 今後の予定を再描画
@@ -2485,6 +2485,7 @@ async function fetchSchedulesAndRender(){
     if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
   }
 }
+  window.fetchSchedulesAndRender = fetchSchedulesAndRender;
 // state が無ければ作る（重複定義ガード付き）
 window.state = window.state || {};
 state.schedulesRaw = state.schedulesRaw || [];
