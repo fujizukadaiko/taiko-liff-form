@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.5";
+  const FRONT_VERSION = "Front v3.2.6";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxBEF7quF4QJ8hrFhqPTEamBsz_jqtmAj5ePdOD1E535zGd9yoxdVOu1uMfSCTorCJMoA/exec";     // ←差し替え
 
@@ -2524,10 +2524,9 @@ async function onRegister(){
     if (typeof updateSegFilterUI === "function") updateSegFilterUI();
   }
 
-// ===== 今後の予定：ローカル再描画（UIの選択だけで即時フィルタ） =====
+// ===== 今後の予定：ローカル再描画 =====
 function renderSchedulesLocal(){
   const box = $("#schedulesBox");
-
   // まだ初回取得前なら待機表示
   if (!Array.isArray(state.schedulesRaw) || state.schedulesRaw.length === 0){
     box.innerHTML = `読み込み待機中（「再取得」を押すと読み込みます）`;
@@ -2561,18 +2560,23 @@ function renderSchedulesLocal(){
   }
 
   // ユーザー区分（閲覧者でも常に表示＝会員0件時はフィルタしない）
-  const segSet = getMemberSegSet();
-  arr = arr.filter(it => {
-    const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
-    return eventVisibleForUser(evSeg, segSet, /* includeBoth */ true);  // 両方は常に含める
-  });
+  const segSet = (typeof getMemberSegSet === "function") ? getMemberSegSet() : null;
+  if (segSet){
+    arr = arr.filter(it => {
+      const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
+      return (typeof eventVisibleForUser === "function")
+        ? eventVisibleForUser(evSeg, segSet, /* includeBoth */ true)
+        : true;
+    });
+  }
 
   // UIの区分フィルタ（大人/子ども選択時でも『両方』は残す）
-  if (segSet && segSet.size > 0 && userHasBoth()){
+  if (segSet && segSet.size > 0 && (typeof userHasBoth === "function") && userHasBoth()){
     const uiSeg = $("#selSeg")?.value || "";
     if (uiSeg){
       arr = arr.filter(it => {
-        const n = normSeg(it.segment || it.targetSegment || it.attendSegment || "");
+        const normSegFn = (typeof normSeg === "function") ? normSeg : (s=>String(s||"").toLowerCase());
+        const n = normSegFn(it.segment || it.targetSegment || it.attendSegment || "");
         if (uiSeg === "adult") return (n === "adult" || n === "both");
         if (uiSeg === "child") return (n === "child" || n === "both");
         return true;
@@ -2583,7 +2587,8 @@ function renderSchedulesLocal(){
   state.schedules = arr;
 
   // ここでカードHTMLを作成
-  const listHtml = window.renderSchedulesView ? window.renderSchedulesView(state.schedules) : "";
+  const renderView = window.renderSchedulesView || ((list)=>`<div class="listEmpty">一覧テンプレート未定義です（renderSchedulesView）。</div>`);
+  const listHtml = renderView(state.schedules);
 
   // ★ 閲覧者（= 会員未登録）ガイドを“下部”に付け足す
   const viewerOnly = !state.members || state.members.length === 0;
@@ -2604,28 +2609,23 @@ function renderSchedulesLocal(){
   box.innerHTML = listHtml + guideHtml;
 }
 
-// ===== 今後の予定：外部から呼ぶエントリ関数（グローバル公開） =====
-// ・forceFetch=true のときはサーバーから再取得してからローカル再描画
-async function renderSchedules(forceFetch){
-  try{
-    if (forceFetch) {
-      // サーバ再取得（必要なら実装を既存の refreshData に委譲）
-      if (typeof refreshData === "function") {
-        await refreshData();
-      }
+// ===== 今後の予定：外部公開関数（互換） =====
+window.renderSchedules = async function(forceFetch){
+  // forceFetch が true のときはデータ再取得（refreshData が既存想定）
+  if (forceFetch && typeof refreshData === "function"){
+    try{
+      await refreshData();
+    }catch(e){
+      console.error("[schedules] refreshData() でエラー:", e);
     }
-  }catch(e){
-    console.error("[schedules] refreshData failed:", e);
   }
   renderSchedulesLocal();
-}
-// グローバル公開（onclick から呼べるように）
-window.renderSchedules = renderSchedules;
+};
 
-// 互換：外部から呼ばれる可能性がある場合
-window.loadSchedules = function(){ renderSchedules(false); };
+// 互換：外部から呼ばれる想定があればこちら
+window.loadSchedules = function(){ window.renderSchedules(false); };
 
-// ICS コピー
+// 便利関数
 window.copyIcsFeed = function(){
   const ipt = $("#icsFeedUrl");
   if (!ipt) return;
