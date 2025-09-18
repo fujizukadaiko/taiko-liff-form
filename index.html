@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.7";
+  const FRONT_VERSION = "Front v3.2.8";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -823,6 +823,35 @@
       display:inline-flex; align-items:center; justify-content:center;
       height:20px; padding:0 8px; border-radius:999px; font-size:11px;
       border:1.5px solid var(--c-border); background:#f7f7f7; color:#444;
+    }
+    /* === 種別バッジを右端に＆四角形に === */
+
+    /* 1) 1行目（バッジ行）のレイアウトはそのままFlex。
+          種別バッジだけ右端へ寄せる */
+    .scheduleCard .row1 { display:flex; align-items:center; gap:8px; }
+    .scheduleCard .row1 .kind-badge { margin-left:auto; }
+    
+    /* 2) “四角い”種別バッジ（やや小さめのまま）
+       - 丸 pill → 角丸少なめの矩形
+       - 既存の .kind-badge を上書き */
+    .kind-badge{
+      display:inline-flex; align-items:center; justify-content:center;
+      height:20px;               /* 小さめ */
+      padding:0 10px;            /* 少しだけ幅にゆとり */
+      border-radius:6px;         /* ← 999px から変更（四角い見た目） */
+      font-size:11px;
+      border:1.5px solid var(--c-border);
+      background:#f7f7f7;
+      color:#444;
+      line-height:1;             /* 縦位置を安定 */
+      white-space:nowrap;        /* 折り返し防止（‘発表’等は短い想定） */
+    }
+    
+    /* （参考）区分バッジは“やや小さめ”の pill のまま */
+    .seg-badge.sm{
+      height:20px;
+      padding:0 8px;
+      font-size:11px;
     }
   </style>
   
