@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.7";
+  const FRONT_VERSION = "Front v3.2.8";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxBEF7quF4QJ8hrFhqPTEamBsz_jqtmAj5ePdOD1E535zGd9yoxdVOu1uMfSCTorCJMoA/exec";     // ←差し替え
 
@@ -259,25 +259,7 @@
       cursor: not-allowed;
       filter: saturate(.6);
     }
-    /* =========================================================
-   Schedules用：プルダウンを少し低め（出欠フォームと統一）
-   ※ 既存の .selectBtn を上書きします（全ページ共通OK）
-   ========================================================= */
-    .selectBtn{
-      height: 36px;         /* 高さをコンパクトに */
-      min-height: 36px;
-      line-height: 34px;    /* テキスト縦位置のバランス調整 */
-      padding: 0 12px;      /* 左右はそのまま */
-      font-size: 14px;      /* 少しだけ控えめ */
-    }
     
-    /* iOS / Safari 対応（矢印のズレを抑制：必要なら） */
-    .selectBtn::-ms-expand { display: none; }
-    .selectBtn {
-      -webkit-appearance: none;
-      appearance: none;
-    }
-
 /* =========================================================
    ゴーストボタン（#btnFetchSchedules など）を紫ボーダーに統一
    既存 .btn, .btn-sm を活かして「色味」だけを合わせます
@@ -308,108 +290,7 @@
       cursor: not-allowed;
       filter: saturate(.6);
     }
-    /* ================================
-   今後の予定：レイアウトと見た目
-   ================================ */
-    
-    /* 2列グリッド：プルダウンを横並び、下段にボタン */
-    .schedControls{
-      display: grid;
-      grid-template-columns: auto auto;
-      gap: 10px 14px;
-      align-items: end;
-      justify-content: start; /* 横幅を内容サイズに合わせる */
-    }
-    .schedControls .field{
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-    .schedControls .span2{
-      grid-column: 1 / -1; /* 2列ぶち抜きで下段にボタン */
-    }
-    
-    /* プルダウンを短め幅に（内容量に応じて調整可） */
-    .schedSel{
-      width: 160px;          /* コンパクト幅（ご希望に応じて 140〜200pxで微調整可） */
-      max-width: 100%;
-    }
-    
-    /* モバイルで列落ちしても綺麗に見せる */
-    @media (max-width: 420px){
-      .schedControls{
-        grid-template-columns: 1fr 1fr; /* 2列のままでもOK。1列にしたければ 1fr に */
-      }
-      .schedSel{
-        width: 100%; /* 極端に狭い端末では全幅にして文字切れを防止 */
-      }
-    }
-    
-    /* 文字が見切れる対策：選択肢垂直位置のクリップを緩和 */
-    .selectBtn{
-      height: 36px;
-      min-height: 36px;
-      line-height: normal;  /* ← 重要：iOSで文字が切れないよう固定line-heightを解除 */
-      padding: 6px 12px;    /* 縦の余白で視認性を確保 */
-      font-size: 14px;
-      -webkit-appearance: none;
-      appearance: none;
-    }
-    /* ================================
-   今後の予定：2行のラベル｜プルダウン配置
-   ================================ */
-    /* ラベル｜セレクト の2列グリッド。要素は [label, select, label, select, span2...] の順 */
-    .schedControls{
-      display: grid;
-      grid-template-columns: auto max-content; /* 左=ラベル、右=プルダウン */
-      gap: 10px 14px;
-      align-items: center;
-      justify-content: start;
-    }    
-    /* ボタンは2列ぶち抜きで下段へ */
-    .schedControls .span2{
-      grid-column: 1 / -1;
-    }
-    
-    /* ラベル側のスタイル（任意） */
-    .scLabel{
-      font-size: 14px;
-      color: var(--c-text);
-      white-space: nowrap;
-    }
-    
-    /* プルダウンを短め幅に（前回より“半分”寄りのサイズ） */
-    .schedSel.short{
-      width: 120px;                  /* 目安：前回160px → 120px。さらに短くしたければ 96〜110pxなどに */
-      max-width: 100%;
-    }
-    
-    /* 端末幅が狭い時の保険：文字が見切れないように */
-    @media (max-width: 420px){
-      .schedSel.short{
-        width: clamp(100px, 40vw, 128px); /* 端末に応じて少し伸縮 */
-      }
-    }
-    
-    /* iOS 文字欠け対策（selectの縦詰まりを避ける） */
-    .selectBtn{
-      height: 36px;
-      min-height: 36px;
-      line-height: normal;
-      padding: 6px 12px;
-      font-size: 14px;
-      -webkit-appearance: none;
-      appearance: none;
-    }
-    /* 氏名編集(登録)ページの微調整 */
-    .regAddRow { 
-      margin-top: 12px;               /* 上と詰まらないように余白を追加 */
-    }
-    #regNote {
-      margin: 6px 0 8px;               /* タイトル直下の注意書きの行間 */
-      font-size: 12px;
-      color: var(--c-muted);
-    }
+  
     /* ===== 演奏者行（ラベルは1行、下段で入力と削除を2列に並べる） ===== */
     /* ===== 演奏者行：名前 7 / 右カラム 3（区分+削除） ===== */
     .perfRow{
@@ -509,307 +390,230 @@
       .spinner { border-top-color: rgb(79 70 229); }
     }
   </script>
-  <!-- ===== Custom Overrides（最後に評価されるCSS） ===== -->
-  <style id="custom-overrides">
-    :root{
-      /* プルダウンの横幅（必要に応じて微調整） */
-      --attSel-width: 180px;
-    }
-
-    /* 名前 + セレクトを同じ行に。右側のセレクト幅を固定 */
-    .row-att{
-      display: grid;
-      grid-template-columns: 1fr var(--attSel-width);
-      gap: 8px;
-      align-items: center;
-    }
-
-    /* ボタン風プルダウンの幅を統一（プレースホルダと選択後で幅が変わらないように） */
-    .selectBtn{
-      width: var(--attSel-width);
-      min-width: var(--attSel-width);
-      box-sizing: border-box;
-      white-space: nowrap;
-      border: 1.5px solid var(--c-primary-2);
-      color: var(--c-primary-2);
-      background: #fff;
-      border-radius: 10px;
-      padding: 6px 10px;
-      font-weight: 600;
-    }
-
-    /* プレースホルダ行（value=""）の色 */
-    .selectBtn option[value=""]{
-      color: #9aa;
-    }
-
-    /* すべてのボタンの disabled 視覚（前にご提示のものもここにまとめてOK） */
-    button[disabled],
-    .btn[disabled]{
-      opacity: .55;
-      pointer-events: none;
-      cursor: not-allowed;
-      filter: saturate(.6);
-    }
-    /* ---- 軽い削除ボタン（見た目を他ボタンと差別化） ---- */
-    .btn-remove{
-      background:#fff !important;
-      color:#222 !important;                         /* 黒系文字 */
-      border:1px solid #dcd2ef !important;           /* ごく薄い紫の枠 */
-      box-shadow:
-        0 2px 10px rgba(127,106,165,0.10),           /* 薄い紫のソフトシャドウ */
-        0 1px 0 rgba(0,0,0,0.02) inset;
-      transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
-    }
-    .btn-remove:hover{
-      filter: brightness(0.98);
-      box-shadow:
-        0 3px 12px rgba(127,106,165,0.16),
-        0 1px 0 rgba(0,0,0,0.03) inset;
-    }
-    .btn-remove:active{
-      transform: translateY(1px);
-    }
-    .btn-remove:focus-visible{
-      outline: none;
-      box-shadow:
-        0 0 0 3px rgba(127,106,165,0.12),            /* フォーカス時に薄いリング */
-        0 2px 10px rgba(127,106,165,0.10);
-    }
-    /* 無効時の視覚（全体ルールに準拠） */
-    .btn-remove[disabled]{
-      opacity: .55;
-      pointer-events: none;
-      cursor: not-allowed;
-      filter: saturate(.6);
-    }
-    /* === disabledテキスト入力の見た目をselectと統一（iOS/Safari対応） === */
-    input[type="text"]:disabled,
-    input[type="date"]:disabled,
-    input[type="time"]:disabled,
-    textarea:disabled {
-      color: #888 !important;                     /* テキスト色 */
-      -webkit-text-fill-color: #888 !important;   /* iOS/Safariで薄くなるのを防ぐ */
-      opacity: 1 !important;                      /* iOSの透明度低下を打ち消す */
-      background: #f7f5ff !important;             /* 既存ルールと統一 */
-      border-color: #e6e0f0 !important;
-    }
-    
-    /* placeholderも濃さを統一する */
-    input[type="text"]:disabled::placeholder,
-    input[type="date"]:disabled::placeholder,
-    input[type="time"]:disabled::placeholder,
-    textarea:disabled::placeholder {
-      color: #888 !important;
-      opacity: 1 !important;
-    }
-    
-    /* Safari旧挙動の保険 */
-    input[type="text"]:disabled::-webkit-input-placeholder,
-    input[type="date"]:disabled::-webkit-input-placeholder,
-    input[type="time"]:disabled::-webkit-input-placeholder,
-    textarea:disabled::-webkit-input-placeholder {
-      color: #888 !important;
-      opacity: 1 !important;
-    }
-    /* 上部アコーディオンのヘッダーを常時うす紫、open時は少し濃く */
-    #adminListAcc .fHead{
-      background:#f5efff !important;
-      border-radius:10px;
-    }
-    #adminListAcc.open .fHead{
-      background:#efe7ff !important;
-    }
-    /* アコーディオン内の編集ボタンを小さめ＆薄めトーンに */
-    #adminListAcc .btn-edit{
-      min-height: 32px;
-      padding: 6px 10px;
-      font-size: 13px;
-      border-radius: 9px;
-      background:#fff !important;
-      color: color-mix(in srgb, var(--c-primary-2), #000 0%) !important; /* 文字は既存と同系色 */
-      border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 12%) !important; /* 枠をワントーン薄く */
-      box-shadow: 0 1px 3px rgba(127,106,165,0.08);
-    }
-    #adminListAcc .btn-edit:hover{
-      background:#f8f6ff !important;
-      border-color: color-mix(in srgb, var(--c-primary-2), #000 20%) !important;
-    }
-    /* 管理フォームのみ：注釈の文字をさらに小さく（10px） */
-    #view-admin .hint{
-      font-size: 10px !important;
-      line-height: 1.55;
-    }
-    /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
-    .repControls{
-      display: grid;
-      grid-template-columns: auto max-content;
-      gap: 10px 14px;
-      align-items: center;
-      justify-content: start;
-    }
-    .repLabel{
-      font-size: 14px;
-      color: var(--c-text);
-      white-space: nowrap;
-    }
-    /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
-    .repControls{
-      display: grid;
-      grid-template-columns: auto max-content;
-      gap: 10px 14px;
-      align-items: center;
-      justify-content: start;
-    }
-    .repLabel{
-      font-size: 14px;
-      color: var(--c-text);
-      white-space: nowrap;
-    }
-    /* 下段に「再取得」ボタンを左寄せで配置 */
-    .repControls .span2{
-      grid-column: 1 / -1;
-      display: flex;
-      justify-content: flex-start;
-      margin-top: 4px;
-    }
-    /* ===== 出欠：セグメントを独立行にしたときの余白（最小CSS） ===== */
-    .fHead .seg-badge{ margin: 0 0 4px 0; }   /* 上段バッジの下に少し余白 */
-    /* ===== 区分別の枠色（カード/行を共通で） ===== */
-    :root{
-      --seg-child-border:#f59e9e;   /* 子ども=薄い赤 */
-      --seg-adult-border:#93c5fd;   /* 大人=薄い青  */
-      --seg-both-border:#e8e2f0;    /* 両方=薄い紫（既存） */
-    }
-    /* イベントカード類（トップ/フォーム/予定/管理一覧） */
-    .card[data-seg="child"], .fEvent[data-seg="child"], .eventRow[data-seg="child"]{
-      border-color: var(--seg-child-border) !important;
-    }
-    .card[data-seg="adult"], .fEvent[data-seg="adult"], .eventRow[data-seg="adult"]{
-      border-color: var(--seg-adult-border) !important;
-    }
-    .card[data-seg="both"], .fEvent[data-seg="both"], .eventRow[data-seg="both"]{
-      border-color: var(--seg-both-border) !important;
-    }
-    
-    /* ===== 欠席バッジ（赤→ブルーグレー） ===== */
-    .stat-ng{
-      background:#eef2f7 !important;
-      border:1px solid #d2d9e3 !important;
-      color:#334155 !important;
-    }
-    
-    /* ===== 出欠フォーム：開いた時のヘッダー色を区分別に ===== */
-    .fEvent[data-seg="child"].open .fHead { background:#ffecec !important; } /* 子ども=淡赤 */
-    .fEvent[data-seg="adult"].open .fHead { background:#e6f0ff !important; } /* 大人=淡青 */
-    .fEvent[data-seg="both"].open  .fHead { background:#efe7ff !important; } /* 両方=既存(紫) */
-    /* ===== ① アコーディオン色：閉じた時/ホバー時/開いた時を区分別に統一 ===== */
-    /* デフォルト（閉じている時）は透明にして枠色だけ見せる */
-    .fEvent[data-seg] .fHead{
-      background: transparent !important;
-    }
-    
-    /* ホバー時 */
-    .fEvent[data-seg="child"] .fHead:hover { background:#fff5f5 !important; } /* 淡い赤 */
-    .fEvent[data-seg="adult"] .fHead:hover { background:#f2f7ff !important; } /* 淡い青 */
-    .fEvent[data-seg="both"]  .fHead:hover { background:#f5efff !important; } /* 既存の淡紫 */
-    
-    /* 開いた時（既に設定済みでもOK。ここで最終上書き） */
-    .fEvent[data-seg="child"].open .fHead { background:#ffecec !important; }
-    .fEvent[data-seg="adult"].open .fHead { background:#e6f0ff !important; }
-    .fEvent[data-seg="both"].open  .fHead { background:#efe7ff !important; }
-    
-    /* ===== ② 角のはみ出し対策（背景を枠内で丸めてクリップ） ===== */
-    .fEvent{
-      overflow: hidden;                 /* 子要素の背景が枠外へ出ないように */
-    }
-    .fEvent .fHead{
-      border-top-left-radius:  inherit; /* コンテナの角丸に合わせる */
-      border-top-right-radius: inherit;
-      background-clip: padding-box;     /* Safari等のにじみ対策 */
-    }
-    
-    /* ===== ③ 欠席バッジ：水色系に変更（未回答と差別化） ===== */
-    .stat-ng{
-      background:#e6f2ff !important;   /* 淡い水色 */
-      border:1px solid #bad7ff !important;
-      color:#1e3a8a !important;        /* やや深い青文字 */
-    }
-    
-    /* 未回答（現状グレー）のままでOK。必要ならここで微調整できます
-    .stat-na{ ... }
-    */
-    /* === 氏名編集ページ専用の上書き === */
-    #view-register .perfRow{
-      display: grid;
-      grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); /* 名前7 : 右3 */
-      grid-auto-rows: auto;
-      column-gap: 12px;
-      row-gap: 8px;
-      align-items: center;
-    }
-    
-    /* ラベルは2列ぶち抜き */
-    #view-register .perfRow .perfLabel{ grid-column: 1 / -1; }
-    
-    /* 左：演奏者名入力は全幅 */
-    #view-register .perfRow .regPerf{
-      grid-column: 1 / 2;
-      width: 100%;
-      height: 44px;
-    }
-    
-    /* 右：区分セレクト（上段）・削除（下段）を縦積み & 全幅 */
-    #view-register .perfRow .regPerfSeg{
-      grid-column: 2 / 3;
-      width: 100%;
-      height: 44px;
-      justify-self: stretch;
-    }
-    #view-register .perfRow .btn-remove{
-      grid-column: 2 / 3;
-      width: 100% !important;
-      min-height: 40px;
-      height: 44px;
-      justify-self: stretch;
-      align-self: end;
-    }
-    
-    /* ここがポイント：氏名編集では “固定幅Select” を解除して全幅化 */
-    #view-register .selectBtn{
-      width: 100% !important;
-      min-width: 0 !important;
-      box-sizing: border-box;
-    }
-    
-    /* モバイル微調整 */
-    @media (max-width: 420px){
-      #view-register .perfRow{ column-gap: 10px; }
-    }
-    /* ===== 出欠結果バッジ（管理レポート） ===== */
-    .repCard { background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; }
-    .repHead { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
-    .repTitle { font-weight:700; }
-    .repSub   { font-size:12px; color:var(--c-muted); }
-    
-    .repRow  { display:flex; align-items:baseline; gap:8px; padding:6px 0; border-top:1px dashed #eee; }
-    .repRow:first-child { border-top:0; }
-    .repName { font-weight:600; min-width:9em; }
-    .repAt   { font-size:12px; color:var(--c-muted); }
-    
-    .badge-att {
-      display:inline-flex; align-items:center; justify-content:center;
-      height:22px; padding:0 8px; border-radius:999px; font-size:12px; font-weight:700;
-      border:1.5px solid;
-    }
-    .badge-att.yes   { color:#047857; background:#ecfdf5; border-color:#a7f3d0; } /* 参加=緑 */
-    .badge-att.no    { color:#b91c1c; background:#fef2f2; border-color:#fecaca; } /* 欠席=赤 */
-    .badge-att.maybe { color:#92400e; background:#fffbeb; border-color:#fde68a; } /* 未定=黄 */
-    .badge-att.na    { color:#475569; background:#f1f5f9; border-color:#cbd5e1; } /* その他/空 */
-    
-    .repNA  { margin-top:10px; padding-top:8px; border-top:1px solid var(--c-border); font-size:13px; color:#475569; }  
-  </style>
   
+  <style id="custom-overrides">
+  :root{
+    /* ===== 共通カスタム変数 ===== */
+    --attSel-width: 180px;             /* 出欠セレクト固定幅 */
+    --seg-child-border:#f59e9e;        /* 区分バッジの境界色（子ども） */
+    --seg-adult-border:#60a5fa;        /* 区分バッジの境界色（大人） */
+    --seg-both-border:#bda8ea;         /* 区分バッジの境界色（両方） */
+  }
+
+  /* ===== 出欠：名前 + セレクト同一行（右側固定幅） ===== */
+  .row-att{
+    display: grid;
+    grid-template-columns: 1fr var(--attSel-width);
+    gap: 8px;
+    align-items: center;
+  }
+  .selectBtn{
+    width: var(--attSel-width);
+    min-width: var(--attSel-width);
+    box-sizing: border-box;
+    white-space: nowrap;
+    border: 1.5px solid var(--c-primary-2);
+    color: var(--c-primary-2);
+    background: #fff;
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-weight: 600;
+    height: 36px;            /* 高さを統一（iOSの縦詰まり回避） */
+    min-height: 36px;
+    line-height: normal;
+    -webkit-appearance: none;
+    appearance: none;
+    box-shadow: 0 1px 4px rgba(127,106,165,0.14);
+  }
+  .selectBtn:focus{
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(127,106,165,.18);
+  }
+  .selectBtn option[value=""]{ color:#9aa; }  /* プレースホルダ行 */
+
+  /* ===== アコーディオン（選択中の色をやや濃く） ===== */
+  .fHead{ transition: background-color .12s ease; }
+  .fHead:hover{ background:#f5efff; }
+  .fEvent.open .fHead{ background:#efe7ff; }
+  .fEvent[data-seg="child"].open .fHead { background:#ffecec; } /* 子ども */
+  .fEvent[data-seg="adult"].open .fHead { background:#e6f0ff; } /* 大人 */
+  .fEvent[data-seg="both"].open  .fHead { background:#efe7ff; } /* 両方 */
+
+  /* ===== タイトル行の強調（日時・@場所を太字） ===== */
+  .fTitleRow .t-date,
+  .fTitleRow .t-place{ font-weight:700; }
+
+  /* ===== ガイド文（枠・背景なし、文字のみ） ===== */
+  #view-form #formEventsBox.guidePlain{
+    background:transparent; border:0; padding:0; margin:4px 0 8px;
+  }
+
+  /* ===== バッジ：未保存表示 ===== */
+  .badge-unsaved{
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:2px 8px; height:22px; border-radius:999px; font-size:11px; font-weight:600;
+    color:#b45309; border:1.5px solid #f59e0b; background:#fff8e6; white-space:nowrap;
+  }
+
+  /* ===== ステータス色（NGは読みやすい青灰に） ===== */
+  .stat-ng{
+    background:#eef2f7;
+    border:1px solid #d2d9e3;
+    color:#334155;
+  }
+
+  /* ===== ボタン（共通の無効状態） ===== */
+  button[disabled],
+  .btn[disabled]{
+    opacity:.55; pointer-events:none; cursor:not-allowed; filter:saturate(.6);
+  }
+  /* 送信ボタンの無効化（送信中の薄紫） */
+  .btn-primary[disabled],
+  .btn-primary:disabled{
+    background:#ede7ff !important;
+    border-color:#d6ccff !important;
+    color:var(--c-primary-2) !important;
+    cursor:not-allowed !important;
+    pointer-events:none !important;
+    box-shadow:none !important;
+    filter:saturate(.85);
+  }
+
+  /* ===== ゴーストボタン：紫ボーダーに統一 ===== */
+  .btn.btn-ghost{
+    background:#fff !important;
+    color:var(--c-primary-2) !important;
+    border:1px solid color-mix(in srgb, var(--c-primary-2), #000 10%) !important;
+    box-shadow:0 1px 4px rgba(127,106,165,0.08);
+    transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
+  }
+  .btn.btn-ghost:hover{
+    background: color-mix(in srgb, var(--c-primary), #fff 90%) !important;
+    border-color: var(--c-primary) !important;
+    color: var(--c-primary-2) !important;
+    box-shadow:0 2px 8px rgba(127,106,165,0.12);
+  }
+  .btn.btn-ghost:focus-visible{
+    outline:2px solid transparent !important;
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--c-primary), #fff 80%) !important;
+  }
+
+  /* ===== 削除ボタンは軽いトーンで差別化 ===== */
+  .btn-remove{
+    background:#fff !important;
+    color:#222 !important;
+    border:1px solid #dcd2ef !important;
+    box-shadow:0 2px 10px rgba(127,106,165,0.10), 0 1px 0 rgba(0,0,0,0.02) inset;
+    transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
+  }
+  .btn-remove:hover{
+    filter:brightness(.98);
+    box-shadow:0 3px 12px rgba(127,106,165,0.16), 0 1px 0 rgba(0,0,0,0.03) inset;
+  }
+  .btn-remove:active{ transform:translateY(1px); }
+  .btn-remove:focus-visible{
+    outline:none;
+    box-shadow:0 0 0 3px rgba(127,106,165,0.12), 0 2px 10px rgba(127,106,165,0.10);
+  }
+
+  /* ===== disabled入力の見た目をselectと統一（iOS/Safari対策含む） ===== */
+  .selectBtn:disabled,
+  input[type="date"]:disabled,
+  input[type="time"]:disabled,
+  input[type="text"]:disabled,
+  textarea:disabled{
+    color:#888 !important;
+    -webkit-text-fill-color:#888 !important; /* iOS濃度維持 */
+    opacity:1 !important;
+    background:#f7f5ff !important;
+    border-color:#e6e0f0 !important;
+    box-shadow:none !important;
+    cursor:not-allowed !important;
+  }
+  input[type="text"]:disabled::placeholder,
+  input[type="date"]:disabled::placeholder,
+  input[type="time"]:disabled::placeholder,
+  textarea:disabled::placeholder{
+    color:#888 !important; opacity:1 !important;
+  }
+  input[type="text"]:disabled::-webkit-input-placeholder,
+  input[type="date"]:disabled::-webkit-input-placeholder,
+  input[type="time"]:disabled::-webkit-input-placeholder,
+  textarea:disabled::-webkit-input-placeholder{
+    color:#888 !important; opacity:1 !important;
+  }
+
+  /* ===== 管理アコーディオンの見た目を微調整 ===== */
+  #adminListAcc .fHead{
+    background:#f5efff !important; border-radius:10px;
+  }
+  #adminListAcc.open .fHead{ background:#efe7ff !important; }
+  #adminListAcc .btn-edit{
+    min-height:32px; padding:6px 10px; font-size:13px; border-radius:9px;
+    background:#fff !important;
+    color: color-mix(in srgb, var(--c-primary-2), #000 0%) !important;
+    border:1px solid color-mix(in srgb, var(--c-primary-2), #000 12%) !important;
+    box-shadow:0 1px 3px rgba(127,106,165,0.08);
+  }
+  #adminListAcc .btn-edit:hover{
+    background:#f8f6ff !important;
+    border-color: color-mix(in srgb, var(--c-primary-2), #000 20%) !important;
+  }
+  #view-admin .hint{ font-size:10px !important; line-height:1.55; }
+
+  /* ===== “今後の予定”：2列→下段ボタンのレイアウト ===== */
+  .schedControls{
+    display:grid;
+    grid-template-columns:auto max-content;  /* 左=ラベル, 右=プルダウン */
+    gap:10px 14px;
+    align-items:center;
+    justify-content:start;
+  }
+  .schedControls .field{ display:flex; flex-direction:column; min-width:0; }
+  .schedControls .span2{ grid-column:1 / -1; }  /* ぶち抜き（下段ボタン） */
+  .scLabel{ font-size:14px; color:var(--c-text); white-space:nowrap; }
+  .schedSel{ width:160px; max-width:100%; }
+  .schedSel.short{ width:120px; max-width:100%; }
+  @media (max-width:420px){
+    .schedSel{ width:100%; }
+    .schedSel.short{ width: clamp(100px, 40vw, 128px); }
+  }
+
+  /* ===== 出欠結果一覧：ラベル右にセレクト＋下段に再取得 ===== */
+    .repControls .span2{
+    grid-column:1 / -1;
+    display:flex; justify-content:flex-start; margin-top:4px;
+  }
+
+  /* ===== 氏名登録行：7:3グリッド（区分＋削除） ===== */
+  .perfRow{
+    display:grid;
+    grid-template-columns:7fr 3fr;  /* 7:3 */
+    grid-auto-rows:auto;
+    column-gap:12px; row-gap:8px;
+    margin:10px 0; align-items:center;
+  }
+  .perfRow .perfLabel{ grid-column:1 / -1; font-size:12px; color:var(--c-muted); }
+  .perfRow .regPerf{ grid-column:1 / 2; width:100%; height:44px; }
+  .perfRow .regPerfSeg{ grid-column:2 / 3; width:100%; height:44px; }
+  .perfRow .btn-remove{
+    grid-column:2 / 3; width:100%; min-height:40px; height:44px; padding:0 12px; border-radius:12px;
+    justify-self:stretch; align-self:end;
+  }
+  @media (max-width:420px){ .perfRow{ column-gap:10px; } }
+
+  /* ===== 区分バッジ ===== */
+  .fHead .seg-badge{ margin:0 0 4px 0; }
+  .seg-badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    height:20px; padding:0 8px; border-radius:999px;
+    font-size:11px; font-weight:700; white-space:nowrap; border:1.5px solid; margin-right:8px;
+  }
+  .seg-adult { color:#1d4ed8; background:#e6f0ff; border-color:var(--seg-adult-border); }
+  .seg-child { color:#b91c1c; background:#ffecec; border-color:var(--seg-child-border); }
+  .seg-both  { color:#6d5a93; background:#f1eaff; border-color:var(--seg-both-border); }
+</style> 
+ 
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -2189,7 +1993,7 @@ function renderAttendSelectHTML(evId, name, current){
 
   // ★ 演奏者未登録ならフォーム全体を隠してガイドだけ出す
   if ((state.members || []).length === 0){
-    bboxHeader.classList.add("guidePlain");
+    boxHeader.classList.add("guidePlain");
      const guide = (window.viewerGuideHTML)
        ? window.viewerGuideHTML()
        : `<div class="warnBox card" style="margin-bottom:10px;">
