@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.9";
+  const FRONT_VERSION = "Front v3.3.0";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1713,6 +1713,7 @@ function updateSegFilterUI(){
   // 非表示にしたときは値をクリア（＝全予定表示）
   if (!showIt) {
     sel.value = '';
+    saveFilters?.();  // selSeg を隠した時も保存
   }
 }
 // 修正後：includeBoth で “両方” を含めるか選べるように
@@ -2494,7 +2495,29 @@ async function onRegister(){
 (() => {
   if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 6) return;
   window.__SchedulesBlockV__ = 6;
-
+  // --- フィルタ保存/復元（localStorage） ---
+  const FILTER_KEY = 'sched:filters:v1';
+  function saveFilters(){
+    try{
+      const o = {
+        days: document.getElementById('selDays')?.value || '60',
+        kind: document.getElementById('selKind')?.value || '',
+        seg : document.getElementById('selSeg') ?.value || '',
+      };
+      localStorage.setItem(FILTER_KEY, JSON.stringify(o));
+    }catch(_){}
+  }
+  function loadFilters(){
+    try{
+      const o = JSON.parse(localStorage.getItem(FILTER_KEY) || '{}');
+      if (o.days && document.getElementById('selDays')) document.getElementById('selDays').value = o.days;
+      if (o.kind && document.getElementById('selKind')) document.getElementById('selKind').value = o.kind;
+      // seg は「両方所属ユーザー」のみ有効
+      if (o.seg && document.getElementById('selSeg') && userHasBoth()){
+        document.getElementById('selSeg').value = o.seg;
+      }
+    }catch(_){}
+  }
   // ===== ユーティリティ =====
   function parseYmdStrictLocal(s){
     const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
@@ -2625,6 +2648,7 @@ async function onRegister(){
       if (initial){
         box.innerHTML = `読み込み中… <span class="spinner"></span>`;
         exposeSegFilterIfNeeded();
+        loadFilters();
 
         // API から最新を1回取得して、生の配列を保持
         const daysSel = Number($("#selDays").value || 60);
@@ -2660,9 +2684,9 @@ async function onRegister(){
 
   // ===== UI操作で即反映（ここでバインド） =====
   document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('selDays')?.addEventListener('change', renderSchedulesLocal);
-    document.getElementById('selKind')?.addEventListener('change', renderSchedulesLocal);
-    document.getElementById('selSeg') ?.addEventListener('change', renderSchedulesLocal);
+    document.getElementById('selDays')?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
+    document.getElementById('selKind')?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
+    document.getElementById('selSeg') ?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
   });
 })();
 // ===== 今後の予定（Schedules） v5 END =====
