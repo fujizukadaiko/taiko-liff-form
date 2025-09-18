@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.8";
+  const FRONT_VERSION = "Front v3.2.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxBEF7quF4QJ8hrFhqPTEamBsz_jqtmAj5ePdOD1E535zGd9yoxdVOu1uMfSCTorCJMoA/exec";     // ←差し替え
 
@@ -791,7 +791,6 @@
           <button id="btnFetchSchedules" class="btn btn-ghost btn-sm">再取得</button>
         </div>
       </div>
-    
       <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
     </div>    
     </section>
@@ -2457,6 +2456,52 @@ window.copyIcsFeed = function(){
   alert("購読URLをコピーしました");
 };
 
+  // --- Schedules API のURLを作る ---
+function buildSchedulesUrl(){
+  const days = Number(document.getElementById('selDays')?.value || 60) || 60;
+  const type = document.getElementById('selKind')?.value || "";   // "", "発表" など
+  const seg  = document.getElementById('selSeg') ?.value || "";   // "", "adult", "child"
+
+  const p = new URLSearchParams();
+  p.set('period', String(days));       // 30/60/90 など日数でOK
+  if (type) p.set('type', type);
+  if (seg)  p.set('seg',  seg);
+
+  return `${API_ENDPOINT}/schedules?${p.toString()}`;
+}
+
+// --- 取得してローカル描画に流し込む ---
+async function fetchSchedulesAndRender(){
+  const box = document.getElementById('schedulesBox');
+  if (box) box.textContent = "読み込み中…";
+  try{
+    const res = await fetch(buildSchedulesUrl(), { method:'GET' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+
+    // API側が { items:[...] } でも [...] でも受けられるように吸収
+    state.schedulesRaw = Array.isArray(json?.items) ? json.items
+                     : Array.isArray(json)         ? json
+                     : [];
+    renderSchedulesLocal();   // ← 既存のローカル再描画をそのまま活用
+  }catch(err){
+    console.error(err);
+    if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
+  }
+}
+// state が無ければ作る（重複定義ガード付き）
+window.state = window.state || {};
+state.schedulesRaw = state.schedulesRaw || [];
+
+// 「再取得」ボタンと初回ロードの紐付け
+document.addEventListener('DOMContentLoaded', () => {
+  // 既存の change バインドはそのまま活かす前提
+  document.getElementById('btnFetchSchedules')
+    ?.addEventListener('click', fetchSchedulesAndRender);
+
+  // 初回表示時に一度取得（必要なければこの1行は消してOK）
+  fetchSchedulesAndRender();
+});
   // ===== UI操作で即反映（ここでバインド） =====
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('selDays')?.addEventListener('change', renderSchedulesLocal);
