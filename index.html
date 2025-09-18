@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.3";
+  const FRONT_VERSION = "Front v3.2.4";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwcyXwuczoV2All6HtzlO6mEk7oafvqQOmctqjjERdY0SGj2i5jnKGHbQhXzv2NRbM1Wg/exec";     // ←差し替え
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxBEF7quF4QJ8hrFhqPTEamBsz_jqtmAj5ePdOD1E535zGd9yoxdVOu1uMfSCTorCJMoA/exec";     // ←差し替え
 
   // （オプション）設定チェック：重複定義や未設定を早期に気づけます
   (function(){
@@ -477,6 +477,10 @@
     .seg-both  {
       color:#6d5a93; background:#f1eaff; border-color:#bda8ea; /* 紫系 */
     }
+    .pill.sm.seg-adult { background:#e9f4ff; color:#0b66c3; }
+    .pill.sm.seg-child { background:#eafaea; color:#13823b; }
+    .pill.sm.seg-both  { background:#f3f3ff; color:#5a54d6; }
+    .card.warn { border:1px solid #f1d46b; }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -2487,18 +2491,28 @@ async function onRegister(){
       show("#view-register");
     }, { once:true });
   }
-  // ===== カード描画 =====
+  // （差し替え）カード描画
   function renderScheduleCard(it){
-    const seg = dispSeg(normSeg(it.segment||it.targetSegment||it.attendSegment||""));
-    const titleLine = [seg, it.kind||"", it.title||""].filter(Boolean).join(" ");
-    const memoLine  = it.memo ? `<div class="small">${it.memo}</div>` : "";
     const segNorm = normSeg(it.segment||it.targetSegment||it.attendSegment||"");
+    const segBadge = (()=>{
+      if (segNorm==="adult") return `<span class="pill sm seg-adult">大人の部</span>`;
+      if (segNorm==="child") return `<span class="pill sm seg-child">子どもの部</span>`;
+      return `<span class="pill sm seg-both">両方</span>`;
+    })();
+    const kindBadge = it.kind ? `<span class="pill sm">${it.kind}</span>` : "";
+  
+    const memoLine = it.memo ? `<div class="small">${it.memo}</div>` : "";
+  
     return `<div class="card" data-seg="${segNorm||'both'}">
-      <div><b>${it.date} ${it.time||""}</b> @ ${it.place||""}</div>
-      <div class="small muted">${titleLine}</div>
+      <div class="row" style="gap:6px; align-items:center; margin-bottom:4px;">
+        ${segBadge}${kindBadge}
+      </div>
+      <div><b>${it.date}</b>　${it.title||""}</div>
+      <div class="small muted">@ ${it.place||""}</div>
       ${memoLine}
     </div>`;
   }
+  
   window.renderSchedulesView = function(list){
     if (!Array.isArray(list) || list.length===0) {
       return `<div class="listEmpty">該当する予定はありません</div>`;
@@ -2510,94 +2524,85 @@ async function onRegister(){
     if (typeof updateSegFilterUI === "function") updateSegFilterUI();
   }
 
-  // ===== ローカル再描画（UIの選択だけで即時フィルタ） =====
- function renderSchedulesLocal(){
-  const box = $("#schedulesBox");
-
-  // まだ取得前でも「待機中」ではなく空配列で処理してガイドを出す
-  const base = Array.isArray(state.schedulesRaw) ? state.schedulesRaw.slice() : [];
-
-  // ローカルUI値
-  const selDaysEl = document.getElementById('selDays');
-  const days = Number(selDaysEl && selDaysEl.value ? selDaysEl.value : 60) || 60;
-  const kindSel = document.getElementById('selKind')?.value || "";
-
-  // 1) 期間
-  const today = new Date(); today.setHours(0,0,0,0);
-  const until = new Date(today.getTime()); until.setDate(until.getDate()+days);
-  const parseYmdStrictLocal = (s)=>{
-    const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
-    if (!m) return null;
-    const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
-    return isNaN(d) ? null : d;
-  };
-  let arr = base.filter(it=>{
-    const d = parseYmdStrictLocal(it.ymd || it.date);
-    return d && d >= today && d <= until;
-  });
-
-  // 2) 種別
-  if (kindSel){
-    arr = arr.filter(it => String(it.kind||"").trim() === kindSel);
-  }
-
-  // 3) ユーザー区分（未登録＝区分なし → 全表示）
-  const segSet = getMemberSegSet();
-  arr = arr.filter(it => {
-    const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
-    return eventVisibleForUser(evSeg, segSet, /* includeBoth */ true);
-  });
-
-  // 4) 両方所属ユーザーのみ、UI区分フィルタ
-  if (segSet && segSet.size > 0 && userHasBoth()){
-    const uiSeg = $("#selSeg")?.value || "";
-    if (uiSeg){
-      arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
-    }
-  }
-
-  state.schedules = arr;
-
-  // ★ 上部にガイド（members=0 なら常に表示）
-  const guide = (state.members.length === 0)
-    ? viewerGuideHTML()
-    : "";
-
-  // リスト（データ未取得時は「該当なし」になるが、ガイドが先に出る）
-  const listHTML = window.renderSchedulesView(state.schedules || []);
-  box.innerHTML = guide + listHTML;
-
-  // ガイドボタンのイベント
-  bindViewerGuideButton();
-}
-
-  // ===== 初回 or 再取得時だけ API を叩く =====
-  window.renderSchedules = async function(initial=false){
-    const box = $("#schedulesBox");
-
-    try{
-      if (initial){
-        box.innerHTML = `読み込み中… <span class="spinner"></span>`;
-        exposeSegFilterIfNeeded();
-
-        // API から最新を1回取得して、生の配列を保持
-        const daysSel = Number($("#selDays").value || 60);
-        const kindSel = $("#selKind").value || "";
-        // 初回は広めの日数で全件を取得（例: 180日）。種別も付けない
-        const url = `?schedules=1&days=180`;
-        const r = await api(url);
-        if (r.status !== "ok" || !Array.isArray(r.schedules)) {
-          box.innerHTML = `<span class="err">取得に失敗しました</span>`;
-          return;
-        }
-        // ★ 生データを保持（以後はローカルでフィルタ）
-        state.schedulesRaw = r.schedules.slice();
+    // ===== ローカル再描画（UIの選択だけで即時フィルタ） =====
+    // （差し替え）今後の予定：ローカル再描画
+    function renderSchedulesLocal(){
+      const box = $("#schedulesBox");
+    
+      // まだ初回取得前なら待機表示
+      if (!Array.isArray(state.schedulesRaw) || state.schedulesRaw.length === 0){
+        box.innerHTML = `読み込み待機中（「再取得」を押すと読み込みます）`;
+        return;
       }
-      // 取得済みデータを UI 値でフィルタして描画
-      renderSchedulesLocal();
-
-    }catch(err){
-      box.innerHTML = `<span class="err">エラー: ${err.message||err}</span>`;
+    
+      const base = state.schedulesRaw.slice();
+    
+      // 期間フィルタ
+      const selDaysEl = document.getElementById('selDays');
+      const days = Number(selDaysEl && selDaysEl.value ? selDaysEl.value : 60) || 60;
+    
+      const kindSel = document.getElementById('selKind')?.value || "";
+    
+      const today = new Date(); today.setHours(0,0,0,0);
+      const until = new Date(today.getTime()); until.setDate(until.getDate()+days);
+    
+      let arr = base.filter(it=>{
+        const d = (()=>{
+          const m = String(it.ymd || it.date || "").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+          if (!m) return null;
+          const dd = new Date(+m[1], +m[2]-1, +m[3]); dd.setHours(0,0,0,0);
+          return isNaN(dd) ? null : dd;
+        })();
+        return d && d >= today && d <= until;
+      });
+    
+      // 種別
+      if (kindSel){
+        arr = arr.filter(it => String(it.kind||"").trim() === kindSel);
+      }
+    
+      // ユーザー区分（閲覧者でも常に表示＝会員0件時はフィルタしない）
+      const segSet = getMemberSegSet();                       //  [oai_citation:0‡名称未設定.txt](file-service://file-PwJqNvhDRsVYS7KhQNrDRd)
+      arr = arr.filter(it => {
+        const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
+        return eventVisibleForUser(evSeg, segSet, /* includeBoth */ true);  // 両方は常に含める
+      });                                                                     //  [oai_citation:1‡名称未設定.txt](file-service://file-PwJqNvhDRsVYS7KhQNrDRd)
+    
+      // UIの区分フィルタ（大人/子ども選択時でも『両方』は残す）
+      if (segSet && segSet.size > 0 && userHasBoth()){                        //  [oai_citation:2‡名称未設定.txt](file-service://file-PwJqNvhDRsVYS7KhQNrDRd)
+        const uiSeg = $("#selSeg")?.value || "";
+        if (uiSeg){
+          arr = arr.filter(it => {
+            const n = normSeg(it.segment || it.targetSegment || it.attendSegment || "");
+            if (uiSeg === "adult") return (n === "adult" || n === "both");
+            if (uiSeg === "child") return (n === "child" || n === "both");
+            return true;
+          });
+        }
+      }
+    
+      state.schedules = arr;
+    
+      // ここでカードHTMLを作成
+      const listHtml = window.renderSchedulesView(state.schedules);            //  [oai_citation:3‡名称未設定.txt](file-service://file-PwJqNvhDRsVYS7KhQNrDRd)
+    
+      // ★ 閲覧者（= 会員未登録）ガイドを“下部”に付け足す
+      const viewerOnly = !state.members || state.members.length === 0;
+      const guideHtml = viewerOnly ? `
+        <div class="card warn" style="margin-top:12px; background:#fff7d1;">
+          <div class="small">
+            出欠回答をするには氏名登録が必要です（閲覧のみなら登録不要です）。
+          </div>
+          <div class="row" style="justify-content:flex-end; margin-top:8px;">
+            <button class="btn btn-primary btn-sm" type="button"
+              onclick="registerMode='create'; resetRegisterForm(); show('#view-register');">
+              氏名を登録する
+            </button>
+          </div>
+        </div>
+      ` : "";
+    
+      box.innerHTML = listHtml + guideHtml;
     }
   };
 
