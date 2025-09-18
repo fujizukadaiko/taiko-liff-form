@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.9";
+  const FRONT_VERSION = "Front v3.4.0";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxkVMUfLkSP_6wqoVEJr6vsPzlCHl3M9UNyVFMqQr2UOQhsqS75GcZ0ZUHN71_Exahr/exec";     // ←差し替え
 
@@ -2455,46 +2455,86 @@ window.copyIcsFeed = function(){
   // --- Schedules API のURLを作る ---
 // --- PATCH: /schedules 用の URL を生成（days / kind / segment） ---
 // --- Schedules API のURLを作る（/exec にクエリで渡す） ---
+// --- Schedules API のURLを作る（第一候補は period を使う） ---
 function buildSchedulesUrl(){
-  // GitHub Pages など外部から叩く時は /exec/schedules NG → /exec?schedules=1 を使う
   const days = Number(document.getElementById('selDays')?.value || 60) || 60;
   const kind = document.getElementById('selKind')?.value || "";   // "発表" など
-  const seg  = document.getElementById('selSeg') ?.value || "";   // "adult" | "child" | ""
+  const seg  = document.getElementById('selSeg')  ?.value || "";  // "adult" | "child" | ""
 
   const p = new URLSearchParams();
-  p.set('schedules', '1');          // ← ここが重要（/schedules ではなくクエリで渡す）
-  p.set('days', String(days));      // サーバは days を受ける（period ではなく days）
-  if (kind) p.set('kind', kind);
-  if (seg)  p.set('segment', seg);
+  p.set('schedules', '1');
+  p.set('period', String(days));       // ← ★ ここを period に
+  if (kind) p.set('kind', kind);       // サーバ実装が kind を受ける想定
+  if (seg)  p.set('segment', seg);     // サーバ実装が segment を受ける想定
 
   const url = `${API_ENDPOINT}?${p.toString()}`;
-  console.log('[schedules] fetch:', url);
+  console.log('[schedules] fetch (candidate #1):', url);
   return url;
 }
 
 // --- 取得してローカル描画に流し込む ---
 // --- PATCH: 取得してローカル描画（/schedules を優先、失敗時は互換フォールバック） ---
 // --- 取得してローカル描画（?schedules=1 を一次、失敗時は ?events=1 フォールバック） ---
+// --- 取得してローカル描画（?schedules=1 を複数パターンで試し、ダメなら ?events=1） ---
 async function fetchSchedulesAndRender(){
   const box = document.getElementById('schedulesBox');
   if (box) box.textContent = "読み込み中…";
 
-  try{
-    const res = await fetch(buildSchedulesUrl(), { method: 'GET' }); // /exec?schedules=1...
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
+  const days = Number(document.getElementById('selDays')?.value || 60) || 60;
+  const kind = document.getElementById('selKind')?.value || "";
+  const seg  = document.getElementById('selSeg')  ?.value || "";
 
-    // APIが {items:[...]} でも [...] でも吸収
-    state.schedulesRaw = Array.isArray(json?.items) ? json.items
-                      : Array.isArray(json)         ? json
-                      : [];
-    renderSchedulesLocal();
-    return;
-  }catch(err){
-    console.warn('[schedules] fetch failed, fallback to ?events=1', err);
+  // 候補URLを順番に試す
+  const candidates = [];
+
+  // #1 いまの第一候補（period / kind / segment）
+  candidates.push(buildSchedulesUrl());
+
+  // #2 days / kind / segment
+  {
+    const p = new URLSearchParams();
+    p.set('schedules','1');
+    p.set('days', String(days));
+    if (kind) p.set('kind', kind);
+    if (seg)  p.set('segment', seg);
+    const url = `${API_ENDPOINT}?${p.toString()}`;
+    console.log('[schedules] fetch (candidate #2):', url);
+    candidates.push(url);
   }
 
-  // 最終手段：?events=1 から最低限の表示項目を合成
+  // #3 days / type / seg（別実装に備えた別名）
+  {
+    const p = new URLSearchParams();
+    p.set('schedules','1');
+    p.set('days', String(days));
+    if (kind) p.set('type', kind);
+    if (seg)  p.set('seg', seg);
+    const url = `${API_ENDPOINT}?${p.toString()}`;
+    console.log('[schedules] fetch (candidate #3):', url);
+    candidates.push(url);
+  }
+
+  // 順に叩く
+  let lastErr = null;
+  for (const url of candidates){
+    try{
+      const res = await fetch(url, { method:'GET' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+
+      state.schedulesRaw = Array.isArray(json?.items) ? json.items
+                        : Array.isArray(json)         ? json
+                        : [];
+      renderSchedulesLocal();
+      return; // 成功したので終了
+    }catch(e){
+      console.warn('[schedules] candidate failed:', url, e);
+      lastErr = e;
+    }
+  }
+
+  // すべてダメなら ?events=1 フォールバック
+  console.warn('[schedules] all candidates failed, fallback to ?events=1', lastErr);
   try{
     let base = state.events;
     if (!Array.isArray(base) || base.length === 0){
@@ -2513,7 +2553,7 @@ async function fetchSchedulesAndRender(){
       memo   : e.memo || ''
     }));
     renderSchedulesLocal();
-  } catch (e2){
+  }catch(e2){
     console.error(e2);
     if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
   }
