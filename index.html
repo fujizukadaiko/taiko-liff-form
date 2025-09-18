@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.8";
+  const FRONT_VERSION = "Front v3.2.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -852,6 +852,27 @@
       height:20px;
       padding:0 8px;
       font-size:11px;
+    }
+    /* 3行目：@場所 と「集合…」を同一行に保つ */
+    .scheduleCard .row3{
+      display:flex;
+      align-items:baseline;      /* ベースラインを揃えると綺麗 */
+      gap:8px;
+      flex-wrap:nowrap;          /* ← 折り返さない */
+    }
+    
+    .scheduleCard .row3 .place{
+      flex:1 1 auto;             /* 左は可変 */
+      min-width:0;               /* ← iOS/Safariでellipsisに必須 */
+      overflow:hidden;
+      text-overflow:ellipsis;    /* 長い場所名は省略 */
+      white-space:nowrap;
+    }
+    
+    .scheduleCard .row3 .meet{
+      flex:0 0 auto;             /* 右は固定幅（押し出されない） */
+      white-space:nowrap;        /* 常に1行 */
+      margin-left:auto;          /* 右端寄せ */
     }
   </style>
   
@@ -2503,7 +2524,16 @@ async function onRegister(){
     if (place)     row3Parts.push(`＠${place}`);
     if (meetAt)    row3Parts.push(`集合時間 ${meetAt}`);
     if (meetPlace) row3Parts.push(`集合場所 ${meetPlace}`);
-    const row3 = row3Parts.length ? `<div class="row3">${row3Parts.join('　')}</div>` : '';
+    const row3 = `
+      <div class="row3 small">
+        <span class="place">@${it.place || ""}</span>
+        ${
+          (it.meetAt || it.meetPlace)
+            ? `<span class="meet">集合 ${it.meetAt || ""} ${it.meetPlace || ""}</span>`
+            : ``
+        }
+      </div>
+    `;
   
     // バッジ
     const segCls   = segNorm==='adult' ? 'seg-adult' : segNorm==='child' ? 'seg-child' : 'seg-both';
