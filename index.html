@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.1.8";
+  const FRONT_VERSION = "Front v3.1.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwSITJbfK_2d5RWAQKIh83TptKcsMvhCO2rQLBYiLZPBrcvEsHAIzsJ9KQ0WP-9TT3GDg/exec";     // ←差し替え
 
@@ -782,6 +782,28 @@
     @media (max-width: 420px){
       #view-register .perfRow{ column-gap: 10px; }
     }
+    /* ===== 出欠結果バッジ（管理レポート） ===== */
+    .repCard { background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; }
+    .repHead { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
+    .repTitle { font-weight:700; }
+    .repSub   { font-size:12px; color:var(--c-muted); }
+    
+    .repRow  { display:flex; align-items:baseline; gap:8px; padding:6px 0; border-top:1px dashed #eee; }
+    .repRow:first-child { border-top:0; }
+    .repName { font-weight:600; min-width:9em; }
+    .repAt   { font-size:12px; color:var(--c-muted); }
+    
+    .badge-att {
+      display:inline-flex; align-items:center; justify-content:center;
+      height:22px; padding:0 8px; border-radius:999px; font-size:12px; font-weight:700;
+      border:1.5px solid;
+    }
+    .badge-att.yes   { color:#047857; background:#ecfdf5; border-color:#a7f3d0; } /* 参加=緑 */
+    .badge-att.no    { color:#b91c1c; background:#fef2f2; border-color:#fecaca; } /* 欠席=赤 */
+    .badge-att.maybe { color:#92400e; background:#fffbeb; border-color:#fde68a; } /* 未定=黄 */
+    .badge-att.na    { color:#475569; background:#f1f5f9; border-color:#cbd5e1; } /* その他/空 */
+    
+    .repNA  { margin-top:10px; padding-top:8px; border-top:1px solid var(--c-border); font-size:13px; color:#475569; }  
   </style>
   
   <!-- LIFF SDK -->
@@ -2995,14 +3017,14 @@ async function renderReport(){
   const fAtt  = document.querySelector("#repAttend")?.value || "";
 
   if (!selId){
-    box.innerHTML = `公演を選択してください`;
+    if (box) box.innerHTML = `公演を選択してください`;
     return;
   }
 
-  // 詳細キャッシュ（互換）
+  // 既存キャッシュを使う（無ければ1件読み）
   let ev = state.reportDetailMap?.[selId];
   if (!ev){
-    box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+    if (box) box.innerHTML = `読み込み中… <span class="spinner"></span>`;
     const r = await api(`?attendanceReport=1&lineId=${esc(state.lineId)}&eventId=${esc(selId)}`);
     if (r.status !== "ok"){ box.innerHTML = `<span class="err">取得に失敗しました</span>`; return; }
     ev = {
@@ -3014,42 +3036,56 @@ async function renderReport(){
     state.reportDetailMap[selId] = ev;
   }
 
-  // rows は displayName（大人は接頭辞済み）、roster も対象区分だけにサーバで絞り済み。
+  // rows（回答あり）と roster（対象者）から「未回答」を算出
   const rows = Array.isArray(ev.rows) ? ev.rows : [];
   const roster = Array.isArray(ev.roster) ? ev.roster : [];
 
-  // 未回答を算出
   const ansMap = new Map();
   rows.forEach(r => { if (r?.name) ansMap.set(String(r.name), r); });
   const notAnswered = roster.filter(n => !ansMap.has(String(n)));
 
-  // フィルタ適用（参加/欠席/未定/未回答）
+  // 出欠フィルタ（「未回答」は rows には含まれない点に注意）
   const pickedRows = rows.filter(r => {
     if (!fAtt) return true;
-    if (fAtt === "未回答") return false; // rows には未回答は入っていない
+    if (fAtt === "未回答") return false;
     return String(r.attend||"") === fAtt;
   });
 
-  // 描画
-  const head = `
-    <div class="repInfo">
-      <div><b>${ev.ymd || ""} ${ev.time || ""}</b>　${ev.title || ""}</div>
-      <div>場所：${ev.place || ""}　対象：${ev.segment || ""}</div>
-      <div>受付：${ev.accepting==="open"?"受付中":"受付終了"}</div>
-    </div>`;
+  // バッジ用クラス
+  const attClass = (a)=>{
+    if (a === "参加") return "yes";
+    if (a === "欠席") return "no";
+    if (a === "未定") return "maybe";
+    return "na";
+  };
 
+  // ヘッダ（タイトル行＋受付タグ）
+  const headHtml = `
+    <div class="repHead">
+      <div class="repTitle">${ev.ymd || ""} ${ev.time || ""}　${ev.title || ""}</div>
+      <span class="tag ${ev.accepting==="open"?"open":"closed"}">
+        ${ev.accepting==="open"?"受付中":"受付終了"}
+      </span>
+    </div>
+    <div class="repSub">場所：${ev.place || ""}　対象：${ev.segment || ""}</div>
+  `;
+
+  // 回答行
   const rowsHtml = pickedRows.map(r=>`
     <div class="repRow">
       <div class="repName">${r.displayName || r.name}</div>
-      <div class="repAtt">${r.attend || ""}</div>
+      <span class="badge-att ${attClass(r.attend)}">${r.attend || ""}</span>
       <div class="repAt">${r.answeredAt || ""}</div>
-    </div>`).join("");
+    </div>
+  `).join("");
 
+  // 未回答
   const naHtml = (fAtt==="" || fAtt==="未回答")
     ? (`<div class="repNA"><b>未回答</b>：${notAnswered.length ? notAnswered.join("、") : "なし"}</div>`)
     : "";
 
-  box.innerHTML = head + rowsHtml + naHtml;
+  // まとめて描画（カード風に）
+  box.innerHTML = `<div class="repCard">${headHtml}${rowsHtml}${naHtml}</div>`;
 }
 </script> 
   
