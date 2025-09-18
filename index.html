@@ -2420,7 +2420,7 @@ async function onRegister(){
     $("#btnRegister").textContent = (registerMode==="edit" ? "保存" : "登録する");
   }
 }
-<!-- ===== 今後の予定（Schedules） v5 ===== -->
+// ===== 今後の予定（Schedules） v5 =====
 (() => {
   if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 6) return;
   window.__SchedulesBlockV__ = 6;
@@ -2555,8 +2555,8 @@ async function onRegister(){
     document.getElementById('selSeg') ?.addEventListener('change', renderSchedulesLocal);
   });
 })();
-<!-- ===== 今後の予定（Schedules） v5 END ===== -->
-<script>
+// ===== 今後の予定（Schedules） v5 END =====
+
 /* ===== 予定登録（管理者） ===== */
 // 種別変更に応じて UI を制御（練習=集合場所/配信フラグ/締切日も無効化）
 function adminTypeChangeAdapt(){
