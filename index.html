@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.7";
+  const FRONT_VERSION = "Front v3.3.8";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxkVMUfLkSP_6wqoVEJr6vsPzlCHl3M9UNyVFMqQr2UOQhsqS75GcZ0ZUHN71_Exahr/exec";     // ←差し替え
 
@@ -2546,8 +2546,7 @@ async function fetchSchedulesAndRender(){
     if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
   }
 }
-}
-  window.fetchSchedulesAndRender = fetchSchedulesAndRender;
+  
 // state が無ければ作る（重複定義ガード付き）
 window.state = window.state || {};
 state.schedulesRaw = state.schedulesRaw || [];
