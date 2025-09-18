@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.6";
+  const FRONT_VERSION = "Front v3.2.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -804,21 +804,24 @@
     .badge-att.na    { color:#475569; background:#f1f5f9; border-color:#cbd5e1; } /* その他/空 */
     
     .repNA  { margin-top:10px; padding-top:8px; border-top:1px solid var(--c-border); font-size:13px; color:#475569; } 
-    /* === 今後の予定：新カードレイアウト === */
-    .scheduleCard .row1{ display:flex; gap:6px; align-items:center; margin-bottom:4px; }
-    .scheduleCard .row2{ font-weight:700; margin:2px 0; display:flex; gap:6px; flex-wrap:wrap; }
+    /* === 今後の予定：新カードレイアウト（微調整） === */
+    .scheduleCard .row1{ display:flex; gap:8px; align-items:center; margin-bottom:4px; }
+    .scheduleCard .row2{ font-weight:700; margin:2px 0 0; display:flex; gap:8px; flex-wrap:wrap; }
     .scheduleCard .row2 .date{ white-space:nowrap; }
     .scheduleCard .row2 .title{ min-width:0; }
-    .scheduleCard .row3{ font-size:12px; color:var(--c-muted); }
-    .scheduleCard .row4{ font-size:12px; margin-top:4px; display:flex; gap:10px; flex-wrap:wrap; color:#444; }
+    .scheduleCard .row3{ font-size:12px; color:#444; margin-top:4px; display:flex; gap:12px; flex-wrap:wrap; }
     
-    /* 既存の区分バッジを “小さめ” でも使えるように */
-    .seg-badge.sm{ height:18px; padding:0 6px; font-size:10px; }
+    /* 区分バッジ：小さすぎたので “やや小さめ” に */
+    .seg-badge.sm{
+      height:20px;               /* ← 18px → 20px */
+      padding:0 8px;             /* ← 6px → 8px */
+      font-size:11px;            /* ← 10px → 11px */
+    }
     
-    /* 種別（発表/練習/その他）用の小さいバッジ */
+    /* 種別（発表/練習/その他）バッジ：同じく“やや小さめ” */
     .kind-badge{
       display:inline-flex; align-items:center; justify-content:center;
-      height:18px; padding:0 6px; border-radius:999px; font-size:10px;
+      height:20px; padding:0 8px; border-radius:999px; font-size:11px;
       border:1.5px solid var(--c-border); background:#f7f7f7; color:#444;
     }
   </style>
@@ -2458,22 +2461,23 @@ async function onRegister(){
     const kind     = String(it.kind||"").trim();
     const title    = it.title || "";
     const ymdStr   = String(it.ymd || it.date || "");
-    const dateDisp = (() => {
-      const d = parseYmdStrictLocal(ymdStr);
-      return d ? ymdDow(d) : ymdStr; // 例) 2025/09/21（日）
-    })();
+    const d = parseYmdStrictLocal(ymdStr);
+    const dateDisp = d ? ymdDow(d) : ymdStr; // 例) 2025/09/21（日）
     const place    = it.place || "";
   
-    // 集合系（あれば表示）
-    const meetAt     = it.meetAt     || "";
-    const meetPlace  = it.meetPlace  || "";
-    const meetParts  = [];
-    if (meetAt)    meetParts.push(`集合時間 ${meetAt}`);
-    if (meetPlace) meetParts.push(`集合場所 ${meetPlace}`);
-    const row4 = meetParts.length ? `<div class="row4">${meetParts.map(s=>`<span>${s}</span>`).join('　')}</div>` : "";
+    // 集合情報
+    const meetAt    = it.meetAt    || "";
+    const meetPlace = it.meetPlace || "";
   
-    // 区分バッジは既存の .seg-badge を“sm”で
-    const segCls = segNorm==='adult' ? 'seg-adult' : segNorm==='child' ? 'seg-child' : 'seg-both';
+    // 3行目は「＠場所　集合時間　集合場所」を一列に並べる
+    const row3Parts = [];
+    if (place)     row3Parts.push(`＠${place}`);
+    if (meetAt)    row3Parts.push(`集合時間 ${meetAt}`);
+    if (meetPlace) row3Parts.push(`集合場所 ${meetPlace}`);
+    const row3 = row3Parts.length ? `<div class="row3">${row3Parts.join('　')}</div>` : '';
+  
+    // バッジ
+    const segCls   = segNorm==='adult' ? 'seg-adult' : segNorm==='child' ? 'seg-child' : 'seg-both';
     const segBadge = segLabel ? `<span class="seg-badge sm ${segCls}">${segLabel}</span>` : '';
     const kindBadge = kind ? `<span class="kind-badge">${kind}</span>` : '';
   
@@ -2486,8 +2490,7 @@ async function onRegister(){
         <span class="date">${dateDisp}</span>
         <span class="title">${title}</span>
       </div>
-      ${place ? `<div class="row3">＠${place}</div>` : ``}
-      ${row4}
+      ${row3}
       ${it.memo ? `<div class="small" style="margin-top:4px;">${it.memo}</div>` : ``}
     </div>`;
   }
