@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.2";
+  const FRONT_VERSION = "Front v3.2.3";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwcyXwuczoV2All6HtzlO6mEk7oafvqQOmctqjjERdY0SGj2i5jnKGHbQhXzv2NRbM1Wg/exec";     // ←差し替え
 
@@ -1458,6 +1458,7 @@ let state = {
   notify: true,        // ★ 追加：既定は ON
   reportMeta: [],          // 管理レポート用：軽量メタ一覧（meta=1）
   reportDetailMap: {},     // { [eventId]: 詳細レスポンス } のキャッシュ
+  viewerOnly: false      // ★ 追加：閲覧のみ（whoami が status:"new"）かどうか
 };
 
 let registerMode = "create"; // "create" | "edit"
@@ -1943,13 +1944,13 @@ function mountHomeWithFilters(){
 
 /* ===== データ読み直し（段階表示 & キャッシュ対応） ===== */
 async function refreshData(){
-  // 1) まずスピナーを出す
+  // 1) スピナー
   $("#eventsBox").innerHTML  = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
   $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
   $("#btnEditNames").style.display = "none";
 
-  // 2) キャッシュがあれば“即表示”
+  // 2) キャッシュ即時表示（あれば）
   const cachedEvents  = cacheGet("events");
   const cachedMembers = cacheGet(`whoami:${state.lineId}`);
   const cachedAnswers = cacheGet(`answers:${state.lineId}`);
@@ -1964,28 +1965,44 @@ async function refreshData(){
     }
   }
 
-  // 3) イベント & 会員を並列に取得（タイムアウト/リトライ付き）
+  // 3) events & whoami を並列取得
   let eventsResp = null, whoResp = null;
   try{
     const [evRes, whoRes] = await Promise.allSettled([
       fetchJsonWithTimeout("?events=1", 15000),
       fetchJsonWithTimeout(`?whoami=1&id=${esc(state.lineId)}`, 15000)
     ]);
-    if (evRes.status === "fulfilled")  eventsResp = evRes.value;
-    if (whoRes.status === "fulfilled")  whoResp   = whoRes.value;
+    if (evRes.status === "fulfilled") eventsResp = evRes.value;
+    if (whoRes.status === "fulfilled") whoResp   = whoRes.value;
   }catch(_){}
 
-  state.events  = (eventsResp?.status==="ok" && Array.isArray(eventsResp.events)) ? eventsResp.events : (state.events||[]);
-  state.members = (whoResp?.status==="ok" ? (whoResp.members||[]) : (state.members||[]));
-  // ★ notify を同期（値が無い時は true を既定に）
- state.notify  = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
-                 ? whoResp.notify : (typeof state.notify === "boolean" ? state.notify : true);
+  // events は常に反映（登録の有無に依存しない）
+  state.events = (eventsResp?.status==="ok" && Array.isArray(eventsResp.events))
+                  ? eventsResp.events : (state.events||[]);
+
+  // whoami の扱い：status:"new" → 閲覧のみモード
+  if (whoResp?.status === "ok"){
+    state.members = whoResp.members || [];
+    state.viewerOnly = false;
+  } else if (whoResp?.status === "new"){
+    state.members = [];
+    state.viewerOnly = true;
+  } else {
+    // 取得失敗時は前回値を温存（viewerOnlyも触らない）
+    state.members = state.members || [];
+  }
+
+  // notify の同期（値が無い時は true を既定に）
+  state.notify = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
+                  ? whoResp.notify
+                  : (typeof state.notify === "boolean" ? state.notify : true);
+
   updateSegFilterUI();
 
-  // 3-α) 取得できた段階で一旦「イベントだけ」再描画して体感を上げる
+  // 3-α) 体感高速：イベントだけ先に描画
   bootHomeQuickRender();
 
-  // 4) 回答はイベントIDが分かってから取得（遅れてもOK）
+  // 4) 回答（イベントIDが揃ってから）
   state.answers = state.answers || {};
   try{
     const ids = (state.events||[]).map(e=>e.eventId).filter(Boolean);
@@ -1993,18 +2010,17 @@ async function refreshData(){
       const r = await fetchJsonWithTimeout(`?getAttendanceAll=1&lineId=${esc(state.lineId)}&eventIds=${esc(JSON.stringify(ids))}`, 15000);
       if (r.status === "ok" && r.map) {
         state.answers = r.map;
-        // 回答が来たら差し替え
         mountHomeWithFilters();
         cacheSet(`answers:${state.lineId}`, state.answers);
       }
     }
-  }catch(_){ /* 無視：画面は表示済み */ }
+  }catch(_){}
 
-  // 5) キャッシュ保存（次回起動を高速に）
+  // 5) キャッシュ保存
   if (state.events?.length)  cacheSet("events", state.events);
-  if (state.members)         cacheSet(`whoami:${state.lineId}`, state.members);
+  cacheSet(`whoami:${state.lineId}`, state.members);
 
-  // 6) ボタンの復帰
+  // 6) HOMEの主ボタン
   const hasMembers = (state.members||[]).length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
@@ -2164,72 +2180,85 @@ function renderAttendSelectHTML(evId, name, current){
 
   // ===== 既存の buildFormView を置換（renderAttendEvent を使用） =====
   window.buildFormView = function(){
-    const boxHeader = $("#formEventsBox");
-    const box = $("#formFields");
-    box.innerHTML = "";
-    boxHeader.innerHTML = `
-      <span class="muted">
-        イベントをタップして出欠を入力後、
-        <span class="em-red">送信ボタンを押してください。</span>
-      </span>`;
+  const boxHeader = $("#formEventsBox");
+  const box = $("#formFields");
 
-    const eventsForForm = state._filteredEventsForViews || [];
-    if (!eventsForForm.length){
-      box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
-      updateSubmitButton();
-      return;
-    }
+  // ★ 演奏者未登録ならフォーム全体を隠してガイドだけ出す
+  if ((state.members || []).length === 0){
+    boxHeader.classList.add("guidePlain");
+    boxHeader.innerHTML = viewerGuideHTML();
+    box.innerHTML = ""; // 入力行は描かない
+    bindViewerGuideButton();
+    updateSubmitButton(); // 送信ボタンは無効になる
+    return;
+  }
 
-    const nameSegMap = buildNameSegMap();
-    const uniqueNamesAll = Array.from(new Set((state.members||[]).map(m => m.performerName))).filter(Boolean);
-    const userSegSet = getMemberSegSet();
+  // --- ここから通常描画 ---
+  boxHeader.classList.remove("guidePlain");
+  box.innerHTML = "";
+  boxHeader.innerHTML = `
+    <span class="muted">
+      イベントをタップして出欠を入力後、
+      <span class="em-red">送信ボタンを押してください。</span>
+    </span>`;
 
-    // まとめてレンダリング（HTML組み立て）
-    const html = eventsForForm.map(e=>{
-      const ansList = state.answers[e.eventId] || [];
-      const ansMap  = {}; ansList.forEach(r => ansMap[r.performerName] = r);
-      return window.renderAttendEvent({
-        eventId : e.eventId,
-        date    : e.date,
-        time    : e.time,
-        place   : e.place || "",
-        deadline: e.deadline || "",
-        segment : e.segment || e.targetSegment || e.attendSegment || ""
-      }, {
-        uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet
-      });
-    }).join("");
-
-    box.innerHTML = html;
-
-    // アコーディオン開閉
-    box.querySelectorAll(".fEvent .fHead").forEach(h=>{
-      h.addEventListener("click", () => h.closest(".fEvent")?.classList.toggle("open"));
-    });
-
-    // 入力監視（デリゲート）
-    box.addEventListener("change", (ev)=>{
-      const sel = ev.target.closest("select.attSel");
-      if (!sel) return;
-      const eid = sel.dataset.event;
-      const name = sel.dataset.name;
-      const val  = sel.value;
-      draftSetAttend(eid, name, val || "");
-      markUnsavedBadge(eid);
-      updateSubmitButton();
-    });
-
-    box.addEventListener("input", (ev)=>{
-      const c = ev.target.closest("input.evComment");
-      if (!c) return;
-      const eid = c.dataset.event;
-      draftSetComment(eid, c.value);
-      markUnsavedBadge(eid);
-      updateSubmitButton();
-    });
-
+  const eventsForForm = state._filteredEventsForViews || [];
+  if (!eventsForForm.length){
+    box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
     updateSubmitButton();
-  };
+    return;
+  }
+
+  const nameSegMap = buildNameSegMap();
+  const uniqueNamesAll = Array.from(new Set((state.members||[]).map(m => m.performerName))).filter(Boolean);
+  const userSegSet = getMemberSegSet();
+
+  const html = eventsForForm.map(e=>{
+    const ansList = state.answers[e.eventId] || [];
+    const ansMap  = {}; ansList.forEach(r => ansMap[r.performerName] = r);
+    return window.renderAttendEvent({
+      eventId : e.eventId,
+      date    : e.date,
+      time    : e.time,
+      place   : e.place || "",
+      deadline: e.deadline || "",
+      segment : e.segment || e.targetSegment || e.attendSegment || ""
+    }, {
+      uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet
+    });
+  }).join("");
+
+  box.innerHTML = html;
+
+  // アコーディオン
+  box.querySelectorAll(".fEvent .fHead").forEach(h=>{
+    h.addEventListener("click", () => h.closest(".fEvent")?.classList.toggle("open"));
+  });
+
+  // 入力監視（出欠）
+  box.addEventListener("change", (ev)=>{
+    const sel = ev.target.closest("select.attSel");
+    if (!sel) return;
+    const eid = sel.dataset.event;
+    const name = sel.dataset.name;
+    const val  = sel.value;
+    draftSetAttend(eid, name, val || "");
+    markUnsavedBadge(eid);
+    updateSubmitButton();
+  });
+
+  // コメント
+  box.addEventListener("input", (ev)=>{
+    const c = ev.target.closest("input.evComment");
+    if (!c) return;
+    const eid = c.dataset.event;
+    draftSetComment(eid, c.value);
+    markUnsavedBadge(eid);
+    updateSubmitButton();
+  });
+
+  updateSubmitButton();
+};
 })();
 /* ===== 出欠フォーム（アコーディオン＋ドラフト） END ===== */
 
@@ -2434,6 +2463,30 @@ async function onRegister(){
   }
   function addDays(d, n){ const x = new Date(d.getTime()); x.setDate(x.getDate()+n); x.setHours(0,0,0,0); return x; }
 
+  // ===== 閲覧ガイド（黄色い案内 + 登録ボタン） =====
+  function viewerGuideHTML(){
+    return `
+      <div class="warnBox card" style="margin-bottom:10px;">
+        <div style="display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+          <div>
+            <div><b>出欠回答をするには氏名登録が必要です。</b></div>
+            <div class="small">閲覧のみの方は登録不要です。</div>
+          </div>
+          <button id="btnGoRegister" class="btn btn-outline btn-sm">氏名を登録する</button>
+        </div>
+      </div>
+    `;
+  }
+  // ボタンの onClick を張る共通関数
+  function bindViewerGuideButton(){
+    document.getElementById("btnGoRegister")?.addEventListener("click", ()=>{
+      registerMode = "create";
+      resetRegisterForm();
+      $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
+      $("#btnRegister").textContent = "登録する";
+      show("#view-register");
+    }, { once:true });
+  }
   // ===== カード描画 =====
   function renderScheduleCard(it){
     const seg = dispSeg(normSeg(it.segment||it.targetSegment||it.attendSegment||""));
@@ -2458,26 +2511,26 @@ async function onRegister(){
   }
 
   // ===== ローカル再描画（UIの選択だけで即時フィルタ） =====
-  function renderSchedulesLocal(){
+ function renderSchedulesLocal(){
   const box = $("#schedulesBox");
 
-  // まだ初回取得前なら待機表示
-  if (!Array.isArray(state.schedulesRaw) || state.schedulesRaw.length === 0){
-    box.innerHTML = `読み込み待機中（「再取得」を押すと読み込みます）`;
-    return;
-  }
+  // まだ取得前でも「待機中」ではなく空配列で処理してガイドを出す
+  const base = Array.isArray(state.schedulesRaw) ? state.schedulesRaw.slice() : [];
 
-  const base = state.schedulesRaw.slice();
-
-  // ← ここを堅牢に（daysSel ではなく days をローカル算出）
+  // ローカルUI値
   const selDaysEl = document.getElementById('selDays');
   const days = Number(selDaysEl && selDaysEl.value ? selDaysEl.value : 60) || 60;
-
   const kindSel = document.getElementById('selKind')?.value || "";
 
   // 1) 期間
   const today = new Date(); today.setHours(0,0,0,0);
-  const until = addDays(today, days);
+  const until = new Date(today.getTime()); until.setDate(until.getDate()+days);
+  const parseYmdStrictLocal = (s)=>{
+    const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+    if (!m) return null;
+    const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
+    return isNaN(d) ? null : d;
+  };
   let arr = base.filter(it=>{
     const d = parseYmdStrictLocal(it.ymd || it.date);
     return d && d >= today && d <= until;
@@ -2488,7 +2541,7 @@ async function onRegister(){
     arr = arr.filter(it => String(it.kind||"").trim() === kindSel);
   }
 
-  // 3) ユーザー区分（アカウント所属で絞り込み）
+  // 3) ユーザー区分（未登録＝区分なし → 全表示）
   const segSet = getMemberSegSet();
   arr = arr.filter(it => {
     const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
@@ -2504,7 +2557,18 @@ async function onRegister(){
   }
 
   state.schedules = arr;
-  box.innerHTML = window.renderSchedulesView(state.schedules);
+
+  // ★ 上部にガイド（members=0 なら常に表示）
+  const guide = (state.members.length === 0)
+    ? viewerGuideHTML()
+    : "";
+
+  // リスト（データ未取得時は「該当なし」になるが、ガイドが先に出る）
+  const listHTML = window.renderSchedulesView(state.schedules || []);
+  box.innerHTML = guide + listHTML;
+
+  // ガイドボタンのイベント
+  bindViewerGuideButton();
 }
 
   // ===== 初回 or 再取得時だけ API を叩く =====
