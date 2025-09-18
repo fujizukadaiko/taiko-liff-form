@@ -2705,6 +2705,7 @@ async function onRegister(){
       const expanded = btn.getAttribute('aria-expanded') === 'true';
       btn.setAttribute('aria-expanded', String(!expanded));
       memo.hidden = expanded;                 // true → 隠す / false → 表示
+      });
   });
 })();
 // ===== 今後の予定（Schedules） v5 END =====
