@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.0";
+  const FRONT_VERSION = "Front v3.3.1";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -874,6 +874,27 @@
       white-space:nowrap;        /* 常に1行 */
       margin-left:auto;          /* 右端寄せ */
     }
+    /* ===== 今後の予定：折りたたみ付きカード ===== */
+    .scheduleCard{ position:relative; }
+    .scTop{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    /* 種別＝右端・角丸四角バッジ */
+    .scKind{
+      margin-left:auto; display:inline-flex; align-items:center; height:22px;
+      padding:0 10px; font-size:12px; font-weight:700;
+      background:#f7f7fb; border:1px solid var(--c-border); border-radius:8px; color:#444;
+    }
+    .scTitleBtn{
+      all:unset; display:flex; align-items:baseline; gap:8px; width:100%; cursor:pointer;
+    }
+    .scTitleBtn .scDate{ font-weight:700; }
+    .scTitleBtn .scCaret{ margin-left:auto; transition:transform .12s ease; }
+    .scTitleBtn[aria-expanded="true"] .scCaret{ transform:rotate(180deg); }
+    /* 折りたたみ本文（メモ） */
+    .scMemo{
+      margin:6px 0 2px; padding:8px 10px; border:1px dashed var(--c-border);
+      background:#fafafc; border-radius:8px; font-size:13px; color:#444;
+    }
+    .scMeta{ font-size:13px; color:var(--c-text); margin-top:6px; }
   </style>
   
   <!-- LIFF SDK -->
@@ -2529,53 +2550,40 @@ async function onRegister(){
 
   // ===== カード描画 =====
   function renderScheduleCard(it){
-    const segNorm  = normSeg(it.segment||it.targetSegment||it.attendSegment||"");
+    const segNorm = normSeg(it.segment || it.targetSegment || it.attendSegment || "");
     const segLabel = dispSeg(segNorm);
-    const kind     = String(it.kind||"").trim();
-    const title    = it.title || "";
-    const ymdStr   = String(it.ymd || it.date || "");
-    const d = parseYmdStrictLocal(ymdStr);
-    const dateDisp = d ? ymdDow(d) : ymdStr; // 例) 2025/09/21（日）
-    const place    = it.place || "";
+    const dateText = ymdDow(parseYmdStrictLocal(it.ymd || it.date)) || (it.date || "");
+    const kindText = String(it.kind || "").trim();
+    const memoText = String(it.memo || "").trim();
   
-    // 集合情報
-    const meetAt    = it.meetAt    || "";
-    const meetPlace = it.meetPlace || "";
+    // 下段：@場所　集合 hh:mm 集合場所
+    const meetTxt = [
+      (it.meetAt ? `集合 ${it.meetAt}` : ""),
+      (it.meetPlace || "")
+    ].filter(Boolean).join(" ");
   
-    // 3行目は「＠場所　集合時間　集合場所」を一列に並べる
-    const row3Parts = [];
-    if (place)     row3Parts.push(`＠${place}`);
-    if (meetAt)    row3Parts.push(`集合時間 ${meetAt}`);
-    if (meetPlace) row3Parts.push(`集合場所 ${meetPlace}`);
-    const row3 = `
-      <div class="row3 small">
-        <span class="place">@${it.place || ""}</span>
-        ${
-          (it.meetAt || it.meetPlace)
-            ? `<span class="meet">集合 ${it.meetAt || ""} ${it.meetPlace || ""}</span>`
-            : ``
-        }
-      </div>
-    `;
+    return `
+      <div class="card scheduleCard" data-seg="${segNorm || 'both'}">
+        <!-- 1行目：左=区分バッジ / 右=種別バッジ（四角・右寄せ） -->
+        <div class="scTop">
+          ${segLabel ? `<span class="seg-badge ${segNorm==='adult'?'seg-adult':segNorm==='child'?'seg-child':'seg-both'}">${segLabel}</span>` : ``}
+          ${kindText ? `<span class="scKind">${kindText}</span>` : ``}
+        </div>
   
-    // バッジ
-    const segCls   = segNorm==='adult' ? 'seg-adult' : segNorm==='child' ? 'seg-child' : 'seg-both';
-    const segBadge = segLabel ? `<span class="seg-badge sm ${segCls}">${segLabel}</span>` : '';
-    const kindBadge = kind ? `<span class="kind-badge">${kind}</span>` : '';
+        <!-- 2行目：日付 + タイトル（クリックでメモを開閉） -->
+        <button type="button" class="scTitleBtn" aria-expanded="false">
+          <span class="scDate">${dateText}</span>
+          <span class="scTitle">${it.title || ""}</span>
+          ${memoText ? `<span class="scCaret" aria-hidden="true">▾</span>` : ``}
+        </button>
   
-    return `<div class="card scheduleCard" data-seg="${segNorm||'both'}">
-      <div class="row1">
-        ${segBadge}
-        ${kindBadge}
-      </div>
-      <div class="row2">
-        <span class="date">${dateDisp}</span>
-        <span class="title">${title}</span>
-      </div>
-      ${row3}
-      ${it.memo ? `<div class="small" style="margin-top:4px;">${it.memo}</div>` : ``}
-    </div>`;
-  }
+        <!-- 3行目：メモ（折りたたみ。初期は非表示） -->
+        ${memoText ? `<div class="scMemo" hidden>${memoText}</div>` : ``}
+  
+        <!-- 4行目：@場所　集合時間 集合場所 -->
+        <div class="scMeta">@${it.place || ""}${meetTxt ? `　${meetTxt}` : ""}</div>
+      </div>`;
+    }
   window.renderSchedulesView = function(list){
     if (!Array.isArray(list) || list.length===0) {
       return `<div class="listEmpty">該当する予定はありません</div>`;
@@ -2687,6 +2695,16 @@ async function onRegister(){
     document.getElementById('selDays')?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
     document.getElementById('selKind')?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
     document.getElementById('selSeg') ?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
+    // タイトル行をクリックでメモ開閉（schedulesBox 内で委譲）
+    document.getElementById('schedulesBox')?.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.scTitleBtn');
+      if (!btn) return;
+      const card = btn.closest('.scheduleCard');
+      const memo = card?.querySelector('.scMemo');
+      if (!memo) return;                      // メモなしカードは何もしない
+      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', String(!expanded));
+      memo.hidden = expanded;                 // true → 隠す / false → 表示
   });
 })();
 // ===== 今後の予定（Schedules） v5 END =====
