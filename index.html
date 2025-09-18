@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.6";
+  const FRONT_VERSION = "Front v3.2.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxBEF7quF4QJ8hrFhqPTEamBsz_jqtmAj5ePdOD1E535zGd9yoxdVOu1uMfSCTorCJMoA/exec";     // ←差し替え
 
@@ -1368,7 +1368,7 @@
         S.events = Array.isArray(events) ? events : [];
         S.ansMap = myAnswersMap || {};
         S.names  = Array.isArray(performers) ? performers : [];
-        S.nameSegMap = nameSegMap || {};2
+        S.nameSegMap = nameSegMap || {};
         const n = E.ckN(); if (n) S.onlyNA = !!n.checked;
         render();
       },
@@ -2189,12 +2189,31 @@ function renderAttendSelectHTML(evId, name, current){
 
   // ★ 演奏者未登録ならフォーム全体を隠してガイドだけ出す
   if ((state.members || []).length === 0){
-    boxHeader.classList.add("guidePlain");
-    boxHeader.innerHTML = viewerGuideHTML();
-    box.innerHTML = ""; // 入力行は描かない
-    bindViewerGuideButton();
-    updateSubmitButton(); // 送信ボタンは無効になる
-    return;
+    bboxHeader.classList.add("guidePlain");
+     const guide = (window.viewerGuideHTML)
+       ? window.viewerGuideHTML()
+       : `<div class="warnBox card" style="margin-bottom:10px;">
+           <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
+              <div>
+                <div><b>出欠回答をするには氏名登録が必要です。</b></div>
+                <div class="small">閲覧のみの方は登録不要です。</div>
+              </div>
+             <button id="btnGoRegister" class="btn btn-outline btn-sm">氏名を登録する</button>
+            </div>
+          </div>`;
+     boxHeader.innerHTML = guide;
+     box.innerHTML = "";
+     (window.bindViewerGuideButton
+       ? window.bindViewerGuideButton()
+       : document.getElementById("btnGoRegister")?.addEventListener("click", ()=>{
+           registerMode = "create";
+           resetRegisterForm();
+           document.getElementById("regTitle").textContent = "初回登録（入力者 & 演奏者）";
+           document.getElementById("btnRegister").textContent = "登録する";
+           show("#view-register");
+         }, { once:true }));
+        updateSubmitButton(); // 送信ボタンは無効になる
+        return;
   }
 
   // --- ここから通常描画 ---
