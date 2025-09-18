@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.2.4";
+  const FRONT_VERSION = "Front v3.2.5";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1364,7 +1364,7 @@
         S.events = Array.isArray(events) ? events : [];
         S.ansMap = myAnswersMap || {};
         S.names  = Array.isArray(performers) ? performers : [];
-        S.nameSegMap = nameSegMap || {};2
+        S.nameSegMap = nameSegMap || {};
         const n = E.ckN(); if (n) S.onlyNA = !!n.checked;
         render();
       },
@@ -2497,11 +2497,14 @@ async function onRegister(){
 
   // 4) 両方所属ユーザーのみ、UI区分フィルタ
   if (segSet && segSet.size > 0 && userHasBoth()){
-    const uiSeg = $("#selSeg")?.value || "";
-    if (uiSeg){
-      arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
-    }
+  const uiSeg = $("#selSeg")?.value || "";
+  if (uiSeg){
+    arr = arr.filter(it => {
+      const code = normSeg(it.segment || it.targetSegment || it.attendSegment || "");
+      return code === uiSeg || code === "both";
+    });
   }
+}
 
   state.schedules = arr;
   box.innerHTML = window.renderSchedulesView(state.schedules);
