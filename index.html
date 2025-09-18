@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.0";
+  const FRONT_VERSION = "Front v3.2.2";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxkVMUfLkSP_6wqoVEJr6vsPzlCHl3M9UNyVFMqQr2UOQhsqS75GcZ0ZUHN71_Exahr/exec";     // ←差し替え
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwcyXwuczoV2All6HtzlO6mEk7oafvqQOmctqjjERdY0SGj2i5jnKGHbQhXzv2NRbM1Wg/exec";     // ←差し替え
 
   // （オプション）設定チェック：重複定義や未設定を早期に気づけます
   (function(){
@@ -259,7 +259,25 @@
       cursor: not-allowed;
       filter: saturate(.6);
     }
+    /* =========================================================
+   Schedules用：プルダウンを少し低め（出欠フォームと統一）
+   ※ 既存の .selectBtn を上書きします（全ページ共通OK）
+   ========================================================= */
+    .selectBtn{
+      height: 36px;         /* 高さをコンパクトに */
+      min-height: 36px;
+      line-height: 34px;    /* テキスト縦位置のバランス調整 */
+      padding: 0 12px;      /* 左右はそのまま */
+      font-size: 14px;      /* 少しだけ控えめ */
+    }
     
+    /* iOS / Safari 対応（矢印のズレを抑制：必要なら） */
+    .selectBtn::-ms-expand { display: none; }
+    .selectBtn {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
 /* =========================================================
    ゴーストボタン（#btnFetchSchedules など）を紫ボーダーに統一
    既存 .btn, .btn-sm を活かして「色味」だけを合わせます
@@ -290,7 +308,108 @@
       cursor: not-allowed;
       filter: saturate(.6);
     }
-  
+    /* ================================
+   今後の予定：レイアウトと見た目
+   ================================ */
+    
+    /* 2列グリッド：プルダウンを横並び、下段にボタン */
+    .schedControls{
+      display: grid;
+      grid-template-columns: auto auto;
+      gap: 10px 14px;
+      align-items: end;
+      justify-content: start; /* 横幅を内容サイズに合わせる */
+    }
+    .schedControls .field{
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .schedControls .span2{
+      grid-column: 1 / -1; /* 2列ぶち抜きで下段にボタン */
+    }
+    
+    /* プルダウンを短め幅に（内容量に応じて調整可） */
+    .schedSel{
+      width: 160px;          /* コンパクト幅（ご希望に応じて 140〜200pxで微調整可） */
+      max-width: 100%;
+    }
+    
+    /* モバイルで列落ちしても綺麗に見せる */
+    @media (max-width: 420px){
+      .schedControls{
+        grid-template-columns: 1fr 1fr; /* 2列のままでもOK。1列にしたければ 1fr に */
+      }
+      .schedSel{
+        width: 100%; /* 極端に狭い端末では全幅にして文字切れを防止 */
+      }
+    }
+    
+    /* 文字が見切れる対策：選択肢垂直位置のクリップを緩和 */
+    .selectBtn{
+      height: 36px;
+      min-height: 36px;
+      line-height: normal;  /* ← 重要：iOSで文字が切れないよう固定line-heightを解除 */
+      padding: 6px 12px;    /* 縦の余白で視認性を確保 */
+      font-size: 14px;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    /* ================================
+   今後の予定：2行のラベル｜プルダウン配置
+   ================================ */
+    /* ラベル｜セレクト の2列グリッド。要素は [label, select, label, select, span2...] の順 */
+    .schedControls{
+      display: grid;
+      grid-template-columns: auto max-content; /* 左=ラベル、右=プルダウン */
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: start;
+    }    
+    /* ボタンは2列ぶち抜きで下段へ */
+    .schedControls .span2{
+      grid-column: 1 / -1;
+    }
+    
+    /* ラベル側のスタイル（任意） */
+    .scLabel{
+      font-size: 14px;
+      color: var(--c-text);
+      white-space: nowrap;
+    }
+    
+    /* プルダウンを短め幅に（前回より“半分”寄りのサイズ） */
+    .schedSel.short{
+      width: 120px;                  /* 目安：前回160px → 120px。さらに短くしたければ 96〜110pxなどに */
+      max-width: 100%;
+    }
+    
+    /* 端末幅が狭い時の保険：文字が見切れないように */
+    @media (max-width: 420px){
+      .schedSel.short{
+        width: clamp(100px, 40vw, 128px); /* 端末に応じて少し伸縮 */
+      }
+    }
+    
+    /* iOS 文字欠け対策（selectの縦詰まりを避ける） */
+    .selectBtn{
+      height: 36px;
+      min-height: 36px;
+      line-height: normal;
+      padding: 6px 12px;
+      font-size: 14px;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    /* 氏名編集(登録)ページの微調整 */
+    .regAddRow { 
+      margin-top: 12px;               /* 上と詰まらないように余白を追加 */
+    }
+    #regNote {
+      margin: 6px 0 8px;               /* タイトル直下の注意書きの行間 */
+      font-size: 12px;
+      color: var(--c-muted);
+    }
     /* ===== 演奏者行（ラベルは1行、下段で入力と削除を2列に並べる） ===== */
     /* ===== 演奏者行：名前 7 / 右カラム 3（区分+削除） ===== */
     .perfRow{
@@ -358,10 +477,6 @@
     .seg-both  {
       color:#6d5a93; background:#f1eaff; border-color:#bda8ea; /* 紫系 */
     }
-    .pill.sm.seg-adult { background:#e9f4ff; color:#0b66c3; }
-    .pill.sm.seg-child { background:#eafaea; color:#13823b; }
-    .pill.sm.seg-both  { background:#f3f3ff; color:#5a54d6; }
-    .card.warn { border:1px solid #f1d46b; }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -390,230 +505,307 @@
       .spinner { border-top-color: rgb(79 70 229); }
     }
   </script>
-  
+  <!-- ===== Custom Overrides（最後に評価されるCSS） ===== -->
   <style id="custom-overrides">
-  :root{
-    /* ===== 共通カスタム変数 ===== */
-    --attSel-width: 180px;             /* 出欠セレクト固定幅 */
-    --seg-child-border:#f59e9e;        /* 区分バッジの境界色（子ども） */
-    --seg-adult-border:#60a5fa;        /* 区分バッジの境界色（大人） */
-    --seg-both-border:#bda8ea;         /* 区分バッジの境界色（両方） */
-  }
+    :root{
+      /* プルダウンの横幅（必要に応じて微調整） */
+      --attSel-width: 180px;
+    }
 
-  /* ===== 出欠：名前 + セレクト同一行（右側固定幅） ===== */
-  .row-att{
-    display: grid;
-    grid-template-columns: 1fr var(--attSel-width);
-    gap: 8px;
-    align-items: center;
-  }
-  .selectBtn{
-    width: var(--attSel-width);
-    min-width: var(--attSel-width);
-    box-sizing: border-box;
-    white-space: nowrap;
-    border: 1.5px solid var(--c-primary-2);
-    color: var(--c-primary-2);
-    background: #fff;
-    border-radius: 10px;
-    padding: 6px 10px;
-    font-weight: 600;
-    height: 36px;            /* 高さを統一（iOSの縦詰まり回避） */
-    min-height: 36px;
-    line-height: normal;
-    -webkit-appearance: none;
-    appearance: none;
-    box-shadow: 0 1px 4px rgba(127,106,165,0.14);
-  }
-  .selectBtn:focus{
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(127,106,165,.18);
-  }
-  .selectBtn option[value=""]{ color:#9aa; }  /* プレースホルダ行 */
+    /* 名前 + セレクトを同じ行に。右側のセレクト幅を固定 */
+    .row-att{
+      display: grid;
+      grid-template-columns: 1fr var(--attSel-width);
+      gap: 8px;
+      align-items: center;
+    }
 
-  /* ===== アコーディオン（選択中の色をやや濃く） ===== */
-  .fHead{ transition: background-color .12s ease; }
-  .fHead:hover{ background:#f5efff; }
-  .fEvent.open .fHead{ background:#efe7ff; }
-  .fEvent[data-seg="child"].open .fHead { background:#ffecec; } /* 子ども */
-  .fEvent[data-seg="adult"].open .fHead { background:#e6f0ff; } /* 大人 */
-  .fEvent[data-seg="both"].open  .fHead { background:#efe7ff; } /* 両方 */
+    /* ボタン風プルダウンの幅を統一（プレースホルダと選択後で幅が変わらないように） */
+    .selectBtn{
+      width: var(--attSel-width);
+      min-width: var(--attSel-width);
+      box-sizing: border-box;
+      white-space: nowrap;
+      border: 1.5px solid var(--c-primary-2);
+      color: var(--c-primary-2);
+      background: #fff;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 600;
+    }
 
-  /* ===== タイトル行の強調（日時・@場所を太字） ===== */
-  .fTitleRow .t-date,
-  .fTitleRow .t-place{ font-weight:700; }
+    /* プレースホルダ行（value=""）の色 */
+    .selectBtn option[value=""]{
+      color: #9aa;
+    }
 
-  /* ===== ガイド文（枠・背景なし、文字のみ） ===== */
-  #view-form #formEventsBox.guidePlain{
-    background:transparent; border:0; padding:0; margin:4px 0 8px;
-  }
-
-  /* ===== バッジ：未保存表示 ===== */
-  .badge-unsaved{
-    display:inline-flex; align-items:center; justify-content:center;
-    padding:2px 8px; height:22px; border-radius:999px; font-size:11px; font-weight:600;
-    color:#b45309; border:1.5px solid #f59e0b; background:#fff8e6; white-space:nowrap;
-  }
-
-  /* ===== ステータス色（NGは読みやすい青灰に） ===== */
-  .stat-ng{
-    background:#eef2f7;
-    border:1px solid #d2d9e3;
-    color:#334155;
-  }
-
-  /* ===== ボタン（共通の無効状態） ===== */
-  button[disabled],
-  .btn[disabled]{
-    opacity:.55; pointer-events:none; cursor:not-allowed; filter:saturate(.6);
-  }
-  /* 送信ボタンの無効化（送信中の薄紫） */
-  .btn-primary[disabled],
-  .btn-primary:disabled{
-    background:#ede7ff !important;
-    border-color:#d6ccff !important;
-    color:var(--c-primary-2) !important;
-    cursor:not-allowed !important;
-    pointer-events:none !important;
-    box-shadow:none !important;
-    filter:saturate(.85);
-  }
-
-  /* ===== ゴーストボタン：紫ボーダーに統一 ===== */
-  .btn.btn-ghost{
-    background:#fff !important;
-    color:var(--c-primary-2) !important;
-    border:1px solid color-mix(in srgb, var(--c-primary-2), #000 10%) !important;
-    box-shadow:0 1px 4px rgba(127,106,165,0.08);
-    transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
-  }
-  .btn.btn-ghost:hover{
-    background: color-mix(in srgb, var(--c-primary), #fff 90%) !important;
-    border-color: var(--c-primary) !important;
-    color: var(--c-primary-2) !important;
-    box-shadow:0 2px 8px rgba(127,106,165,0.12);
-  }
-  .btn.btn-ghost:focus-visible{
-    outline:2px solid transparent !important;
-    box-shadow:0 0 0 3px color-mix(in srgb, var(--c-primary), #fff 80%) !important;
-  }
-
-  /* ===== 削除ボタンは軽いトーンで差別化 ===== */
-  .btn-remove{
-    background:#fff !important;
-    color:#222 !important;
-    border:1px solid #dcd2ef !important;
-    box-shadow:0 2px 10px rgba(127,106,165,0.10), 0 1px 0 rgba(0,0,0,0.02) inset;
-    transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
-  }
-  .btn-remove:hover{
-    filter:brightness(.98);
-    box-shadow:0 3px 12px rgba(127,106,165,0.16), 0 1px 0 rgba(0,0,0,0.03) inset;
-  }
-  .btn-remove:active{ transform:translateY(1px); }
-  .btn-remove:focus-visible{
-    outline:none;
-    box-shadow:0 0 0 3px rgba(127,106,165,0.12), 0 2px 10px rgba(127,106,165,0.10);
-  }
-
-  /* ===== disabled入力の見た目をselectと統一（iOS/Safari対策含む） ===== */
-  .selectBtn:disabled,
-  input[type="date"]:disabled,
-  input[type="time"]:disabled,
-  input[type="text"]:disabled,
-  textarea:disabled{
-    color:#888 !important;
-    -webkit-text-fill-color:#888 !important; /* iOS濃度維持 */
-    opacity:1 !important;
-    background:#f7f5ff !important;
-    border-color:#e6e0f0 !important;
-    box-shadow:none !important;
-    cursor:not-allowed !important;
-  }
-  input[type="text"]:disabled::placeholder,
-  input[type="date"]:disabled::placeholder,
-  input[type="time"]:disabled::placeholder,
-  textarea:disabled::placeholder{
-    color:#888 !important; opacity:1 !important;
-  }
-  input[type="text"]:disabled::-webkit-input-placeholder,
-  input[type="date"]:disabled::-webkit-input-placeholder,
-  input[type="time"]:disabled::-webkit-input-placeholder,
-  textarea:disabled::-webkit-input-placeholder{
-    color:#888 !important; opacity:1 !important;
-  }
-
-  /* ===== 管理アコーディオンの見た目を微調整 ===== */
-  #adminListAcc .fHead{
-    background:#f5efff !important; border-radius:10px;
-  }
-  #adminListAcc.open .fHead{ background:#efe7ff !important; }
-  #adminListAcc .btn-edit{
-    min-height:32px; padding:6px 10px; font-size:13px; border-radius:9px;
-    background:#fff !important;
-    color: color-mix(in srgb, var(--c-primary-2), #000 0%) !important;
-    border:1px solid color-mix(in srgb, var(--c-primary-2), #000 12%) !important;
-    box-shadow:0 1px 3px rgba(127,106,165,0.08);
-  }
-  #adminListAcc .btn-edit:hover{
-    background:#f8f6ff !important;
-    border-color: color-mix(in srgb, var(--c-primary-2), #000 20%) !important;
-  }
-  #view-admin .hint{ font-size:10px !important; line-height:1.55; }
-
-  /* ===== “今後の予定”：2列→下段ボタンのレイアウト ===== */
-  .schedControls{
-    display:grid;
-    grid-template-columns:auto max-content;  /* 左=ラベル, 右=プルダウン */
-    gap:10px 14px;
-    align-items:center;
-    justify-content:start;
-  }
-  .schedControls .field{ display:flex; flex-direction:column; min-width:0; }
-  .schedControls .span2{ grid-column:1 / -1; }  /* ぶち抜き（下段ボタン） */
-  .scLabel{ font-size:14px; color:var(--c-text); white-space:nowrap; }
-  .schedSel{ width:160px; max-width:100%; }
-  .schedSel.short{ width:120px; max-width:100%; }
-  @media (max-width:420px){
-    .schedSel{ width:100%; }
-    .schedSel.short{ width: clamp(100px, 40vw, 128px); }
-  }
-
-  /* ===== 出欠結果一覧：ラベル右にセレクト＋下段に再取得 ===== */
+    /* すべてのボタンの disabled 視覚（前にご提示のものもここにまとめてOK） */
+    button[disabled],
+    .btn[disabled]{
+      opacity: .55;
+      pointer-events: none;
+      cursor: not-allowed;
+      filter: saturate(.6);
+    }
+    /* ---- 軽い削除ボタン（見た目を他ボタンと差別化） ---- */
+    .btn-remove{
+      background:#fff !important;
+      color:#222 !important;                         /* 黒系文字 */
+      border:1px solid #dcd2ef !important;           /* ごく薄い紫の枠 */
+      box-shadow:
+        0 2px 10px rgba(127,106,165,0.10),           /* 薄い紫のソフトシャドウ */
+        0 1px 0 rgba(0,0,0,0.02) inset;
+      transition: transform .08s ease, filter .12s ease, box-shadow .12s ease;
+    }
+    .btn-remove:hover{
+      filter: brightness(0.98);
+      box-shadow:
+        0 3px 12px rgba(127,106,165,0.16),
+        0 1px 0 rgba(0,0,0,0.03) inset;
+    }
+    .btn-remove:active{
+      transform: translateY(1px);
+    }
+    .btn-remove:focus-visible{
+      outline: none;
+      box-shadow:
+        0 0 0 3px rgba(127,106,165,0.12),            /* フォーカス時に薄いリング */
+        0 2px 10px rgba(127,106,165,0.10);
+    }
+    /* 無効時の視覚（全体ルールに準拠） */
+    .btn-remove[disabled]{
+      opacity: .55;
+      pointer-events: none;
+      cursor: not-allowed;
+      filter: saturate(.6);
+    }
+    /* === disabledテキスト入力の見た目をselectと統一（iOS/Safari対応） === */
+    input[type="text"]:disabled,
+    input[type="date"]:disabled,
+    input[type="time"]:disabled,
+    textarea:disabled {
+      color: #888 !important;                     /* テキスト色 */
+      -webkit-text-fill-color: #888 !important;   /* iOS/Safariで薄くなるのを防ぐ */
+      opacity: 1 !important;                      /* iOSの透明度低下を打ち消す */
+      background: #f7f5ff !important;             /* 既存ルールと統一 */
+      border-color: #e6e0f0 !important;
+    }
+    
+    /* placeholderも濃さを統一する */
+    input[type="text"]:disabled::placeholder,
+    input[type="date"]:disabled::placeholder,
+    input[type="time"]:disabled::placeholder,
+    textarea:disabled::placeholder {
+      color: #888 !important;
+      opacity: 1 !important;
+    }
+    
+    /* Safari旧挙動の保険 */
+    input[type="text"]:disabled::-webkit-input-placeholder,
+    input[type="date"]:disabled::-webkit-input-placeholder,
+    input[type="time"]:disabled::-webkit-input-placeholder,
+    textarea:disabled::-webkit-input-placeholder {
+      color: #888 !important;
+      opacity: 1 !important;
+    }
+    /* 上部アコーディオンのヘッダーを常時うす紫、open時は少し濃く */
+    #adminListAcc .fHead{
+      background:#f5efff !important;
+      border-radius:10px;
+    }
+    #adminListAcc.open .fHead{
+      background:#efe7ff !important;
+    }
+    /* アコーディオン内の編集ボタンを小さめ＆薄めトーンに */
+    #adminListAcc .btn-edit{
+      min-height: 32px;
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 9px;
+      background:#fff !important;
+      color: color-mix(in srgb, var(--c-primary-2), #000 0%) !important; /* 文字は既存と同系色 */
+      border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 12%) !important; /* 枠をワントーン薄く */
+      box-shadow: 0 1px 3px rgba(127,106,165,0.08);
+    }
+    #adminListAcc .btn-edit:hover{
+      background:#f8f6ff !important;
+      border-color: color-mix(in srgb, var(--c-primary-2), #000 20%) !important;
+    }
+    /* 管理フォームのみ：注釈の文字をさらに小さく（10px） */
+    #view-admin .hint{
+      font-size: 10px !important;
+      line-height: 1.55;
+    }
+    /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
+    .repControls{
+      display: grid;
+      grid-template-columns: auto max-content;
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: start;
+    }
+    .repLabel{
+      font-size: 14px;
+      color: var(--c-text);
+      white-space: nowrap;
+    }
+    /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
+    .repControls{
+      display: grid;
+      grid-template-columns: auto max-content;
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: start;
+    }
+    .repLabel{
+      font-size: 14px;
+      color: var(--c-text);
+      white-space: nowrap;
+    }
+    /* 下段に「再取得」ボタンを左寄せで配置 */
     .repControls .span2{
-    grid-column:1 / -1;
-    display:flex; justify-content:flex-start; margin-top:4px;
-  }
-
-  /* ===== 氏名登録行：7:3グリッド（区分＋削除） ===== */
-  .perfRow{
-    display:grid;
-    grid-template-columns:7fr 3fr;  /* 7:3 */
-    grid-auto-rows:auto;
-    column-gap:12px; row-gap:8px;
-    margin:10px 0; align-items:center;
-  }
-  .perfRow .perfLabel{ grid-column:1 / -1; font-size:12px; color:var(--c-muted); }
-  .perfRow .regPerf{ grid-column:1 / 2; width:100%; height:44px; }
-  .perfRow .regPerfSeg{ grid-column:2 / 3; width:100%; height:44px; }
-  .perfRow .btn-remove{
-    grid-column:2 / 3; width:100%; min-height:40px; height:44px; padding:0 12px; border-radius:12px;
-    justify-self:stretch; align-self:end;
-  }
-  @media (max-width:420px){ .perfRow{ column-gap:10px; } }
-
-  /* ===== 区分バッジ ===== */
-  .fHead .seg-badge{ margin:0 0 4px 0; }
-  .seg-badge{
-    display:inline-flex; align-items:center; justify-content:center;
-    height:20px; padding:0 8px; border-radius:999px;
-    font-size:11px; font-weight:700; white-space:nowrap; border:1.5px solid; margin-right:8px;
-  }
-  .seg-adult { color:#1d4ed8; background:#e6f0ff; border-color:var(--seg-adult-border); }
-  .seg-child { color:#b91c1c; background:#ffecec; border-color:var(--seg-child-border); }
-  .seg-both  { color:#6d5a93; background:#f1eaff; border-color:var(--seg-both-border); }
-</style> 
- 
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: flex-start;
+      margin-top: 4px;
+    }
+    /* ===== 出欠：セグメントを独立行にしたときの余白（最小CSS） ===== */
+    .fHead .seg-badge{ margin: 0 0 4px 0; }   /* 上段バッジの下に少し余白 */
+    /* ===== 区分別の枠色（カード/行を共通で） ===== */
+    :root{
+      --seg-child-border:#f59e9e;   /* 子ども=薄い赤 */
+      --seg-adult-border:#93c5fd;   /* 大人=薄い青  */
+      --seg-both-border:#e8e2f0;    /* 両方=薄い紫（既存） */
+    }
+    /* イベントカード類（トップ/フォーム/予定/管理一覧） */
+    .card[data-seg="child"], .fEvent[data-seg="child"], .eventRow[data-seg="child"]{
+      border-color: var(--seg-child-border) !important;
+    }
+    .card[data-seg="adult"], .fEvent[data-seg="adult"], .eventRow[data-seg="adult"]{
+      border-color: var(--seg-adult-border) !important;
+    }
+    .card[data-seg="both"], .fEvent[data-seg="both"], .eventRow[data-seg="both"]{
+      border-color: var(--seg-both-border) !important;
+    }
+    
+    /* ===== 欠席バッジ（赤→ブルーグレー） ===== */
+    .stat-ng{
+      background:#eef2f7 !important;
+      border:1px solid #d2d9e3 !important;
+      color:#334155 !important;
+    }
+    
+    /* ===== 出欠フォーム：開いた時のヘッダー色を区分別に ===== */
+    .fEvent[data-seg="child"].open .fHead { background:#ffecec !important; } /* 子ども=淡赤 */
+    .fEvent[data-seg="adult"].open .fHead { background:#e6f0ff !important; } /* 大人=淡青 */
+    .fEvent[data-seg="both"].open  .fHead { background:#efe7ff !important; } /* 両方=既存(紫) */
+    /* ===== ① アコーディオン色：閉じた時/ホバー時/開いた時を区分別に統一 ===== */
+    /* デフォルト（閉じている時）は透明にして枠色だけ見せる */
+    .fEvent[data-seg] .fHead{
+      background: transparent !important;
+    }
+    
+    /* ホバー時 */
+    .fEvent[data-seg="child"] .fHead:hover { background:#fff5f5 !important; } /* 淡い赤 */
+    .fEvent[data-seg="adult"] .fHead:hover { background:#f2f7ff !important; } /* 淡い青 */
+    .fEvent[data-seg="both"]  .fHead:hover { background:#f5efff !important; } /* 既存の淡紫 */
+    
+    /* 開いた時（既に設定済みでもOK。ここで最終上書き） */
+    .fEvent[data-seg="child"].open .fHead { background:#ffecec !important; }
+    .fEvent[data-seg="adult"].open .fHead { background:#e6f0ff !important; }
+    .fEvent[data-seg="both"].open  .fHead { background:#efe7ff !important; }
+    
+    /* ===== ② 角のはみ出し対策（背景を枠内で丸めてクリップ） ===== */
+    .fEvent{
+      overflow: hidden;                 /* 子要素の背景が枠外へ出ないように */
+    }
+    .fEvent .fHead{
+      border-top-left-radius:  inherit; /* コンテナの角丸に合わせる */
+      border-top-right-radius: inherit;
+      background-clip: padding-box;     /* Safari等のにじみ対策 */
+    }
+    
+    /* ===== ③ 欠席バッジ：水色系に変更（未回答と差別化） ===== */
+    .stat-ng{
+      background:#e6f2ff !important;   /* 淡い水色 */
+      border:1px solid #bad7ff !important;
+      color:#1e3a8a !important;        /* やや深い青文字 */
+    }
+    
+    /* 未回答（現状グレー）のままでOK。必要ならここで微調整できます
+    .stat-na{ ... }
+    */
+    /* === 氏名編集ページ専用の上書き === */
+    #view-register .perfRow{
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); /* 名前7 : 右3 */
+      grid-auto-rows: auto;
+      column-gap: 12px;
+      row-gap: 8px;
+      align-items: center;
+    }
+    
+    /* ラベルは2列ぶち抜き */
+    #view-register .perfRow .perfLabel{ grid-column: 1 / -1; }
+    
+    /* 左：演奏者名入力は全幅 */
+    #view-register .perfRow .regPerf{
+      grid-column: 1 / 2;
+      width: 100%;
+      height: 44px;
+    }
+    
+    /* 右：区分セレクト（上段）・削除（下段）を縦積み & 全幅 */
+    #view-register .perfRow .regPerfSeg{
+      grid-column: 2 / 3;
+      width: 100%;
+      height: 44px;
+      justify-self: stretch;
+    }
+    #view-register .perfRow .btn-remove{
+      grid-column: 2 / 3;
+      width: 100% !important;
+      min-height: 40px;
+      height: 44px;
+      justify-self: stretch;
+      align-self: end;
+    }
+    
+    /* ここがポイント：氏名編集では “固定幅Select” を解除して全幅化 */
+    #view-register .selectBtn{
+      width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box;
+    }
+    
+    /* モバイル微調整 */
+    @media (max-width: 420px){
+      #view-register .perfRow{ column-gap: 10px; }
+    }
+    /* ===== 出欠結果バッジ（管理レポート） ===== */
+    .repCard { background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; }
+    .repHead { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
+    .repTitle { font-weight:700; }
+    .repSub   { font-size:12px; color:var(--c-muted); }
+    
+    .repRow  { display:flex; align-items:baseline; gap:8px; padding:6px 0; border-top:1px dashed #eee; }
+    .repRow:first-child { border-top:0; }
+    .repName { font-weight:600; min-width:9em; }
+    .repAt   { font-size:12px; color:var(--c-muted); }
+    
+    .badge-att {
+      display:inline-flex; align-items:center; justify-content:center;
+      height:22px; padding:0 8px; border-radius:999px; font-size:12px; font-weight:700;
+      border:1.5px solid;
+    }
+    .badge-att.yes   { color:#047857; background:#ecfdf5; border-color:#a7f3d0; } /* 参加=緑 */
+    .badge-att.no    { color:#b91c1c; background:#fef2f2; border-color:#fecaca; } /* 欠席=赤 */
+    .badge-att.maybe { color:#92400e; background:#fffbeb; border-color:#fde68a; } /* 未定=黄 */
+    .badge-att.na    { color:#475569; background:#f1f5f9; border-color:#cbd5e1; } /* その他/空 */
+    
+    .repNA  { margin-top:10px; padding-top:8px; border-top:1px solid var(--c-border); font-size:13px; color:#475569; }  
+  </style>
+  
   <!-- LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
@@ -791,6 +983,7 @@
           <button id="btnFetchSchedules" class="btn btn-ghost btn-sm">再取得</button>
         </div>
       </div>
+    
       <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
     </div>    
     </section>
@@ -1171,7 +1364,7 @@
         S.events = Array.isArray(events) ? events : [];
         S.ansMap = myAnswersMap || {};
         S.names  = Array.isArray(performers) ? performers : [];
-        S.nameSegMap = nameSegMap || {};
+        S.nameSegMap = nameSegMap || {};2
         const n = E.ckN(); if (n) S.onlyNA = !!n.checked;
         render();
       },
@@ -1265,7 +1458,6 @@ let state = {
   notify: true,        // ★ 追加：既定は ON
   reportMeta: [],          // 管理レポート用：軽量メタ一覧（meta=1）
   reportDetailMap: {},     // { [eventId]: 詳細レスポンス } のキャッシュ
-  viewerOnly: false      // ★ 追加：閲覧のみ（whoami が status:"new"）かどうか
 };
 
 let registerMode = "create"; // "create" | "edit"
@@ -1606,7 +1798,7 @@ function bindHandlers(){
   $("#btnAddPerf").onclick     = ()=> addPerformerField("");
   $("#btnRegister").onclick    = onRegister;
 
-  $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); updateSegFilterUI(); window.fetchSchedulesAndRender && window.fetchSchedulesAndRender(); };
+  $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); updateSegFilterUI(); renderSchedules(true); };
   $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
   $("#btnFetchSchedules").onclick    = ()=> renderSchedules(true);
   // 区分フィルタが変更されたら 今後の予定を再描画
@@ -1751,13 +1943,13 @@ function mountHomeWithFilters(){
 
 /* ===== データ読み直し（段階表示 & キャッシュ対応） ===== */
 async function refreshData(){
-  // 1) スピナー
+  // 1) まずスピナーを出す
   $("#eventsBox").innerHTML  = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
   $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
   $("#btnEditNames").style.display = "none";
 
-  // 2) キャッシュ即時表示（あれば）
+  // 2) キャッシュがあれば“即表示”
   const cachedEvents  = cacheGet("events");
   const cachedMembers = cacheGet(`whoami:${state.lineId}`);
   const cachedAnswers = cacheGet(`answers:${state.lineId}`);
@@ -1772,44 +1964,28 @@ async function refreshData(){
     }
   }
 
-  // 3) events & whoami を並列取得
+  // 3) イベント & 会員を並列に取得（タイムアウト/リトライ付き）
   let eventsResp = null, whoResp = null;
   try{
     const [evRes, whoRes] = await Promise.allSettled([
       fetchJsonWithTimeout("?events=1", 15000),
       fetchJsonWithTimeout(`?whoami=1&id=${esc(state.lineId)}`, 15000)
     ]);
-    if (evRes.status === "fulfilled") eventsResp = evRes.value;
-    if (whoRes.status === "fulfilled") whoResp   = whoRes.value;
+    if (evRes.status === "fulfilled")  eventsResp = evRes.value;
+    if (whoRes.status === "fulfilled")  whoResp   = whoRes.value;
   }catch(_){}
 
-  // events は常に反映（登録の有無に依存しない）
-  state.events = (eventsResp?.status==="ok" && Array.isArray(eventsResp.events))
-                  ? eventsResp.events : (state.events||[]);
-
-  // whoami の扱い：status:"new" → 閲覧のみモード
-  if (whoResp?.status === "ok"){
-    state.members = whoResp.members || [];
-    state.viewerOnly = false;
-  } else if (whoResp?.status === "new"){
-    state.members = [];
-    state.viewerOnly = true;
-  } else {
-    // 取得失敗時は前回値を温存（viewerOnlyも触らない）
-    state.members = state.members || [];
-  }
-
-  // notify の同期（値が無い時は true を既定に）
-  state.notify = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
-                  ? whoResp.notify
-                  : (typeof state.notify === "boolean" ? state.notify : true);
-
+  state.events  = (eventsResp?.status==="ok" && Array.isArray(eventsResp.events)) ? eventsResp.events : (state.events||[]);
+  state.members = (whoResp?.status==="ok" ? (whoResp.members||[]) : (state.members||[]));
+  // ★ notify を同期（値が無い時は true を既定に）
+ state.notify  = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
+                 ? whoResp.notify : (typeof state.notify === "boolean" ? state.notify : true);
   updateSegFilterUI();
 
-  // 3-α) 体感高速：イベントだけ先に描画
+  // 3-α) 取得できた段階で一旦「イベントだけ」再描画して体感を上げる
   bootHomeQuickRender();
 
-  // 4) 回答（イベントIDが揃ってから）
+  // 4) 回答はイベントIDが分かってから取得（遅れてもOK）
   state.answers = state.answers || {};
   try{
     const ids = (state.events||[]).map(e=>e.eventId).filter(Boolean);
@@ -1817,17 +1993,18 @@ async function refreshData(){
       const r = await fetchJsonWithTimeout(`?getAttendanceAll=1&lineId=${esc(state.lineId)}&eventIds=${esc(JSON.stringify(ids))}`, 15000);
       if (r.status === "ok" && r.map) {
         state.answers = r.map;
+        // 回答が来たら差し替え
         mountHomeWithFilters();
         cacheSet(`answers:${state.lineId}`, state.answers);
       }
     }
-  }catch(_){}
+  }catch(_){ /* 無視：画面は表示済み */ }
 
-  // 5) キャッシュ保存
+  // 5) キャッシュ保存（次回起動を高速に）
   if (state.events?.length)  cacheSet("events", state.events);
-  cacheSet(`whoami:${state.lineId}`, state.members);
+  if (state.members)         cacheSet(`whoami:${state.lineId}`, state.members);
 
-  // 6) HOMEの主ボタン
+  // 6) ボタンの復帰
   const hasMembers = (state.members||[]).length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
@@ -1987,104 +2164,72 @@ function renderAttendSelectHTML(evId, name, current){
 
   // ===== 既存の buildFormView を置換（renderAttendEvent を使用） =====
   window.buildFormView = function(){
-  const boxHeader = $("#formEventsBox");
-  const box = $("#formFields");
+    const boxHeader = $("#formEventsBox");
+    const box = $("#formFields");
+    box.innerHTML = "";
+    boxHeader.innerHTML = `
+      <span class="muted">
+        イベントをタップして出欠を入力後、
+        <span class="em-red">送信ボタンを押してください。</span>
+      </span>`;
 
-  // ★ 演奏者未登録ならフォーム全体を隠してガイドだけ出す
-  if ((state.members || []).length === 0){
-    boxHeader.classList.add("guidePlain");
-     const guide = (window.viewerGuideHTML)
-       ? window.viewerGuideHTML()
-       : `<div class="warnBox card" style="margin-bottom:10px;">
-           <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;">
-              <div>
-                <div><b>出欠回答をするには氏名登録が必要です。</b></div>
-                <div class="small">閲覧のみの方は登録不要です。</div>
-              </div>
-             <button id="btnGoRegister" class="btn btn-outline btn-sm">氏名を登録する</button>
-            </div>
-          </div>`;
-     boxHeader.innerHTML = guide;
-     box.innerHTML = "";
-     (window.bindViewerGuideButton
-       ? window.bindViewerGuideButton()
-       : document.getElementById("btnGoRegister")?.addEventListener("click", ()=>{
-           registerMode = "create";
-           resetRegisterForm();
-           document.getElementById("regTitle").textContent = "初回登録（入力者 & 演奏者）";
-           document.getElementById("btnRegister").textContent = "登録する";
-           show("#view-register");
-         }, { once:true }));
-        updateSubmitButton(); // 送信ボタンは無効になる
-        return;
-  }
+    const eventsForForm = state._filteredEventsForViews || [];
+    if (!eventsForForm.length){
+      box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
+      updateSubmitButton();
+      return;
+    }
 
-  // --- ここから通常描画 ---
-  boxHeader.classList.remove("guidePlain");
-  box.innerHTML = "";
-  boxHeader.innerHTML = `
-    <span class="muted">
-      イベントをタップして出欠を入力後、
-      <span class="em-red">送信ボタンを押してください。</span>
-    </span>`;
+    const nameSegMap = buildNameSegMap();
+    const uniqueNamesAll = Array.from(new Set((state.members||[]).map(m => m.performerName))).filter(Boolean);
+    const userSegSet = getMemberSegSet();
 
-  const eventsForForm = state._filteredEventsForViews || [];
-  if (!eventsForForm.length){
-    box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
-    updateSubmitButton();
-    return;
-  }
+    // まとめてレンダリング（HTML組み立て）
+    const html = eventsForForm.map(e=>{
+      const ansList = state.answers[e.eventId] || [];
+      const ansMap  = {}; ansList.forEach(r => ansMap[r.performerName] = r);
+      return window.renderAttendEvent({
+        eventId : e.eventId,
+        date    : e.date,
+        time    : e.time,
+        place   : e.place || "",
+        deadline: e.deadline || "",
+        segment : e.segment || e.targetSegment || e.attendSegment || ""
+      }, {
+        uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet
+      });
+    }).join("");
 
-  const nameSegMap = buildNameSegMap();
-  const uniqueNamesAll = Array.from(new Set((state.members||[]).map(m => m.performerName))).filter(Boolean);
-  const userSegSet = getMemberSegSet();
+    box.innerHTML = html;
 
-  const html = eventsForForm.map(e=>{
-    const ansList = state.answers[e.eventId] || [];
-    const ansMap  = {}; ansList.forEach(r => ansMap[r.performerName] = r);
-    return window.renderAttendEvent({
-      eventId : e.eventId,
-      date    : e.date,
-      time    : e.time,
-      place   : e.place || "",
-      deadline: e.deadline || "",
-      segment : e.segment || e.targetSegment || e.attendSegment || ""
-    }, {
-      uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet
+    // アコーディオン開閉
+    box.querySelectorAll(".fEvent .fHead").forEach(h=>{
+      h.addEventListener("click", () => h.closest(".fEvent")?.classList.toggle("open"));
     });
-  }).join("");
 
-  box.innerHTML = html;
+    // 入力監視（デリゲート）
+    box.addEventListener("change", (ev)=>{
+      const sel = ev.target.closest("select.attSel");
+      if (!sel) return;
+      const eid = sel.dataset.event;
+      const name = sel.dataset.name;
+      const val  = sel.value;
+      draftSetAttend(eid, name, val || "");
+      markUnsavedBadge(eid);
+      updateSubmitButton();
+    });
 
-  // アコーディオン
-  box.querySelectorAll(".fEvent .fHead").forEach(h=>{
-    h.addEventListener("click", () => h.closest(".fEvent")?.classList.toggle("open"));
-  });
+    box.addEventListener("input", (ev)=>{
+      const c = ev.target.closest("input.evComment");
+      if (!c) return;
+      const eid = c.dataset.event;
+      draftSetComment(eid, c.value);
+      markUnsavedBadge(eid);
+      updateSubmitButton();
+    });
 
-  // 入力監視（出欠）
-  box.addEventListener("change", (ev)=>{
-    const sel = ev.target.closest("select.attSel");
-    if (!sel) return;
-    const eid = sel.dataset.event;
-    const name = sel.dataset.name;
-    const val  = sel.value;
-    draftSetAttend(eid, name, val || "");
-    markUnsavedBadge(eid);
     updateSubmitButton();
-  });
-
-  // コメント
-  box.addEventListener("input", (ev)=>{
-    const c = ev.target.closest("input.evComment");
-    if (!c) return;
-    const eid = c.dataset.event;
-    draftSetComment(eid, c.value);
-    markUnsavedBadge(eid);
-    updateSubmitButton();
-  });
-
-  updateSubmitButton();
-};
+  };
 })();
 /* ===== 出欠フォーム（アコーディオン＋ドラフト） END ===== */
 
@@ -2289,52 +2434,18 @@ async function onRegister(){
   }
   function addDays(d, n){ const x = new Date(d.getTime()); x.setDate(x.getDate()+n); x.setHours(0,0,0,0); return x; }
 
-  // ===== 閲覧ガイド（黄色い案内 + 登録ボタン） =====
-  function viewerGuideHTML(){
-    return `
-      <div class="warnBox card" style="margin-bottom:10px;">
-        <div style="display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
-          <div>
-            <div><b>出欠回答をするには氏名登録が必要です。</b></div>
-            <div class="small">閲覧のみの方は登録不要です。</div>
-          </div>
-          <button id="btnGoRegister" class="btn btn-outline btn-sm">氏名を登録する</button>
-        </div>
-      </div>
-    `;
-  }
-  // ボタンの onClick を張る共通関数
-  function bindViewerGuideButton(){
-    document.getElementById("btnGoRegister")?.addEventListener("click", ()=>{
-      registerMode = "create";
-      resetRegisterForm();
-      $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
-      $("#btnRegister").textContent = "登録する";
-      show("#view-register");
-    }, { once:true });
-  }
-  // （差し替え）カード描画
+  // ===== カード描画 =====
   function renderScheduleCard(it){
+    const seg = dispSeg(normSeg(it.segment||it.targetSegment||it.attendSegment||""));
+    const titleLine = [seg, it.kind||"", it.title||""].filter(Boolean).join(" ");
+    const memoLine  = it.memo ? `<div class="small">${it.memo}</div>` : "";
     const segNorm = normSeg(it.segment||it.targetSegment||it.attendSegment||"");
-    const segBadge = (()=>{
-      if (segNorm==="adult") return `<span class="pill sm seg-adult">大人の部</span>`;
-      if (segNorm==="child") return `<span class="pill sm seg-child">子どもの部</span>`;
-      return `<span class="pill sm seg-both">両方</span>`;
-    })();
-    const kindBadge = it.kind ? `<span class="pill sm">${it.kind}</span>` : "";
-  
-    const memoLine = it.memo ? `<div class="small">${it.memo}</div>` : "";
-  
     return `<div class="card" data-seg="${segNorm||'both'}">
-      <div class="row" style="gap:6px; align-items:center; margin-bottom:4px;">
-        ${segBadge}${kindBadge}
-      </div>
-      <div><b>${it.date}</b>　${it.title||""}</div>
-      <div class="small muted">@ ${it.place||""}</div>
+      <div><b>${it.date} ${it.time||""}</b> @ ${it.place||""}</div>
+      <div class="small muted">${titleLine}</div>
       ${memoLine}
     </div>`;
   }
-  
   window.renderSchedulesView = function(list){
     if (!Array.isArray(list) || list.length===0) {
       return `<div class="listEmpty">該当する予定はありません</div>`;
@@ -2346,9 +2457,10 @@ async function onRegister(){
     if (typeof updateSegFilterUI === "function") updateSegFilterUI();
   }
 
-// ===== 今後の予定：ローカル再描画 =====
-function renderSchedulesLocal(){
+  // ===== ローカル再描画（UIの選択だけで即時フィルタ） =====
+  function renderSchedulesLocal(){
   const box = $("#schedulesBox");
+
   // まだ初回取得前なら待機表示
   if (!Array.isArray(state.schedulesRaw) || state.schedulesRaw.length === 0){
     box.innerHTML = `読み込み待機中（「再取得」を押すと読み込みます）`;
@@ -2357,221 +2469,85 @@ function renderSchedulesLocal(){
 
   const base = state.schedulesRaw.slice();
 
-  // 期間フィルタ
+  // ← ここを堅牢に（daysSel ではなく days をローカル算出）
   const selDaysEl = document.getElementById('selDays');
   const days = Number(selDaysEl && selDaysEl.value ? selDaysEl.value : 60) || 60;
 
   const kindSel = document.getElementById('selKind')?.value || "";
 
+  // 1) 期間
   const today = new Date(); today.setHours(0,0,0,0);
-  const until = new Date(today.getTime()); until.setDate(until.getDate()+days);
-
+  const until = addDays(today, days);
   let arr = base.filter(it=>{
-    const d = (()=>{
-      const m = String(it.ymd || it.date || "").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
-      if (!m) return null;
-      const dd = new Date(+m[1], +m[2]-1, +m[3]); dd.setHours(0,0,0,0);
-      return isNaN(dd) ? null : dd;
-    })();
+    const d = parseYmdStrictLocal(it.ymd || it.date);
     return d && d >= today && d <= until;
   });
 
-  // 種別
+  // 2) 種別
   if (kindSel){
     arr = arr.filter(it => String(it.kind||"").trim() === kindSel);
   }
 
-  // ユーザー区分（閲覧者でも常に表示＝会員0件時はフィルタしない）
-  const segSet = (typeof getMemberSegSet === "function") ? getMemberSegSet() : null;
-  if (segSet){
-    arr = arr.filter(it => {
-      const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
-      return (typeof eventVisibleForUser === "function")
-        ? eventVisibleForUser(evSeg, segSet, /* includeBoth */ true)
-        : true;
-    });
-  }
+  // 3) ユーザー区分（アカウント所属で絞り込み）
+  const segSet = getMemberSegSet();
+  arr = arr.filter(it => {
+    const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
+    return eventVisibleForUser(evSeg, segSet, /* includeBoth */ true);
+  });
 
-  // UIの区分フィルタ（大人/子ども選択時でも『両方』は残す）
-  if (segSet && segSet.size > 0 && (typeof userHasBoth === "function") && userHasBoth()){
+  // 4) 両方所属ユーザーのみ、UI区分フィルタ
+  if (segSet && segSet.size > 0 && userHasBoth()){
     const uiSeg = $("#selSeg")?.value || "";
     if (uiSeg){
-      arr = arr.filter(it => {
-        const normSegFn = (typeof normSeg === "function") ? normSeg : (s=>String(s||"").toLowerCase());
-        const n = normSegFn(it.segment || it.targetSegment || it.attendSegment || "");
-        if (uiSeg === "adult") return (n === "adult" || n === "both");
-        if (uiSeg === "child") return (n === "child" || n === "both");
-        return true;
-      });
+      arr = arr.filter(it => normSeg(it.segment || it.targetSegment || it.attendSegment || "") === uiSeg);
     }
   }
 
   state.schedules = arr;
-
-  // ここでカードHTMLを作成
-  const renderView = window.renderSchedulesView || ((list)=>`<div class="listEmpty">一覧テンプレート未定義です（renderSchedulesView）。</div>`);
-  const listHtml = renderView(state.schedules);
-
-  // ★ 閲覧者（= 会員未登録）ガイドを“下部”に付け足す
-  const viewerOnly = !state.members || state.members.length === 0;
-  const guideHtml = viewerOnly ? `
-    <div class="card warn" style="margin-top:12px; background:#fff7d1;">
-      <div class="small">
-        出欠回答をするには氏名登録が必要です（閲覧のみなら登録不要です）。
-      </div>
-      <div class="row" style="justify-content:flex-end; margin-top:8px;">
-        <button class="btn btn-primary btn-sm" type="button"
-          onclick="registerMode='create'; resetRegisterForm(); show('#view-register');">
-          氏名を登録する
-        </button>
-      </div>
-    </div>
-  ` : "";
-
-  box.innerHTML = listHtml + guideHtml;
+  box.innerHTML = window.renderSchedulesView(state.schedules);
 }
 
-// ===== 今後の予定：外部公開関数（互換） =====
-window.renderSchedules = async function(forceFetch){
-  if (forceFetch) {
-    await fetchSchedulesAndRender();    // ← 取得は新関数に一本化
-    return;
-  }
-  renderSchedulesLocal();               // ← ローカル再描画のみ
-};
+  // ===== 初回 or 再取得時だけ API を叩く =====
+  window.renderSchedules = async function(initial=false){
+    const box = $("#schedulesBox");
 
-// 互換：外部から呼ばれる想定があればこちら
-window.loadSchedules = function(){ window.renderSchedules(false); };
-
-// 便利関数
-window.copyIcsFeed = function(){
-  const ipt = $("#icsFeedUrl");
-  if (!ipt) return;
-  ipt.select();
-  document.execCommand("copy");
-  alert("購読URLをコピーしました");
-};
-
-  // --- Schedules API のURLを作る ---
-// --- PATCH: /schedules 用の URL を生成（days / kind / segment） ---
-// --- Schedules API のURLを作る（/exec にクエリで渡す） ---
-// --- Schedules API のURLを作る（第一候補は period を使う） ---
-function buildSchedulesUrl(){
-  const days = Number(document.getElementById('selDays')?.value || 60) || 60;
-  const kind = document.getElementById('selKind')?.value || "";   // "発表" など
-  const seg  = document.getElementById('selSeg')  ?.value || "";  // "adult" | "child" | ""
-
-  const p = new URLSearchParams();
-  p.set('schedules', '1');
-  p.set('period', String(days));       // ← ★ ここを period に
-  if (kind) p.set('kind', kind);       // サーバ実装が kind を受ける想定
-  if (seg)  p.set('segment', seg);     // サーバ実装が segment を受ける想定
-
-  const url = `${API_ENDPOINT}?${p.toString()}`;
-  console.log('[schedules] fetch (candidate #1):', url);
-  return url;
-}
-
-// --- 取得してローカル描画に流し込む ---
-// --- PATCH: 取得してローカル描画（/schedules を優先、失敗時は互換フォールバック） ---
-// --- 取得してローカル描画（?schedules=1 を一次、失敗時は ?events=1 フォールバック） ---
-// --- 取得してローカル描画（?schedules=1 を複数パターンで試し、ダメなら ?events=1） ---
-async function fetchSchedulesAndRender(){
-  const box = document.getElementById('schedulesBox');
-  if (box) box.textContent = "読み込み中…";
-
-  const days = Number(document.getElementById('selDays')?.value || 60) || 60;
-  const kind = document.getElementById('selKind')?.value || "";
-  const seg  = document.getElementById('selSeg')  ?.value || "";
-
-  // 候補URLを順番に試す
-  const candidates = [];
-
-  // #1 いまの第一候補（period / kind / segment）
-  candidates.push(buildSchedulesUrl());
-
-  // #2 days / kind / segment
-  {
-    const p = new URLSearchParams();
-    p.set('schedules','1');
-    p.set('days', String(days));
-    if (kind) p.set('kind', kind);
-    if (seg)  p.set('segment', seg);
-    const url = `${API_ENDPOINT}?${p.toString()}`;
-    console.log('[schedules] fetch (candidate #2):', url);
-    candidates.push(url);
-  }
-
-  // #3 days / type / seg（別実装に備えた別名）
-  {
-    const p = new URLSearchParams();
-    p.set('schedules','1');
-    p.set('days', String(days));
-    if (kind) p.set('type', kind);
-    if (seg)  p.set('seg', seg);
-    const url = `${API_ENDPOINT}?${p.toString()}`;
-    console.log('[schedules] fetch (candidate #3):', url);
-    candidates.push(url);
-  }
-
-  // 順に叩く
-  let lastErr = null;
-  for (const url of candidates){
     try{
-      const res = await fetch(url, { method:'GET' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
+      if (initial){
+        box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+        exposeSegFilterIfNeeded();
 
-      state.schedulesRaw = Array.isArray(json?.items) ? json.items
-                        : Array.isArray(json)         ? json
-                        : [];
+        // API から最新を1回取得して、生の配列を保持
+        const daysSel = Number($("#selDays").value || 60);
+        const kindSel = $("#selKind").value || "";
+        // 初回は広めの日数で全件を取得（例: 180日）。種別も付けない
+        const url = `?schedules=1&days=180`;
+        const r = await api(url);
+        if (r.status !== "ok" || !Array.isArray(r.schedules)) {
+          box.innerHTML = `<span class="err">取得に失敗しました</span>`;
+          return;
+        }
+        // ★ 生データを保持（以後はローカルでフィルタ）
+        state.schedulesRaw = r.schedules.slice();
+      }
+      // 取得済みデータを UI 値でフィルタして描画
       renderSchedulesLocal();
-      return; // 成功したので終了
-    }catch(e){
-      console.warn('[schedules] candidate failed:', url, e);
-      lastErr = e;
+
+    }catch(err){
+      box.innerHTML = `<span class="err">エラー: ${err.message||err}</span>`;
     }
-  }
+  };
 
-  // すべてダメなら ?events=1 フォールバック
-  console.warn('[schedules] all candidates failed, fallback to ?events=1', lastErr);
-  try{
-    let base = state.events;
-    if (!Array.isArray(base) || base.length === 0){
-      const r = await fetch(API_ENDPOINT + '?events=1');
-      const j = await r.json();
-      base = Array.isArray(j?.events) ? j.events : [];
-    }
-    state.schedulesRaw = (base || []).map(e => ({
-      id     : e.eventId || e.id,
-      title  : e.title || e.name || '',
-      kind   : e.type || e.kind || '発表',
-      segment: e.segment || e.targetSegment || e.attendSegment || '',
-      ymd    : e.date || e.ymd || '',
-      hm     : e.time || e.hm || '',
-      place  : e.place || e.venue || '',
-      memo   : e.memo || ''
-    }));
-    renderSchedulesLocal();
-  }catch(e2){
-    console.error(e2);
-    if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
-  }
-}
-  
-// state が無ければ作る（重複定義ガード付き）
-window.state = window.state || {};
-state.schedulesRaw = state.schedulesRaw || [];
+  // 互換：外部から呼ばれる想定があればこちら
+  window.loadSchedules = function(){ renderSchedules(false); };
 
-// 「再取得」ボタンと初回ロードの紐付け
-document.addEventListener('DOMContentLoaded', () => {
-  // 既存の change バインドはそのまま活かす前提
-  document.getElementById('btnFetchSchedules')
-    ?.addEventListener('click', fetchSchedulesAndRender);
+  window.copyIcsFeed = function(){
+    const ipt = $("#icsFeedUrl");
+    if (!ipt) return;
+    ipt.select();
+    document.execCommand("copy");
+    alert("購読URLをコピーしました");
+  };
 
-  // 初回表示時に一度取得（必要なければこの1行は消してOK）
-  fetchSchedulesAndRender();
-});
   // ===== UI操作で即反映（ここでバインド） =====
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('selDays')?.addEventListener('change', renderSchedulesLocal);
