@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.2";
+  const FRONT_VERSION = "Front v3.3.3";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxBEF7quF4QJ8hrFhqPTEamBsz_jqtmAj5ePdOD1E535zGd9yoxdVOu1uMfSCTorCJMoA/exec";     // ←差し替え
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxOQCDAeOUTvY4BfsRnIGlUbCejXNnUo_TCUXnkrPaWpsB43sgiAjNG1WZKOOzaBkfEMA/exec";     // ←差し替え
 
   // （オプション）設定チェック：重複定義や未設定を早期に気づけます
   (function(){
@@ -2462,7 +2462,12 @@ function buildSchedulesUrl(){
   p.set('period', String(days));       // 30/60/90 など日数でOK
   if (type) p.set('type', type);
   if (seg)  p.set('seg',  seg);
-const u = `${API_ENDPOINT}/schedules?${p.toString()}`;
+// まずは GAS 互換のクエリ型に（GASが未実装でも次のフォールバックが効く）
+ p.set('schedules', '1');     // ← バックエンドで未対応でも害はありません
+ p.set('period', String(days));
+ if (type) p.set('type', type);
+ if (seg)  p.set('seg',  seg);
+ const u = `${API_ENDPOINT}?${p.toString()}`;
 console.log("[schedules] fetch:", u);
 return u;
   return `${API_ENDPOINT}/schedules?${p.toString()}`;
@@ -2483,8 +2488,31 @@ async function fetchSchedulesAndRender(){
                      : [];
     renderSchedulesLocal();   // ← 既存のローカル再描画をそのまま活用
   }catch(err){
-    console.error(err);
-    if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
+    console.warn('[schedules] primary fetch failed, fallback to ?events=1', err);
+   try {
+     // 既に state.events があればそれを使う。無ければ ?events=1 を取る
+     let base = state.events;
+     if (!Array.isArray(base) || base.length === 0){
+       const r = await fetch(API_ENDPOINT + '?events=1');
+       const j = await r.json();
+       base = Array.isArray(j?.events) ? j.events : [];
+     }
+     // 表示用に最小項目へ変換
+     state.schedulesRaw = (base || []).map(e => ({
+       id: e.eventId || e.id,
+       title: e.title || e.name || '',
+       kind: e.type || e.kind || '発表',
+       segment: e.segment || e.targetSegment || e.attendSegment || '',
+       ymd: e.date || e.ymd || '',
+       hm: e.time || e.hm || '',
+       place: e.place || e.venue || '',
+       memo: e.memo || ''
+     }));
+     renderSchedulesLocal();
+   } catch (e2){
+     console.error(e2);
+     if (box) box.innerHTML = `<div class="listEmpty">取得に失敗しました</div>`;
+   }
   }
 }
   window.fetchSchedulesAndRender = fetchSchedulesAndRender;
