@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.6";
+  const FRONT_VERSION = "Front v3.4.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1965,7 +1965,13 @@ async function init(){
 function bindHandlers(){
   $("#btnReload").onclick      = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
   $("#btnPrimary").onclick     = onPrimary;
-  $("#btnEditNames").onclick   = onEditNames;
+  $("#btnEditNames").onclick   = () => {
+     registerMode = "edit";
+     buildRegisterFormFromMembers();
+     $("#regTitle").textContent = "氏名編集（入力者 & 演奏者）";
+     $("#btnRegister").textContent = "保存";
+     show("#view-register");
+   };
   $("#btnBackFromForm").onclick = () => {
     if (state.submitting) return;       // 送信中は遷移させない
     show("#view-home");
@@ -2241,7 +2247,13 @@ function onPrimary(){
     show("#view-form");
   }
 }
-
+function onEditNames(){
+  registerMode = "edit";
+  buildRegisterFormFromMembers();
+  $("#regTitle").textContent = "氏名編集（入力者 & 演奏者）";
+  $("#btnRegister").textContent = "保存";
+  show("#view-register");
+}
 /* ===== 出欠フォーム（アコーディオン＋ドラフト） ===== */
 // ▼ セレクト（参加/欠席/未定 + 初回のみplaceholder）を生成するユーティリティ
 function renderAttendSelectHTML(evId, name, current){
