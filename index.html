@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.6.3";
+  const FRONT_VERSION = "Front v3.6.4";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -3054,6 +3054,7 @@ function enterAdminCreateMode(){
   $("#ad_deadline").value = "";
   $("#ad_publish").value = "Yes";
   $("#ad_status").value = "active";
+  $("#ad_status").disabled = true;  // ★ 追加：新規は編集不可に
   $("#ad_flag").innerHTML = `<option value="N" selected>N</option><option value="Y">Y（初回配信対象）</option>`;
   $("#ad_flag").value = "N";
 
@@ -3082,6 +3083,7 @@ function fillAdminFormFromItem(it){
   $("#ad_deadline").value = toDateInputFromYmdSlash(it.deadline || "");
   $("#ad_publish").value = it.publish || "Yes";
   $("#ad_status").value  = it.status  || "active";
+  $("#ad_status").disabled = false; // ★ 追加：編集時はプルダウンを有効化
   $("#ad_segment").value = it.segment || "子ども";
 
   adminTypeChangeAdapt();
@@ -3106,7 +3108,7 @@ async function adminSubmit(){
     const attT  = $("#ad_attendTarget").value.trim().toUpperCase();
     const dlIn  = $("#ad_deadline").value.trim();
     const pub   = $("#ad_publish").value.trim();
-    const st    = $("#ad_status").value.trim();
+    const st = (adminMode === "create") ? "active" : $("#ad_status").value.trim();
     const segRaw = $("#ad_segment").value.trim(); // ← 追加
     let seg = segRaw;
     // セグメント表記ゆれを正す（スプシ側：子ども/大人/両方 を想定）
