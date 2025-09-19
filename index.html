@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.7";
+  const FRONT_VERSION = "Front v3.4.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
   // （オプション）設定チェック：重複定義や未設定を早期に気づけます
   (function(){
@@ -971,23 +971,6 @@
 </head>
 
 <body>
-  <script>
-  // 画面に即表示する簡易トラッパー（暫定）
-  window.addEventListener('error',  e => {
-    const msg = `[JS ERROR] ${e.message} @ ${e.filename}:${e.lineno}`;
-    console.error(msg, e);
-    document.body.insertAdjacentHTML('afterbegin',
-      `<div style="position:fixed;left:8px;right:8px;top:8px;z-index:9999;background:#fffbe6;border:1px solid #f3d27a;padding:8px;border-radius:8px;font:12px/1.5 system-ui">${msg}</div>`);
-  });
-  window.addEventListener('unhandledrejection', e => {
-    const r = e.reason || {};
-    const msg = `[Promise ERROR] ${r.message || r}`;
-    console.error(msg, e);
-    document.body.insertAdjacentHTML('afterbegin',
-      `<div style="position:fixed;left:8px;right:8px;top:56px;z-index:9999;background:#fffbe6;border:1px solid #f3d27a;padding:8px;border-radius:8px;font:12px/1.5 system-ui">${msg}</div>`);
-  });
-</script>
-  
   <header class="is-sticky">
     <div class="siteTitle">出欠入力と予定確認</div>
     <div class="ver" id="ver"></div>
@@ -1965,13 +1948,7 @@ async function init(){
 function bindHandlers(){
   $("#btnReload").onclick      = async ()=>{ logHome("再読み込み中…"); await refreshData(); logHome(""); };
   $("#btnPrimary").onclick     = onPrimary;
-  $("#btnEditNames").onclick   = () => {
-     registerMode = "edit";
-     buildRegisterFormFromMembers();
-     $("#regTitle").textContent = "氏名編集（入力者 & 演奏者）";
-     $("#btnRegister").textContent = "保存";
-     show("#view-register");
-   };
+  $("#btnEditNames").onclick   = onEditNames;
   $("#btnBackFromForm").onclick = () => {
     if (state.submitting) return;       // 送信中は遷移させない
     show("#view-home");
@@ -2200,8 +2177,9 @@ async function refreshData(){
      ? "登録氏名の編集"
      : (hasPerf ? "出欠を入力 / 変更する" : "初回登録に進む");
    $("#btnPrimary").disabled = false;
-   // 閲覧者でも「登録氏名の編集」補助ボタンは出す
-   $("#btnEditNames").style.display = (hasPerf || viewer) ? "" : "none";
+   // サブの「登録氏名の編集」は“閲覧者では出さない”
+   const showEditSubBtn = hasPerf && !viewer; // 演奏者が1件以上 かつ 閲覧者でない
+   $("#btnEditNames").style.display = showEditSubBtn ? "" : "none";
 }
 
 /* ===== HOME描画 ===== */
@@ -2209,7 +2187,7 @@ function renderHome(){
   const hasMembers = state.members.length > 0;
   $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
   $("#btnPrimary").disabled = false;
-  $("#btnEditNames").style.display = hasMembers ? "" : "none";
+  $("#btnEditNames").style.display = (hasMembers && !isViewer()) ? "" : "none";
 
   // トップでは answersBox 非表示仕様のまま（必要なら表示可能）
   const perfs = Array.from(new Set(state.members.map(m => m.performerName))).filter(Boolean);
@@ -2806,7 +2784,7 @@ async function onRegister(){
     const ipt = $("#icsFeedUrl");
     if (!ipt) return;
     ipt.select();
-    document.execCommand("copy");
+    await navigator.clipboard.writeText(ipt.value);
     alert("購読URLをコピーしました");
   };
 
