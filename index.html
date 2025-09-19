@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.6";
+  const FRONT_VERSION = "Front v3.3.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1967,13 +1967,11 @@ function bindHandlers(){
   // 管理：セレクト変更で即ローカル描画
   document.getElementById('ad_days')?.addEventListener('change', adminListRenderLocal);
   document.getElementById('ad_seg_filter')?.addEventListener('change', adminListRenderLocal);
-  document.getElementById('repEvent').addEventListener('change', () => { renderReport(); });
   // 「一覧を取得」は本当にサーバー再取得
   $("#btnAdminFetch").onclick = ()=> adminListFetch();
   // レポート
   $("#btnReportBack").onclick = ()=> show("#view-home");
   $("#btnReportReload").onclick = ()=> reportReload();
-  $("#repEvent").addEventListener("change", renderReport);
   $("#repAttend").addEventListener("change", renderReport);
   
   // 管理メニュー（HOME）
@@ -3333,14 +3331,20 @@ window.reportReload = function(){ initAdminReportPage(); };
       if (!eventId){ box.innerHTML = '公演を選択してください'; return; }
     
       // 詳細ロード（キャッシュ優先）
-      let detail = state.reportDetailMap[eventId];
+      let detail = state.reportDetailMap[eventId] || state.reportCache[eventId];
+      if (detail && detail.status === 'error') detail = undefined; // 壊れキャッシュ無効化
       if (!detail){
         box.innerHTML = `読み込み中… <span class="spinner"></span>`;
         try {
           // どちらのクエリでも拾えるように冗長に
-          const r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1`);
-          detail = r.detail || r;
+          const r = await api(
+            `?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1&lineId=${encodeURIComponent(state.lineId)}`
+          );
+          const payload = r.detail || (r.status === 'ok' ? r : null);
+          if (!payload) throw new Error(r.message || 'API error');
+          detail = payload;
           state.reportDetailMap[eventId] = detail;
+          state.reportCache[eventId] = detail; // どちらのキャッシュにも保存
         } catch(e){
           box.innerHTML = `<span class="err">読み込みに失敗しました</span>`;
           return;
