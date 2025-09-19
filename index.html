@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.6.7";
+  const FRONT_VERSION = "Front v3.6.8";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1066,6 +1066,15 @@
     }
     #homeOnlyNALabel input{
       width:16px; height:16px;
+    }
+    /* 管理用カードの3ボタンを編集ボタンと同サイズに強制 */
+    #adminMenu a.btn,
+    #adminMenu button.btn{
+      min-height: 30px !important;
+      padding: 6px 10px !important;
+      font-size: 13px !important;
+      border-radius: 9px !important;
+      box-shadow: 0 1px 3px rgba(127,106,165,0.08);
     }
   </style>
   
