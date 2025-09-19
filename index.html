@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.6.2";
+  const FRONT_VERSION = "Front v3.6.3";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1042,6 +1042,15 @@
       padding: 6px 10px;
       font-size: 13px;
       border-radius: 9px;
+    }
+    /* 管理アコーディオン：ヘッダーと最初の行の間に余白を追加 */
+    #adminListAcc .fBody{
+      padding-top: 12px !important;   /* ← 10〜14pxでお好み調整OK */
+    }
+    
+    /* さらに少し下げたい場合は、コントロール行自体にもマージンを追加 */
+    #adminListAcc .adminControls{
+      margin-top: 4px;                 /* 必要に応じて 6〜8px に */
     }
   </style>
   
