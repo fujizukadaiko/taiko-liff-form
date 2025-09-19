@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.5.5";
+  const FRONT_VERSION = "Front v3.5.6";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -2002,39 +2002,37 @@ function bindHandlers(){
   $("#btnAdminReset").onclick = ()=> enterAdminCreateMode();
   $("#ad_type").addEventListener("change", adminTypeChangeAdapt);
   
-  // 管理アコーディオン（ヘッダーに直接バインド：click/Enter/Space）
-  (function setupAdminAccordion(){
-    const acc  = document.getElementById('adminListAcc');
-    if (!acc) return;
-    const head = acc.querySelector('.fHead');
-    const body = acc.querySelector('.fBody');
-    if (!head || !body) return;
-  
-    const sync = () => {
-      const open = acc.classList.contains('open');
-      head.setAttribute('role', 'button');
-      head.setAttribute('tabindex', '0');
-      head.setAttribute('aria-expanded', open ? 'true' : 'false');
-      body.style.display = open ? 'block' : 'none'; // （CSSでも制御してるので二重でもOK）
-    };
-  
-    head.addEventListener('click', (e) => {
-      e.stopPropagation();                // ← 念のためバブリング抑止（重複トグル防止）
-      acc.classList.toggle('open');
-      sync();
-    });
-  
-    head.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        acc.classList.toggle('open');
-        sync();
-      }
-    });
-  
-    // 初期状態反映
+  // 管理アコーディオン（ヘッダーに直接：click/Enter/Space、キャプチャで確実に拾う）
+function setupAdminAccordion(){
+  const acc  = document.getElementById('adminListAcc');
+  if (!acc) return;
+  const head = acc.querySelector('.fHead');
+  const body = acc.querySelector('.fBody');
+  if (!head || !body) return;
+
+  const sync = () => {
+    const open = acc.classList.contains('open');
+    head.setAttribute('role', 'button');
+    head.setAttribute('tabindex', '0');
+    head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    body.style.display = open ? 'block' : 'none'; // CSSと二重でもOK
+  };
+
+  const toggle = (e) => {
+    acc.classList.toggle('open');
     sync();
-  })();
+  };
+
+  // ★ 子要素で stopPropagation されても確実に発火させるため capture:true
+  head.addEventListener('click', toggle, { capture: true });
+  head.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); }
+  });
+
+  sync();
+}
+// 起動時に一度だけ
+setupAdminAccordion();
 }
 
 /* ===== 体感高速化版：データ読み直し ===== */
