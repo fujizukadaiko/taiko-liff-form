@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.3";
+  const FRONT_VERSION = "Front v3.4.5";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1761,15 +1761,11 @@ function hmFromTimeCell(v){
   return "";
 }
 function normSeg(raw){
-  const s = String(raw||"").trim();
+  const s = String(raw||"").trim().toLowerCase();
   if (!s) return "";
-  // メンバー側：子どもの部 / 大人の部
-  if (s.includes("大人")) return "adult";
-  if (s.includes("子ども") || s.includes("子供")) return "child";
-  // イベント側：子ども / 大人 / 両方
-  if (s.includes("両方")) return "both";
-  if (s.includes("大人")) return "adult";
-  if (s.includes("子ども") || s.includes("子供")) return "child";
+  if (s === "adult" || s.includes("大人")) return "adult";
+  if (s === "child" || s.includes("子ども") || s.includes("子供")) return "child";
+  if (s === "both"  || s.includes("両方")) return "both";
   return "";
 }
 function dispSeg(n){ // 表示用ラベル
@@ -1980,8 +1976,6 @@ function bindHandlers(){
    };
   $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
   $("#btnFetchSchedules").onclick    = ()=> renderSchedules(true);
-  // 区分フィルタが変更されたら 今後の予定を再描画
-  document.getElementById('selSeg')?.addEventListener('change', ()=> renderSchedules(false));
   // 管理：セレクト変更で即ローカル描画
   document.getElementById('ad_days')?.addEventListener('change', adminListRenderLocal);
   document.getElementById('ad_seg_filter')?.addEventListener('change', adminListRenderLocal);
@@ -2082,7 +2076,7 @@ function bootHomeQuickRender(){
     place   : x.place ?? x.venue ?? x.location ?? '',
     deadline: String(x.deadline ?? x.limit ?? x.deadlineYmd ?? ''),
     isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true),
-    segment : x.segment || x.targetSegment || x.attendSegment || ""
+    segment : x.segment || x.targetSegment || x.attendSegment || x.segmentCode || ""
   }));
 
   window.HomeEventsUI?.mount({ events, myAnswersMap: {}, performers, nameSegMap });
@@ -2101,7 +2095,7 @@ function mountHomeWithFilters(){
     place   : x.place ?? x.venue ?? x.location ?? '',
     deadline: String(x.deadline ?? x.limit ?? x.deadlineYmd ?? ''),
     isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true),
-    segment : x.segment || x.targetSegment || x.attendSegment || ""
+    segment : x.segment || x.targetSegment || x.attendSegment || x.segmentCode || ""
   }));
 
   const myAnswersMap = {};
@@ -2652,7 +2646,7 @@ async function onRegister(){
 
   // ===== カード描画 =====
   function renderScheduleCard(it){
-    const segNorm = normSeg(it.segment || it.targetSegment || it.attendSegment || "");
+    const segNorm = normSeg(it.segment || it.segmentCode || it.targetSegment || it.attendSegment || "");
     const segLabel = dispSeg(segNorm);
     const dateText = ymdDow(parseYmdStrictLocal(it.ymd || it.date)) || (it.date || "");
     const kindText = String(it.kind || "").trim();
@@ -2735,7 +2729,7 @@ async function onRegister(){
   // 3) ユーザー区分（アカウント所属で絞り込み）
   const segSet = getMemberSegSet();
   arr = arr.filter(it => {
-    const evSeg = it.segment || it.targetSegment || it.attendSegment || "";
+    const evSeg = it.segment || it.segmentCode || it.targetSegment || it.attendSegment || "";
     return eventVisibleForUser(evSeg, segSet, /* includeBoth */ true);
   });
 
@@ -2744,7 +2738,7 @@ async function onRegister(){
   const uiSeg = $("#selSeg")?.value || "";
   if (uiSeg){
     arr = arr.filter(it => {
-      const code = normSeg(it.segment || it.targetSegment || it.attendSegment || "");
+      const code = normSeg(it.segment || it.segmentCode || it.targetSegment || it.attendSegment || "");
       return code === uiSeg || code === "both";
     });
   }
