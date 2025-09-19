@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.5.7";
+  const FRONT_VERSION = "Front v3.5.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -967,6 +967,35 @@
     /* 管理アコーディオン：開閉をIDで強制表示 */
     #adminListAcc .fBody { display: none; }
     #adminListAcc.open .fBody { display: block; }
+    /* ===== 管理アコーディオン：ラベル｜プルダウンの2列グリッド ===== */
+    .adminControls{
+      display: grid;
+      grid-template-columns: auto max-content; /* 左=ラベル / 右=セレクト */
+      gap: 10px 14px;
+      align-items: center;
+      justify-content: start;
+    }
+    .adminControls .span2{
+      grid-column: 1 / -1;         /* 2列ぶち抜き（下段ボタン） */
+      display: flex;
+      justify-content: flex-start;  /* 左寄せ */
+      margin-top: 4px;
+    }
+    .admLabel{
+      font-size: 14px;
+      color: var(--c-text);
+      white-space: nowrap;
+    }
+    
+    /* 端末幅が狭いときの保険：セレクトは全幅に伸ばす */
+    @media (max-width: 420px){
+      .adminControls{
+        grid-template-columns: 1fr 1fr;
+      }
+      .adminControls select{
+        width: 100%;
+      }
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1148,16 +1177,28 @@
         </div>
       
         <div class="fBody">
-          <!-- 上部のコントロール列 -->
-          <div class="row" style="gap:12px; align-items:flex-end; margin:6px 0;">
-            <div>
-              <label>一覧の表示期間（日数）</label>
-              <select id="ad_days" class="selectBtn">
-                <option value="30">30日</option>
-                <option value="60" selected>60日</option>
-                <option value="90">90日</option>
-              </select>
+          <!-- 上部のコントロール列（2列グリッド：ラベル｜プルダウン／下段に再取得） -->
+          <div class="adminControls">
+            <label for="ad_days" class="admLabel">一覧の表示期間（日数）</label>
+            <select id="ad_days" class="selectBtn schedSel short">
+              <option value="30">30日</option>
+              <option value="60" selected>60日</option>
+              <option value="90">90日</option>
+            </select>
+          
+            <label for="ad_seg_filter" class="admLabel">対象区分フィルタ</label>
+            <select id="ad_seg_filter" class="selectBtn schedSel short">
+              <option value="">（すべて）</option>
+              <option value="adult">大人</option>
+              <option value="child">子ども</option>
+              <option value="both">両方</option>
+            </select>
+          
+            <!-- 下段：再取得ボタン（2列ぶち抜き・左寄せ） -->
+            <div class="span2">
+              <button id="btnAdminFetch" class="btn btn-ghost btn-sm" type="button">再取得</button>
             </div>
+          </div>
       
             <!-- 追加：対象区分フィルタ -->
             <div>
@@ -2004,9 +2045,12 @@ function bindHandlers(){
   $("#ad_type").addEventListener("change", adminTypeChangeAdapt);
   
   // 管理アコーディオン（ヘッダーに直接：click/Enter/Space、キャプチャで確実に拾う）
-  function setupAdminAccordion(){
+   function setupAdminAccordion(){
     const acc  = document.getElementById('adminListAcc');
     if (!acc) return;
+    if (acc.__bound) return;           // ★ もう結んでたら何もしない
+    acc.__bound = true;
+  
     const head = acc.querySelector('.fHead');
     const body = acc.querySelector('.fBody');
     if (!head || !body) return;
@@ -2018,7 +2062,6 @@ function bindHandlers(){
       head.setAttribute('aria-expanded', open ? 'true' : 'false');
       body.style.display = open ? 'block' : 'none';
     };
-  
     const toggle = (e) => { acc.classList.toggle('open'); sync(); };
   
     head.addEventListener('click', toggle, { capture: true });
@@ -2079,7 +2122,7 @@ function bootHomeQuickRender(){
 
   let filteredEvents = (state.events||[]).filter(e=>{
    const evSeg = e.segment || e.targetSegment || e.attendSegment || e.segmentRaw || e.segmentCode || "";
-   return eventVisibleForUser(evSeg, userSegSet, /* includeBoth */ true);
+   return eventVisibleForUser(evSeg, userSegSet, INCLUDE_BOTH_FOR_ALL);
  });
  if (userSegSet.size === 0) filteredEvents = (state.events||[]).slice(); // 未登録＝全表示
 
