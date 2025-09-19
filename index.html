@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.2";
+  const FRONT_VERSION = "Front v3.3.3";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -2726,17 +2726,17 @@ async function onRegister(){
     document.getElementById('selDays')?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
     document.getElementById('selKind')?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
     document.getElementById('selSeg') ?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
-    // タイトル行をクリックでメモ開閉（schedulesBox 内で委譲）
+    // タイトル行クリックで折りたたみ開閉
     document.getElementById('schedulesBox')?.addEventListener('click', (e)=>{
       const btn = e.target.closest('.scTitleBtn');
       if (!btn) return;
-      const card = btn.closest('.scheduleCard');
-      const memo = card?.querySelector('.scMemo');
-      if (!memo) return;                      // メモなしカードは何もしない
+      const card  = btn.closest('.scheduleCard');
+      const panel = card?.querySelector('.scPanel');
+      if (!panel) return;
       const expanded = btn.getAttribute('aria-expanded') === 'true';
       btn.setAttribute('aria-expanded', String(!expanded));
-      memo.hidden = expanded;                 // true → 隠す / false → 表示
-      });
+      panel.hidden = expanded;   // true→隠す / false→表示
+    });
   });
 })();
 // ===== 今後の予定（Schedules） v5 END =====
