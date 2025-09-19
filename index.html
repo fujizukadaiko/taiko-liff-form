@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.5.3";
+  const FRONT_VERSION = "Front v3.5.4";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1986,11 +1986,6 @@ function bindHandlers(){
     show("#view-admin");
     enterAdminCreateMode();
     adminListFetch();
-    // ▼▼ 一時デバッグ：強制オープン ▼▼
-    const acc  = document.getElementById('adminListAcc');
-    const body = acc?.querySelector('.fBody');
-    acc?.classList.add('open');
-    if (body) body.style.display = 'block';
   };
   $("#btnAdminMenuReport").onclick = ()=>{
     if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
