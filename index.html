@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.3";
+  const FRONT_VERSION = "Front v3.3.4";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -889,12 +889,6 @@
     .scTitleBtn .scDate{ font-weight:700; }
     .scTitleBtn .scCaret{ margin-left:auto; transition:transform .12s ease; }
     .scTitleBtn[aria-expanded="true"] .scCaret{ transform:rotate(180deg); }
-    /* 折りたたみ本文（メモ） */
-    .scMemo{
-      margin:6px 0 2px; padding:8px 10px; border:1px dashed var(--c-border);
-      background:#fafafc; border-radius:8px; font-size:13px; color:#444;
-    }
-    .scMeta{ font-size:13px; color:var(--c-text); margin-top:6px; }
     /* タイトル行：1行固定＋末尾…、右端に▾ */
     .scTitleBtn{
       all:unset; display:flex; align-items:baseline; gap:8px; width:100%; cursor:pointer;
@@ -904,15 +898,17 @@
       flex:1 1 auto; min-width:0;            /* ← これがないと省略記号が効かない */
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     }
-    .scTitleBtn .scCaret{ flex:0 0 auto; margin-left:8px; transition:transform .12s ease; }
-    .scTitleBtn[aria-expanded="true"] .scCaret{ transform:rotate(180deg); }
-    
+    .scTitleBtn .scCaret{ flex:0 0 auto; margin-left:8px; transition:transform .12s ease; }    
     /* 折りたたみパネル（フルタイトル／メモ／場所＋集合情報をここに） */
     .scPanel{ margin-top:8px; }
     .scFullTitle{ font-weight:700; margin-bottom:6px; }
     .scMemo{
-      margin:6px 0 2px; padding:8px 10px; border:1px dashed var(--c-border);
-      background:#fafafc; border-radius:8px; font-size:13px; color:#444;
+      margin: 6px 0 2px;
+      padding: 0;                 /* ← 枠内余白も不要なら 0 のまま */
+      border: 0;                  /* ← 枠線なし */
+      background: transparent;    /* ← 背景なし */
+      border-radius: 0;
+      font-size: 13px; color:#444;
     }
     .scMeta{ font-size:13px; color:var(--c-text); margin-top:6px; }
     
@@ -921,6 +917,14 @@
       margin-left:auto; display:inline-flex; align-items:center; height:22px;
       padding:0 10px; font-size:12px; font-weight:700;
       background:#f7f7fb; border:1px solid var(--c-border); border-radius:8px; color:#444;
+    }   
+    /* カード全体がタップ対象と分かるように */
+    .scheduleCard{ cursor: pointer; }
+    
+    /* タイトル行の矢印（テキストで大きめ） */
+    .scTitleBtn .scCaret{
+      flex:0 0 auto; margin-left:8px;
+      font-size: 16px; line-height: 1;   /* 見やすく */
     }
   </style>
   
@@ -2608,7 +2612,7 @@ async function onRegister(){
         <button type="button" class="scTitleBtn" aria-expanded="false">
           <span class="scDate">${dateText}</span>
           <span class="scTitle">${it.title || ""}</span>
-          <span class="scCaret" aria-hidden="true">▾</span>
+          <span class="scCaret" aria-hidden="true">∨</span>
         </button>
   
         <!-- 3行目以降：折りたたみ（フルタイトル/メモ/@場所・集合） -->
@@ -2726,16 +2730,25 @@ async function onRegister(){
     document.getElementById('selDays')?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
     document.getElementById('selKind')?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
     document.getElementById('selSeg') ?.addEventListener('change', () => { renderSchedulesLocal(); saveFilters(); });
-    // タイトル行クリックで折りたたみ開閉
+    // カード全体をタップで開閉（リンクは除外）
     document.getElementById('schedulesBox')?.addEventListener('click', (e)=>{
-      const btn = e.target.closest('.scTitleBtn');
-      if (!btn) return;
-      const card  = btn.closest('.scheduleCard');
-      const panel = card?.querySelector('.scPanel');
-      if (!panel) return;
-      const expanded = btn.getAttribute('aria-expanded') === 'true';
+      // リンクをクリックしたときは開閉しない
+      if (e.target.closest('a')) return;
+    
+      const card  = e.target.closest('.scheduleCard');
+      if (!card) return;
+    
+      const btn   = card.querySelector('.scTitleBtn');
+      const panel = card.querySelector('.scPanel');
+      const caret = card.querySelector('.scCaret');
+      if (!btn || !panel || !caret) return;
+    
+      const expanded = card.getAttribute('data-expanded') === 'true';
+      // 切り替え
+      card.setAttribute('data-expanded', String(!expanded));
       btn.setAttribute('aria-expanded', String(!expanded));
-      panel.hidden = expanded;   // true→隠す / false→表示
+      panel.hidden = expanded;                 // true→隠す / false→表示
+      caret.textContent = expanded ? '∨' : '∧'; // 矢印を文字で切り替え
     });
   });
 })();
