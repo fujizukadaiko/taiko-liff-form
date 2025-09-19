@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.6.5";
+  const FRONT_VERSION = "Front v3.6.6";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -2102,6 +2102,9 @@ function bindHandlers(){
       head.setAttribute('aria-expanded', open ? 'true' : 'false');
       body.style.display = open ? 'block' : 'none';
     };
+
+    acc.__sync = sync; 
+     
     const toggle = (e) => { acc.classList.toggle('open'); sync(); };
   
     head.addEventListener('click', toggle, { capture: true });
@@ -2112,11 +2115,17 @@ function bindHandlers(){
   }
   // ★ 追加：どこからでも閉じられるユーティリティ
   window.closeAdminAccordion = function(){
-    const acc = document.getElementById('adminListAcc');
-    if (!acc) return;
-    acc.classList.remove('open');
-    if (typeof acc.__sync === 'function') acc.__sync(); // inline style も反映
-  };
+  const acc  = document.getElementById('adminListAcc');
+  if (!acc) return;
+  acc.classList.remove('open');
+  // inline style を確実に反映して閉じる
+  const head = acc.querySelector('.fHead');
+  const body = acc.querySelector('.fBody');
+  if (head) head.setAttribute('aria-expanded', 'false');
+  if (body) body.style.display = 'none';
+  // 予備：公開された同期関数があれば呼ぶ
+  if (typeof acc.__sync === 'function') acc.__sync();
+};
   // ★ これを追加（外から呼べるようにする）
   window.setupAdminAccordion = setupAdminAccordion;
   
@@ -3317,11 +3326,15 @@ async function adminSubmit(){
   top.innerHTML = html;
 }
 function adminEdit(obj){
-  // アコーディオンを確実に閉じる（クラス＋inline style 同期）
+  // まずアコーディオンを確実に閉じる
   window.closeAdminAccordion?.();
 
+  // フォームへ反映
   fillAdminFormFromItem(obj);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // ページ先頭ではなく編集フォームの見出しへスクロール
+  document.getElementById('adminFormTitle')
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 <!-- ここから置き換え（管理レポート：軽量メタ→詳細） -->
