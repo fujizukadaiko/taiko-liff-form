@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.5.6";
+  const FRONT_VERSION = "Front v3.5.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1984,6 +1984,7 @@ function bindHandlers(){
   $("#btnAdminMenuSchedules").onclick = ()=>{
     if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
     show("#view-admin");
+    window.setupAdminAccordion?.();
     enterAdminCreateMode();
     adminListFetch();
   };
@@ -2003,36 +2004,35 @@ function bindHandlers(){
   $("#ad_type").addEventListener("change", adminTypeChangeAdapt);
   
   // 管理アコーディオン（ヘッダーに直接：click/Enter/Space、キャプチャで確実に拾う）
-function setupAdminAccordion(){
-  const acc  = document.getElementById('adminListAcc');
-  if (!acc) return;
-  const head = acc.querySelector('.fHead');
-  const body = acc.querySelector('.fBody');
-  if (!head || !body) return;
-
-  const sync = () => {
-    const open = acc.classList.contains('open');
-    head.setAttribute('role', 'button');
-    head.setAttribute('tabindex', '0');
-    head.setAttribute('aria-expanded', open ? 'true' : 'false');
-    body.style.display = open ? 'block' : 'none'; // CSSと二重でもOK
-  };
-
-  const toggle = (e) => {
-    acc.classList.toggle('open');
+  function setupAdminAccordion(){
+    const acc  = document.getElementById('adminListAcc');
+    if (!acc) return;
+    const head = acc.querySelector('.fHead');
+    const body = acc.querySelector('.fBody');
+    if (!head || !body) return;
+  
+    const sync = () => {
+      const open = acc.classList.contains('open');
+      head.setAttribute('role', 'button');
+      head.setAttribute('tabindex', '0');
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      body.style.display = open ? 'block' : 'none';
+    };
+  
+    const toggle = (e) => { acc.classList.toggle('open'); sync(); };
+  
+    head.addEventListener('click', toggle, { capture: true });
+    head.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); }
+    });
     sync();
-  };
-
-  // ★ 子要素で stopPropagation されても確実に発火させるため capture:true
-  head.addEventListener('click', toggle, { capture: true });
-  head.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(e); }
-  });
-
-  sync();
-}
-// 起動時に一度だけ
-setupAdminAccordion();
+  }
+  
+  // ★ これを追加（外から呼べるようにする）
+  window.setupAdminAccordion = setupAdminAccordion;
+  
+  // 起動時に一度だけ（既存のこれも残す）
+  setupAdminAccordion();
 }
 
 /* ===== 体感高速化版：データ読み直し ===== */
@@ -3138,7 +3138,8 @@ async function adminSubmit(){
       flag: raw.flag || "N",
       segment: raw.segment || raw.targetSegment || raw.attendSegment || ""
     }));
-
+    // ... 一覧の innerHTML を更新した直後
+    window.setupAdminAccordion?.();
     // ★ 生配列を保存（上書き禁止：この配列を常に基準にする）
     state.adminItemsRaw = raw;
 
