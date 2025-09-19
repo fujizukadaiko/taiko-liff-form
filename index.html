@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.6.6";
+  const FRONT_VERSION = "Front v3.6.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1052,6 +1052,21 @@
     #adminListAcc .adminControls{
       margin-top: 4px;                 /* 必要に応じて 6〜8px に */
     }
+    /* トップの未定/未回答のみ表示：バッジ風をやめてシンプル表示 */
+    #homeOnlyNALabel{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      background:#fff !important;   /* 背景は白 */
+      border:0 !important;           /* 枠なし */
+      padding:0 !important;          /* 余白もフラットに */
+      box-shadow:none !important;
+      font-size:13px;
+      color:var(--c-text);
+    }
+    #homeOnlyNALabel input{
+      width:16px; height:16px;
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1075,15 +1090,15 @@
       <div id="hello" class="muted"></div>
 
       <!-- 管理メニュー（管理者のみ表示） -->
-      <div id="adminMenu" class="card" style="display:none;">
-        <div class="sectionTitle">管理用</div>
-        <div class="row" style="gap:8px;">
-          <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm" data-view-target="view-admin">予定登録/編集</button>
-          <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm" data-view-target="view-admin-report">出欠結果一覧</button>
-          <a href="https://your-domain.github.io/your-repo/summary.html" target="_blank" class="btn btn-outline btn-sm">サマリ</a>
-        </div>
-        <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
+     <div id="adminMenu" class="card" style="display:none;">
+      <div class="sectionTitle">管理用</div>
+      <div class="row" style="gap:8px;">
+        <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin">予定登録/編集</button>
+        <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin-report">出欠結果一覧</button>
+        <a href="https://your-domain.github.io/your-repo/summary.html" target="_blank" class="btn btn-outline btn-sm btn-compact">サマリ</a>
       </div>
+      <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
+    </div>
 
       <!-- ★ トップ操作ボタン -->
       <div class="btnRow" aria-label="主操作">
@@ -1099,7 +1114,7 @@
       <div class="card">
         <div class="row-space">
           <div class="sectionTitle">回答受付中の公演</div>
-          <label class="pill sm" style="margin-left:auto;">
+          <label id="homeOnlyNALabel" style="margin-left:auto;">
             <input type="checkbox" id="homeOnlyNA" checked>
             未定/未回答のみ表示
           </label>
