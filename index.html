@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.6.4";
+  const FRONT_VERSION = "Front v3.6.5";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -2110,7 +2110,13 @@ function bindHandlers(){
     });
     sync();
   }
-  
+  // ★ 追加：どこからでも閉じられるユーティリティ
+  window.closeAdminAccordion = function(){
+    const acc = document.getElementById('adminListAcc');
+    if (!acc) return;
+    acc.classList.remove('open');
+    if (typeof acc.__sync === 'function') acc.__sync(); // inline style も反映
+  };
   // ★ これを追加（外から呼べるようにする）
   window.setupAdminAccordion = setupAdminAccordion;
   
@@ -3311,10 +3317,11 @@ async function adminSubmit(){
   top.innerHTML = html;
 }
 function adminEdit(obj){
-  // （アコーディオンを閉じる）
-  document.getElementById('adminListAcc')?.classList.remove('open');
+  // アコーディオンを確実に閉じる（クラス＋inline style 同期）
+  window.closeAdminAccordion?.();
+
   fillAdminFormFromItem(obj);
-  window.scrollTo({ top:0, behavior:"smooth" });
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 <!-- ここから置き換え（管理レポート：軽量メタ→詳細） -->
