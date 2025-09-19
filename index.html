@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.1";
+  const FRONT_VERSION = "Front v3.4.2";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1322,6 +1322,8 @@
         });
       });
       document.getElementById('btnReload')?.addEventListener('click', () => location.reload());
+      // ← 起動（これを追加）
+      init();
     });
   </script>
 
