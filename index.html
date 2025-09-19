@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.4";
+  const FRONT_VERSION = "Front v3.3.5";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -926,6 +926,38 @@
       flex:0 0 auto; margin-left:8px;
       font-size: 16px; line-height: 1;   /* 見やすく */
     }
+    /* ===== 出欠結果一覧（管理者）・1枚カード版 ===== */
+    .repCard { background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; }
+    .repHeader { margin-bottom:6px; }
+    .repLine { display:flex; align-items:baseline; gap:8px; }
+    .repLeft { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; min-width:0; }
+    .repRight{ margin-left:auto; display:flex; align-items:center; gap:8px; }
+    .repTitle { font-weight:700; }
+    .repId    { font-size:12px; color:var(--c-muted); }
+    .repPlace { white-space:nowrap; }
+    .repSep   { color:#cbd5e1; }
+    .repHeadRow { padding-bottom:6px; border-bottom:1px dashed #eee; }
+    
+    .repGroup { margin-top:10px; padding-top:8px; border-top:1px dashed #eee; }
+    .repGroupHead{ display:flex; align-items:center; gap:8px; font-weight:700; }
+    .repCount{ font-size:12px; color:var(--c-muted); }
+    
+    .repPersonRow{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; padding:4px 0; }
+    .repName{ font-weight:600; min-width:0; overflow-wrap:anywhere; }
+    .repAt{ font-size:12px; color:var(--c-muted); white-space:nowrap; }
+    
+    /* ステータス/区分バッジ（既存の .tag / .seg-badge を利用しつつ微調整） */
+    .badge-status { @apply inline-block rounded-full px-2 py-0.5 text-xs; }
+    .badge-status.open{ background:#ecfdf5; border:1px solid #a7f3d0; color:#047857; }
+    .badge-status.closed{ background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
+    
+    /* 既存の .badge-att をそのまま見出しに使う */
+    .badge-att { display:inline-flex; align-items:center; justify-content:center;
+      height:22px; padding:0 8px; border-radius:999px; font-size:12px; font-weight:700; border:1.5px solid; }
+    .badge-att.yes   { color:#047857; background:#ecfdf5; border-color:#a7f3d0; }
+    .badge-att.no    { color:#b91c1c; background:#fef2f2; border-color:#fecaca; }
+    .badge-att.maybe { color:#92400e; background:#fffbeb; border-color:#fde68a; }
+    .badge-att.na    { color:#475569; background:#f1f5f9; border-color:#cbd5e1; }
   </style>
   
   <!-- LIFF SDK -->
@@ -3230,107 +3262,156 @@ window.reportReload = function(){ initAdminReportPage(); };
     selEvent.disabled = false;
   }
 
-async function renderReport(){
-  const box = document.querySelector("#repBox");
-  const selId = document.querySelector("#repEvent")?.value || "";
-  const fAtt  = document.querySelector("#repAttend")?.value || ""; // （すべて/参加/欠席/未定/未回答）
-
-  if (!selId){
-    box.innerHTML = `公演を選択してください`;
-    return;
-  }
-
-  // 詳細キャッシュ → 無ければAPI取得
-  let ev = state.reportDetailMap?.[selId];
-  if (!ev){
-    box.innerHTML = `読み込み中… <span class="spinner"></span>`;
-    const r = await api(`?attendanceReport=1&lineId=${esc(state.lineId)}&eventId=${esc(selId)}`);
-    if (r.status !== "ok"){ box.innerHTML = `<span class="err">取得に失敗しました</span>`; return; }
-    ev = {
-      id: r.id, ymd: r.ymd, time: r.time, title: r.title, place: r.place,
-      segment: r.segment, segmentCode: r.segmentCode, accepting: r.accepting,
-      rows: r.rows || [], roster: r.roster || []
-    };
-    state.reportDetailMap = state.reportDetailMap || {};
-    state.reportDetailMap[selId] = ev;
-  }
-
-  // rows は displayName 済み（大人プレフィックス付与済）、roster は対象区分でサーバ側フィルタ済
-  const rows   = Array.isArray(ev.rows) ? ev.rows : [];
-  const roster = Array.isArray(ev.roster) ? ev.roster : [];
-
-  // 回答マップ & 未回答
-  const ansMap = new Map();
-  rows.forEach(r => { if (r?.name) ansMap.set(String(r.name), r); });
-  const notAnswered = roster.filter(n => !ansMap.has(String(n)));
-
-  // 参加/欠席/未定 でグルーピング
-  const groups = { "参加": [], "欠席": [], "未定": [] };
-  for (const r of rows){
-    const k = (r.attend==="参加" || r.attend==="欠席" || r.attend==="未定") ? r.attend : "未定";
-    groups[k].push(r);
-  }
-
-  // セクション描画ヘルパ
-  const section = (label, cls, list) => {
-    if (!list.length) return "";
-    // フィルタ適用（「未回答」は rows に含まれないので別処理）
-    if (fAtt && fAtt !== label) return "";
-    return `
-      <div class="card" style="margin:8px 0;">
-        <div class="row" style="gap:8px; align-items:center; margin-bottom:6px;">
-          <span class="pill sm ${cls}">${label}</span>
-          <span class="small muted">${list.length}名</span>
-        </div>
-        ${list.map(r=>`
-          <div class="row" style="justify-content:space-between; margin:4px 0;">
-            <div class="repName">${r.displayName || r.name}</div>
-            <div class="small muted">回答：${r.answeredAt || ""}</div>
+    /* ===== 出欠結果一覧（管理者） 1枚カード版 ===== */
+    function fmtYmd(s){
+      const m = String(s||'').match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+      if (!m) return String(s||'');
+      const d = new Date(+m[1], +m[2]-1, +m[3]);
+      const yo = '日月火水木金土'[d.getDay()];
+      return `${m[1]}/${m[2]}/${m[3]}（${yo}）`;
+    }
+    function fmtTime(s){
+      const m = String(s||'').match(/^(\d{1,2}):(\d{2})/);
+      if (m) return `${String(+m[1]).padStart(2,'0')}:${m[2]}`;
+      const d = new Date(s||'');
+      return isNaN(d) ? '' : `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+    function fmtDateTime(dt){
+      if (!dt) return '';
+      // 期待されるキーに広く対応
+      const v = (dt.updatedAt||dt.answeredAt||dt.timestamp||dt.at||'').toString();
+      if (v && !isNaN(new Date(v))) {
+        const d = new Date(v);
+        const z = n => String(n).padStart(2,'0');
+        return `${d.getFullYear()}/${z(d.getMonth()+1)}/${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
+      }
+      return String(v||'');
+    }
+    function mapSeg(raw){
+      const s = String(raw||'');
+      if (s.includes('大人')) return {cls:'seg-adult', label:'大人の部'};
+      if (s.includes('子'))   return {cls:'seg-child', label:'子どもの部'};
+      if (s.includes('両'))   return {cls:'seg-both',  label:'両方'};
+      return {cls:'', label:''};
+    }
+    function acceptingBadge(accepting){
+      const v = String(accepting||'').toLowerCase();
+      if (v==='open' || v==='受付中') return `<span class="badge-status open">受付中</span>`;
+      if (v==='closed' || v==='締切' || v==='締め切り' || v==='締切済') return `<span class="badge-status closed">締切</span>`;
+      return '';
+    }
+    function groupByAttend(detail){
+      // API差異に強く：yes/no/maybe/na か、flat list を受ける
+      const groups = { yes:[], no:[], maybe:[], na:[] };
+      const push = (k, it) => { if (it) groups[k].push(it); };
+      if (Array.isArray(detail.yes) || Array.isArray(detail.no) || Array.isArray(detail.maybe) || Array.isArray(detail.na)){
+        ['yes','no','maybe','na'].forEach(k => (detail[k]||[]).forEach(x=>push(k,x)));
+      } else {
+        const list = detail.list || detail.members || detail.rows || [];
+        list.forEach(it=>{
+          const a = (it.attend||it.answer||'').trim();
+          if (a==='参加') push('yes', it);
+          else if (a==='欠席') push('no', it);
+          else if (a==='未定') push('maybe', it);
+          else push('na', it);
+        });
+      }
+      return groups;
+    }
+    function labelFor(k){ return k==='yes'?'参加':k==='no'?'欠席':k==='maybe'?'未定':'未回答'; }
+    
+    async function renderReport(){
+      const box = document.getElementById('repBox');
+      const eventId = document.getElementById('repEvent')?.value || '';
+      const filter = document.getElementById('repAttend')?.value || ''; // '', '参加','欠席','未定','未回答'
+    
+      if (!eventId){ box.innerHTML = '公演を選択してください'; return; }
+    
+      // 詳細ロード（キャッシュ優先）
+      let detail = state.reportDetailMap[eventId];
+      if (!detail){
+        box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+        try {
+          // どちらのクエリでも拾えるように冗長に
+          const r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1`);
+          detail = r.detail || r;
+          state.reportDetailMap[eventId] = detail;
+        } catch(e){
+          box.innerHTML = `<span class="err">読み込みに失敗しました</span>`;
+          return;
+        }
+      }
+    
+      // イベント情報を吸い上げ（キーゆらぎに耐性）
+      const ev = detail.event || detail.header || {};
+      const id   = ev.id || ev.eventId || eventId;
+      const ymd  = ev.ymd || ev.date || '';
+      const hm   = ev.hm || ev.time || '';
+      const place= ev.place || ev.venue || '';
+      const title= ev.title || ev.name || '';
+      const seg  = ev.segment || ev.targetSegment || ev.attendSegment || '';
+      const accepting = ev.accepting || ev.status || '';
+      const segInfo = mapSeg(seg);
+    
+      const headHTML = `
+        <div class="repHeader">
+          <div class="repLine repHeadRow">
+            <div class="repLeft">
+              <b>${fmtYmd(ymd)} ${hm?fmtTime(hm):''}</b>
+              ${place ? `<span class="repSep">|</span><span class="repPlace">@ ${place}</span>` : ``}
+            </div>
+            <div class="repRight">${acceptingBadge(accepting)}</div>
           </div>
-        `).join("")}
-      </div>
-    `;
-  };
-
-  // 未回答セクション
-  const naSection = (() => {
-    if (!notAnswered.length) return "";
-    if (fAtt && fAtt !== "未回答") return "";
-    return `
-      <div class="card" style="margin:8px 0;">
-        <div class="row" style="gap:8px; align-items:center; margin-bottom:6px;">
-          <span class="pill sm stat-na">未回答</span>
-          <span class="small muted">${notAnswered.length}名</span>
-        </div>
-        ${notAnswered.map(n=>`
-          <div class="row" style="justify-content:space-between; margin:4px 0;">
-            <div class="repName">${n}</div>
-            <div class="small muted">回答：—</div>
+          <div class="repLine" style="margin-top:6px;">
+            <div class="repLeft">
+              <div class="repTitle">${title} <span class="repId">（ID: ${id}）</span></div>
+            </div>
+            <div class="repRight">
+              ${segInfo.label ? `<span class="seg-badge ${segInfo.cls}">${segInfo.label}</span>` : ``}
+            </div>
           </div>
-        `).join("")}
-      </div>
-    `;
-  })();
-
-  // ヘッダ（イベント情報）
-  const head = `
-    <div class="repInfo">
-      <div><b>${ev.ymd || ""} ${ev.time || ""}</b>　${ev.title || ""}</div>
-      <div>場所：${ev.place || ""}　対象：${ev.segment || ""}</div>
-      <div>受付：${ev.accepting==="open"?"受付中":"受付終了"}</div>
-    </div>
-  `;
-
-  // 表示順：参加 → 未回答 → 欠席 → 未定（ご要望の順）
-  const html =
-    head +
-    section("参加", "stat-ok", groups["参加"]) +
-    naSection +
-    section("欠席", "stat-ng", groups["欠席"]) +
-    section("未定", "stat-pd", groups["未定"]);
-
-  box.innerHTML = html;
-}
+        </div>
+      `;
+    
+      // 出欠グループ
+      const groups = groupByAttend(detail);
+    
+      // UIフィルタの対応
+      const wantKeys = (() => {
+        if (!filter) return ['yes','maybe','no','na'];
+        if (filter==='参加') return ['yes'];
+        if (filter==='欠席') return ['no'];
+        if (filter==='未定') return ['maybe'];
+        if (filter==='未回答') return ['na'];
+        return ['yes','maybe','no','na'];
+      })();
+    
+      const sectionHTML = wantKeys.map(k=>{
+        const arr = groups[k] || [];
+        if (!arr.length) return '';
+        const rows = arr.map(it=>{
+          const name = (it.name||it.member||it.performerName||'').trim();
+          const segLab = mapSeg(it.segment||it.区分||'').label;
+          const nameDisp = segLab ? `【${segLab}】${name}` : name;
+          const at = fmtDateTime(it);
+          return `<div class="repPersonRow">
+            <div class="repName">${nameDisp||'（名称未設定）'}</div>
+            <div class="repAt">回答：${at||'—'}</div>
+          </div>`;
+        }).join('');
+        return `
+          <div class="repGroup">
+            <div class="repGroupHead">
+              <span class="badge-att ${k}">${labelFor(k)}</span>
+              <span class="repCount">${arr.length}名</span>
+            </div>
+            ${rows}
+          </div>
+        `;
+      }).join('');
+    
+      box.innerHTML = `<div class="repCard">${headHTML}${sectionHTML || '<div class="small muted">該当者なし</div>'}</div>`;
+    }
 </script> 
   
 <script>
