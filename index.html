@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.5";
+  const FRONT_VERSION = "Front v3.4.6";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1918,7 +1918,15 @@ async function init(){
   try{
     $("#ver").textContent = FRONT_VERSION;
 
-    await liff.init({ liffId: LIFF_ID });
+    try {
+   await liff.init({ liffId: LIFF_ID });
+ } catch (e) {
+   console.error('[LIFF init failed]', e);
+   const msg = (e && e.message) ? e.message : String(e);
+   document.getElementById('eventsBox').innerHTML =
+     `<span class="err">LIFF初期化エラー: ${msg}</span>`;
+   return; // ここで中断
+ }
     if (!liff.isLoggedIn()){ liff.login(); return; }
 
     if (liff.getFriendship){
