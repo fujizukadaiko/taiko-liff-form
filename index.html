@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.2";
+  const FRONT_VERSION = "Front v3.4.3";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1812,7 +1812,7 @@ function updateSegFilterUI(){
   }
 }
 // 修正後：includeBoth で “両方” を含めるか選べるように
-function eventVisibleForUser(eventSegRaw, userSegSet, includeBoth=false){
+function eventVisibleForUser(eventSegRaw, userSegSet, includeBoth=true){
   // ユーザー区分情報がない → 全表示
   if (!userSegSet || userSegSet.size === 0) return true;
 
@@ -2063,10 +2063,11 @@ async function fetchJsonWithTimeout(path, ms=15000){
 function bootHomeQuickRender(){
   const userSegSet = getMemberSegSet();
 
-  const filteredEvents = (state.events||[]).filter(e=>{
-    const evSeg = e.segment || e.targetSegment || e.attendSegment || e.segmentRaw || "";
-    return eventVisibleForUser(evSeg, userSegSet, /* includeBoth */ true);
-  });
+  let filteredEvents = (state.events||[]).filter(e=>{
+   const evSeg = e.segment || e.targetSegment || e.attendSegment || e.segmentRaw || e.segmentCode || "";
+   return eventVisibleForUser(evSeg, userSegSet, /* includeBoth */ true);
+ });
+ if (userSegSet.size === 0) filteredEvents = (state.events||[]).slice(); // 未登録＝全表示
 
   // performers（家族名）は会員情報がまだ無くても空配列でOK
   const performers = Array.from(
@@ -2091,7 +2092,8 @@ function bootHomeQuickRender(){
 
 /* --- 回答が届いたら差し替え描画 --- */
 function mountHomeWithFilters(){
-  const filteredEvents = state._filteredEventsForViews || [];
+  const filteredEvents = (state._filteredEventsForViews && state._filteredEventsForViews.length)
+   ? state._filteredEventsForViews : (state.events || []);
   const events = filteredEvents.map(x => ({
     id      : String(x.eventId ?? x.id ?? ''),
     ymd     : ymdDow(parseYmdStrict(x.date)) || String(x.date || x.ymd || ''),
