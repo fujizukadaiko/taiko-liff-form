@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.9";
+  const FRONT_VERSION = "Front v3.4.0";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1863,7 +1863,15 @@ function toDateInputFromYmdSlash(v){ // "yyyy/MM/dd" -> "yyyy-mm-dd"
   const m = String(v||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
   return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
 }
-
+function hasPerformers(){
+  return (state.members||[]).some(m => !!String(m.performerName||'').trim());
+}
+function isViewer(){
+  // サーバが viewerOnly を返してくれる場合はそれを優先
+  if (typeof state.viewerOnly === 'boolean') return state.viewerOnly;
+  // それが無い場合は「演奏者ゼロ かつ 通知OFF」で推定
+  return !hasPerformers() && state.notify === false;
+}
 /* Google Calendar 追加URL */
 const DFLT_MIN = { "発表":90, "練習":150, "その他":60 };
 function toDatesParam(ymdStr, hmStr, kind){
@@ -2140,8 +2148,10 @@ async function refreshData(){
   state.events  = (eventsResp?.status==="ok" && Array.isArray(eventsResp.events)) ? eventsResp.events : (state.events||[]);
   state.members = (whoResp?.status==="ok" ? (whoResp.members||[]) : (state.members||[]));
   // ★ notify を同期（値が無い時は true を既定に）
- state.notify  = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
+  state.notify  = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
                  ? whoResp.notify : (typeof state.notify === "boolean" ? state.notify : true);
+  state.viewerOnly = (whoResp?.status==="ok" && typeof whoResp.viewerOnly === "boolean")
+                   ? whoResp.viewerOnly : state.viewerOnly;
   updateSegFilterUI();
 
   // 3-α) 取得できた段階で一旦「イベントだけ」再描画して体感を上げる
@@ -2167,10 +2177,14 @@ async function refreshData(){
   if (state.members)         cacheSet(`whoami:${state.lineId}`, state.members);
 
   // 6) ボタンの復帰
-  const hasMembers = (state.members||[]).length > 0;
-  $("#btnPrimary").textContent = hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む";
-  $("#btnPrimary").disabled = false;
-  $("#btnEditNames").style.display = hasMembers ? "" : "none";
+   const hasPerf = hasPerformers();
+   const viewer  = isViewer();
+   $("#btnPrimary").textContent = viewer
+     ? "登録氏名の編集"
+     : (hasPerf ? "出欠を入力 / 変更する" : "初回登録に進む");
+   $("#btnPrimary").disabled = false;
+   // 閲覧者でも「登録氏名の編集」補助ボタンは出す
+   $("#btnEditNames").style.display = (hasPerf || viewer) ? "" : "none";
 }
 
 /* ===== HOME描画 ===== */
@@ -2198,23 +2212,23 @@ function renderHome(){
 
 /* ===== メインボタン ===== */
 function onPrimary(){
-  if (state.members.length === 0){
-    registerMode = "create";
-    resetRegisterForm();
-    $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
-    $("#btnRegister").textContent = "登録する";
+  if (isViewer() || !hasPerformers()){
+    // 閲覧者 → 既存レコードの編集に入れる
+    registerMode = isViewer() ? "edit" : "create";
+    if (registerMode === "edit") {
+      buildRegisterFormFromMembers();
+      $("#regTitle").textContent = "氏名編集（入力者 & 演奏者）";
+      $("#btnRegister").textContent = "保存";
+    } else {
+      resetRegisterForm();
+      $("#regTitle").textContent = "初回登録（入力者 & 演奏者）";
+      $("#btnRegister").textContent = "登録する";
+    }
     show("#view-register");
   } else {
     buildFormView();
     show("#view-form");
   }
-}
-function onEditNames(){
-  registerMode = "edit";
-  buildRegisterFormFromMembers();
-  $("#regTitle").textContent = "氏名編集（入力者 & 演奏者）";
-  $("#btnRegister").textContent = "保存";
-  show("#view-register");
 }
 
 /* ===== 出欠フォーム（アコーディオン＋ドラフト） ===== */
