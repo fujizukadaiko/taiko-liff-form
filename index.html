@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.1";
+  const FRONT_VERSION = "Front v3.3.2";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -895,6 +895,33 @@
       background:#fafafc; border-radius:8px; font-size:13px; color:#444;
     }
     .scMeta{ font-size:13px; color:var(--c-text); margin-top:6px; }
+    /* タイトル行：1行固定＋末尾…、右端に▾ */
+    .scTitleBtn{
+      all:unset; display:flex; align-items:baseline; gap:8px; width:100%; cursor:pointer;
+    }
+    .scTitleBtn .scDate{ flex:0 0 auto; font-weight:700; white-space:nowrap; }
+    .scTitleBtn .scTitle{
+      flex:1 1 auto; min-width:0;            /* ← これがないと省略記号が効かない */
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .scTitleBtn .scCaret{ flex:0 0 auto; margin-left:8px; transition:transform .12s ease; }
+    .scTitleBtn[aria-expanded="true"] .scCaret{ transform:rotate(180deg); }
+    
+    /* 折りたたみパネル（フルタイトル／メモ／場所＋集合情報をここに） */
+    .scPanel{ margin-top:8px; }
+    .scFullTitle{ font-weight:700; margin-bottom:6px; }
+    .scMemo{
+      margin:6px 0 2px; padding:8px 10px; border:1px dashed var(--c-border);
+      background:#fafafc; border-radius:8px; font-size:13px; color:#444;
+    }
+    .scMeta{ font-size:13px; color:var(--c-text); margin-top:6px; }
+    
+    /* 種別＝右端・四角バッジ（既存） */
+    .scKind{
+      margin-left:auto; display:inline-flex; align-items:center; height:22px;
+      padding:0 10px; font-size:12px; font-weight:700;
+      background:#f7f7fb; border:1px solid var(--c-border); border-radius:8px; color:#444;
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -2556,34 +2583,38 @@ async function onRegister(){
     const kindText = String(it.kind || "").trim();
     const memoText = String(it.memo || "").trim();
   
-    // 下段：@場所　集合 hh:mm 集合場所
-    const meetTxt = [
+    const meetTxt  = [
       (it.meetAt ? `集合 ${it.meetAt}` : ""),
       (it.meetPlace || "")
     ].filter(Boolean).join(" ");
+    const placeTxt = it.place ? `@${it.place}` : "";
+  
+    // 折りたたみ内の中身（フルタイトル → メモ → 場所/集合）
+    const panelInner = `
+      <div class="scFullTitle">${it.title || ""}</div>
+      ${memoText ? `<div class="scMemo">${memoText}</div>` : ``}
+      ${(placeTxt || meetTxt) ? `<div class="scMeta">${[placeTxt, meetTxt].filter(Boolean).join("　")}</div>` : ``}
+    `;
   
     return `
       <div class="card scheduleCard" data-seg="${segNorm || 'both'}">
-        <!-- 1行目：左=区分バッジ / 右=種別バッジ（四角・右寄せ） -->
+        <!-- 1行目：左=区分 / 右=種別 -->
         <div class="scTop">
           ${segLabel ? `<span class="seg-badge ${segNorm==='adult'?'seg-adult':segNorm==='child'?'seg-child':'seg-both'}">${segLabel}</span>` : ``}
           ${kindText ? `<span class="scKind">${kindText}</span>` : ``}
         </div>
   
-        <!-- 2行目：日付 + タイトル（クリックでメモを開閉） -->
+        <!-- 2行目：日付 + タイトル（1行省略） -->
         <button type="button" class="scTitleBtn" aria-expanded="false">
           <span class="scDate">${dateText}</span>
           <span class="scTitle">${it.title || ""}</span>
-          ${memoText ? `<span class="scCaret" aria-hidden="true">▾</span>` : ``}
+          <span class="scCaret" aria-hidden="true">▾</span>
         </button>
   
-        <!-- 3行目：メモ（折りたたみ。初期は非表示） -->
-        ${memoText ? `<div class="scMemo" hidden>${memoText}</div>` : ``}
-  
-        <!-- 4行目：@場所　集合時間 集合場所 -->
-        <div class="scMeta">@${it.place || ""}${meetTxt ? `　${meetTxt}` : ""}</div>
+        <!-- 3行目以降：折りたたみ（フルタイトル/メモ/@場所・集合） -->
+        <div class="scPanel" hidden>${panelInner}</div>
       </div>`;
-    }
+  }
   window.renderSchedulesView = function(list){
     if (!Array.isArray(list) || list.length===0) {
       return `<div class="listEmpty">該当する予定はありません</div>`;
