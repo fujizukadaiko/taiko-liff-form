@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.5.9";
+  const FRONT_VERSION = "Front v3.6.0";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1169,58 +1169,42 @@
         <div class="sectionTitle">予定登録（管理者）</div>
         <button id="btnAdminBack" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
       </div>
-      <!-- ★ 上段のアコーディオン：現在登録中のイベント一覧 -->
-      <div class="card fEvent" id="adminListAcc">
-        <div class="fHead" style="display:flex; align-items:center; justify-content:space-between;">
-          <div class="sectionTitle" style="margin:0;">現在登録中のイベント一覧</div>
-          <span class="small muted">タップで開閉</span>
-        </div>
-      
-        <div class="fBody">
-          <!-- 上部のコントロール列（2列グリッド：ラベル｜プルダウン／下段に再取得） -->
-          <div class="adminControls">
-            <label for="ad_days" class="admLabel">一覧の表示期間（日数）</label>
-            <select id="ad_days" class="selectBtn schedSel short">
-              <option value="30">30日</option>
-              <option value="60" selected>60日</option>
-              <option value="90">90日</option>
-            </select>
-          
-            <label for="ad_seg_filter" class="admLabel">対象区分フィルタ</label>
-            <select id="ad_seg_filter" class="selectBtn schedSel short">
-              <option value="">（すべて）</option>
-              <option value="adult">大人</option>
-              <option value="child">子ども</option>
-              <option value="both">両方</option>
-            </select>
-          
-            <!-- 下段：再取得ボタン（2列ぶち抜き・左寄せ） -->
-            <div class="span2">
-              <button id="btnAdminFetch" class="btn btn-ghost btn-sm" type="button">再取得</button>
-            </div>
-          </div>
-      
-            <!-- 追加：対象区分フィルタ -->
-            <div>
-              <label>対象区分フィルタ</label>
-              <select id="ad_seg_filter" class="selectBtn">
-                <option value="">（すべて）</option>
-                <option value="adult">大人</option>
-                <option value="child">子ども</option>
-                <option value="both">両方</option>
-              </select>
-            </div>
-      
-            <div style="margin-left:auto;">
-              <button id="btnAdminFetch" class="btn btn-ghost btn-sm" type="button">一覧を取得</button>
-            </div>
-          </div>
-      
-          <!-- ★ 一覧の描画先はアコーディオンの『中』 -->
-          <div id="adminListBoxTop" class="muted">読み込み待機中</div>
-        </div>
+     <!-- ★ 上段のアコーディオン：現在登録中のイベント一覧 -->
+    <div class="card fEvent" id="adminListAcc">
+      <div class="fHead" style="display:flex; align-items:center; justify-content:space-between;">
+        <div class="sectionTitle" style="margin:0;">現在登録中のイベント一覧</div>
+        <span class="small muted">タップで開閉</span>
       </div>
-      <!-- ★ ここまでがアコーディオン -->
+    
+      <div class="fBody">
+        <!-- コントロール：ラベル｜プルダウン ×2（下段に再取得） -->
+        <div class="adminControls">
+          <label for="ad_days" class="admLabel">一覧の表示期間（日数）</label>
+          <select id="ad_days" class="selectBtn schedSel short">
+            <option value="30">30日</option>
+            <option value="60" selected>60日</option>
+            <option value="90">90日</option>
+          </select>
+    
+          <label for="ad_seg_filter" class="admLabel">対象区分フィルタ</label>
+          <select id="ad_seg_filter" class="selectBtn schedSel short">
+            <option value="">（すべて）</option>
+            <option value="adult">大人</option>
+            <option value="child">子ども</option>
+            <option value="both">両方</option>
+          </select>
+    
+          <!-- 下段：2列ぶち抜き -->
+          <div class="span2">
+            <button id="btnAdminFetch" class="btn btn-ghost btn-sm" type="button">再取得</button>
+          </div>
+        </div>
+    
+        <!-- ★ 一覧の描画先はアコーディオンの『中』 -->
+        <div id="adminListBoxTop" class="muted" style="margin-top:8px;">読み込み待機中</div>
+      </div>
+    </div>
+    <!-- ★ ここまでがアコーディオン -->
       <div class="card">
         <div class="row-space">
           <div class="sectionTitle" id="adminFormTitle">新規登録</div>
