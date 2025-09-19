@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.9";
+  const FRONT_VERSION = "Front v3.5.0";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1963,10 +1963,10 @@ function bindHandlers(){
      show("#view-schedules"); 
      updateSegFilterUI(); 
      window.__schedLoadFilters?.();   // ← 追加：前回の選択を復元
-     renderSchedules(true); 
+     window.renderSchedules(true); 
    };
   $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
-  $("#btnFetchSchedules").onclick    = ()=> renderSchedules(true);
+  $("#btnFetchSchedules").onclick    = ()=> window.renderSchedules(true);
   // 管理：セレクト変更で即ローカル描画
   document.getElementById('ad_days')?.addEventListener('change', adminListRenderLocal);
   document.getElementById('ad_seg_filter')?.addEventListener('change', adminListRenderLocal);
@@ -2778,14 +2778,29 @@ async function onRegister(){
   };
 
   // 互換：外部から呼ばれる想定があればこちら
-  window.loadSchedules = function(){ renderSchedules(false); };
+  window.loadSchedules = function(){ window.renderSchedules(false); };
 
-  window.copyIcsFeed = function(){
+  window.copyIcsFeed = async function(){
     const ipt = $("#icsFeedUrl");
     if (!ipt) return;
-    ipt.select();
-    await navigator.clipboard.writeText(ipt.value);
-    alert("購読URLをコピーしました");
+    try {
+      ipt.select();
+      if (window.isSecureContext && navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(ipt.value);
+      } else {
+        // 非HTTPSや古い環境向けフォールバック
+        const ta = document.createElement('textarea');
+        ta.value = ipt.value;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      alert("購読URLをコピーしました");
+    } catch (e) {
+      console.error(e);
+      alert("コピーに失敗しました");
+    }
   };
 
   // ===== UI操作で即反映（ここでバインド） =====
