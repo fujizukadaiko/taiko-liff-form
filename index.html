@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.6.8";
+  const FRONT_VERSION = "Front v3.6.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1828,7 +1828,7 @@ function updateSubmitButton(){
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
 /* ===== 区分(セグメント) 正規化 & 判定ヘルパー ===== */
-const INCLUDE_BOTH_FOR_ALL = false; 
+const INCLUDE_BOTH_FOR_ALL = true;
 // ↑②の仕様に合わせて false（＝常に『両方』は表示対象から除外）
 // 運用で方針変更する場合は true にすると、常に『両方』を表示に含められます。
 function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classList.remove("show")); $(id).classList.add("show"); }
