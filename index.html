@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.3.8";
+  const FRONT_VERSION = "Front v3.3.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1803,7 +1803,10 @@ function updateSegFilterUI(){
   // 非表示にしたときは値をクリア（＝全予定表示）
   if (!showIt) {
     sel.value = '';
-    saveFilters?.();  // selSeg を隠した時も保存
+    // Schedulesブロック内の関数はクロージャ内なので、グローバル経由で“あれば”呼ぶ
+    if (typeof window.__schedSaveFilters === 'function') {
+      window.__schedSaveFilters();
+    }
   }
 }
 // 修正後：includeBoth で “両方” を含めるか選べるように
@@ -2606,6 +2609,9 @@ async function onRegister(){
       }
     }catch(_){}
   }
+  // 他スクリプトから安全に呼べるように公開
+  window.__schedSaveFilters = saveFilters;
+  window.__schedLoadFilters = loadFilters;
   // ===== ユーティリティ =====
   function parseYmdStrictLocal(s){
     const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
