@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.6.1";
+  const FRONT_VERSION = "Front v3.6.2";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyXgQPAN9kQu1ZRz5L1ACOb04eu9UfitcsnoQNzDfTuZUMb80Hw9ytobtZ51EQVZYMEg/exec";     // ←差し替え
 
@@ -1017,6 +1017,28 @@
     /* 管理アコーディオンの編集ボタン（色味は既存のまま、サイズだけ） */
     #adminListAcc .btn-edit{
       min-height: 30px;
+      padding: 6px 10px;
+      font-size: 13px;
+      border-radius: 9px;
+    }
+    /* ▼ 管理アコーディオン：プルダウンを“半分の幅”に固定（小画面でも崩れない） */
+    #adminListAcc .adminControls .schedSel.short{
+      width: 100px !important;      /* 半分くらいの実用幅 */
+      min-width: 100px !important;
+    }
+    
+    /* 以前の「@media (max-width:420px) .adminControls select{ width:100% }」よりも
+       強い指定で、管理アコーディオン内だけは 100% に広がらないようにする */
+    @media (max-width: 420px){
+      #adminListAcc .adminControls .schedSel.short{
+        width: 100px !important;
+        min-width: 100px !important;
+      }
+    }
+    
+    /* ▼ 再取得ボタンを“編集”ボタンと同じコンパクトサイズに */
+    #adminListAcc #btnAdminFetch{
+      min-height: 30px;             /* 編集ボタンと同じ高さ */
       padding: 6px 10px;
       font-size: 13px;
       border-radius: 9px;
