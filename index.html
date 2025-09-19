@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.4.0";
+  const FRONT_VERSION = "Front v3.4.1";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwUyoOlL6l2xVrFTGFotMRWIaC3EMyS38tfqDNK7B7v7zGfNLW662mVDUN60mupn5aUfg/exec";     // ←差し替え
 
@@ -1970,7 +1970,12 @@ function bindHandlers(){
   $("#btnAddPerf").onclick     = ()=> addPerformerField("");
   $("#btnRegister").onclick    = onRegister;
 
-  $("#btnSchedules").onclick   = ()=>{ show("#view-schedules"); updateSegFilterUI(); renderSchedules(true); };
+  $("#btnSchedules").onclick   = ()=>{ 
+     show("#view-schedules"); 
+     updateSegFilterUI(); 
+     window.__schedLoadFilters?.();   // ← 追加：前回の選択を復元
+     renderSchedules(true); 
+   };
   $("#btnBackFromSchedules").onclick = ()=> show("#view-home");
   $("#btnFetchSchedules").onclick    = ()=> renderSchedules(true);
   // 区分フィルタが変更されたら 今後の予定を再描画
@@ -2626,6 +2631,12 @@ async function onRegister(){
   // 他スクリプトから安全に呼べるように公開
   window.__schedSaveFilters = saveFilters;
   window.__schedLoadFilters = loadFilters;
+  window.__schedSaveFilters  = window.__schedSaveFilters  || function(){};
+  window.__schedLoadFilters  = window.__schedLoadFilters  || function(){};
+
+  // 旧コードが素の saveFilters()/loadFilters() を呼んでも落ちないようにする
+  window.saveFilters = function(){ return window.__schedSaveFilters.apply(null, arguments); };
+  window.loadFilters = function(){ return window.__schedLoadFilters.apply(null, arguments); };
   // ===== ユーティリティ =====
   function parseYmdStrictLocal(s){
     const m = String(s||"").match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
