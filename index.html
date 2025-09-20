@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.7.1";
+  const FRONT_VERSION = "Front v3.7.2";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxLxMfq1NhQQyoZXhDuvK7aPucbBR7oM5P377l4O3TNbebq5KITFFZIlY6osiNK2fT7tA/exec";     // ←差し替え
 
@@ -2631,11 +2631,13 @@ async function onSubmit(){
 
   }catch(err){
     logForm(err.message || String(err));
-  }finally{
-    state.submitting = false;
-    btn.disabled = false; updateSubmitButton();
-    if (backBtn) backBtn.disabled = false;
+  } finally {
     window.removeEventListener("beforeunload", navGuard);
+    state.submitting = false;
+    btn.disabled = false;
+    btn.textContent = "まとめて送信";
+    backBtn && (backBtn.disabled = false);
+    updateSubmitButton();
   }
 }
 
