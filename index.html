@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.7.5";
+  const FRONT_VERSION = "Front v3.7.6";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbx2IGTJLOYpC0k-Csk3A3-o19OnSqILTqziT5cw0w0zTp51MDA9ZnUph8iCT1wYY_fU/exec";     // ←差し替え
 
@@ -3375,9 +3375,11 @@ function adminEdit(obj){
       if (!sel) return;
       sel.disabled = true;
       sel.innerHTML = `<option value="">（読み込み中…）</option>`;
-      try{
-        const r = await api(`?attendanceReport=1&meta=1`);
-        if (r.status==="ok" && Array.isArray(r.list)){
+      try {
+        // ← 認可用に id を付ける（必要なら admin=1 も）
+        const r = await api(`?attendanceReport=1&meta=1&id=${esc(state.lineId)}`);
+    
+        if (r?.status === "ok" && Array.isArray(r.list)) {
           state.reportMeta = r.list;
           sel.innerHTML = `<option value="">（選択してください）</option>` +
             r.list.map(e=>{
@@ -3385,11 +3387,19 @@ function adminEdit(obj){
               return `<option value="${e.id}">${label}</option>`;
             }).join("");
         } else {
+          const msg = r?.message || "サーバーがエラーを返しました";
+          console.error("meta error:", r);
           sel.innerHTML = `<option value="">取得エラー</option>`;
+          document.querySelector("#repBox")?.replaceChildren(
+            document.createTextNode(`エラー: ${msg}`)
+          );
         }
-      } catch(err){
+      } catch (e) {
+        console.error(e);
         sel.innerHTML = `<option value="">取得エラー</option>`;
-        console.error(err);
+        document.querySelector("#repBox")?.replaceChildren(
+          document.createTextNode(`通信エラー: ${e.message || e}`)
+        );
       } finally {
         sel.disabled = false;
       }
@@ -3399,7 +3409,7 @@ function adminEdit(obj){
     async onChange(){
       const id  = document.querySelector("#repEvent")?.value || "";
       const box = document.querySelector("#repBox");
-      if (!id){ if(box) box.textContent = "公演を選択してください"; return; }
+      if (!id){ if (box) box.textContent = "公演を選択してください"; return; }
     
       if (state.reportCache[id]) {
         state.report = [ state.reportCache[id] ];
@@ -3407,18 +3417,29 @@ function adminEdit(obj){
         return;
       }
     
-      if (box) box.textContent = "読み込み中…";
+      if (box) box.innerHTML = `読み込み中… <span class="spinner"></span>`;
       try{
-        // ← detail=1 を明示して形を固定
-        const r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1`);
-        // 返り値が {detail: {...}} / {...} どちらでもOKに
-        const payload = r.detail || r;
-        state.reportCache[id] = payload;
+        // 基本は lineId を付けず全件を取りに行く
+        let r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1`);
+        // サーバ側の認可要件でエラーならフォールバック
+        if (r?.status === "error") {
+          r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&id=${esc(state.lineId)}&admin=1`);
+        }
+    
+        const payload = r.detail || (r.status === "ok" ? r : null);
+        if (!payload){
+          const msg = r?.message || "予期せぬ応答";
+          console.error("detail error:", r);
+          if (box) box.textContent = `エラー: ${msg}`;
+          return;
+        }
+    
+        state.reportCache[id] = payload; // キャッシュ
         state.report = [ payload ];
         renderReport();
-      }catch(err){
-        if (box) box.textContent = "エラー：" + (err.message||err);
-        console.error(err);
+      } catch(e){
+        console.error(e);
+        if (box) box.textContent = `通信エラー: ${e.message || e}`;
       }
     },
 
@@ -3535,16 +3556,20 @@ window.reportReload = function(){ initAdminReportPage(); };
   if (detail && detail.status === 'error') detail = undefined; // 壊れキャッシュ無効化
   if (!detail){
     box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+    // （detail が無い時の）詳細ロード部を↓で置き換え
     try {
-      const r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1`);
+      let r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1`);
+      if (r?.status === 'error') {
+        r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1&id=${esc(state.lineId)}&admin=1`);
+      }
       const payload = r.detail || (r.status === 'ok' ? r : null);
-      if (!payload) throw new Error(r.message || 'API error');
+      if (!payload) throw new Error(r?.message || 'API error');
       detail = payload;
       state.reportDetailMap[eventId] = detail;
-      state.reportCache = state.reportCache || {};
       state.reportCache[eventId] = detail;
     } catch(e){
-      box.innerHTML = `<span class="err">読み込みに失敗しました</span>`;
+      box.innerHTML = `<span class="err">読み込みに失敗しました: ${e.message || e}</span>`;
+      console.error("renderReport detail fetch error", e);
       return;
     }
   }
