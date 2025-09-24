@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.7.6";
+  const FRONT_VERSION = "Front v3.7.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbx2IGTJLOYpC0k-Csk3A3-o19OnSqILTqziT5cw0w0zTp51MDA9ZnUph8iCT1wYY_fU/exec";     // ←差し替え
 
@@ -3377,7 +3377,7 @@ function adminEdit(obj){
       sel.innerHTML = `<option value="">（読み込み中…）</option>`;
       try {
         // ← 認可用に id を付ける（必要なら admin=1 も）
-        const r = await api(`?attendanceReport=1&meta=1&id=${esc(state.lineId)}`);
+        const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}&admin=1`);
     
         if (r?.status === "ok" && Array.isArray(r.list)) {
           state.reportMeta = r.list;
@@ -3423,7 +3423,7 @@ function adminEdit(obj){
         let r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1`);
         // サーバ側の認可要件でエラーならフォールバック
         if (r?.status === "error") {
-          r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&id=${esc(state.lineId)}&admin=1`);
+          r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&lineId=${esc(state.lineId)}&admin=1`);
         }
     
         const payload = r.detail || (r.status === "ok" ? r : null);
@@ -3560,7 +3560,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     try {
       let r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1`);
       if (r?.status === 'error') {
-        r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1&id=${esc(state.lineId)}&admin=1`);
+        r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1&lineId=${esc(state.lineId)}&admin=1`);
       }
       const payload = r.detail || (r.status === 'ok' ? r : null);
       if (!payload) throw new Error(r?.message || 'API error');
