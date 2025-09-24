@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.8.0";
+  const FRONT_VERSION = "Front v3.8.1";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbx2IGTJLOYpC0k-Csk3A3-o19OnSqILTqziT5cw0w0zTp51MDA9ZnUph8iCT1wYY_fU/exec";     // ←差し替え
 
@@ -3694,6 +3694,7 @@ window.reportReload = function(){ initAdminReportPage(); };
 
   // 出欠結果の描画（#repEvent の value を eventId とみなして取得）
   async function renderReport(){
+    const lid = encodeURIComponent(state.lineId || "");
     const sel = document.getElementById('repEvent');
     const box = document.getElementById('repBox');
     const id  = sel?.value || '';
@@ -3704,7 +3705,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     // 1) eventId で取得
     let resp;
     try{
-      resp = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&admin=1`);
+      resp = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lid}`);
     }catch(e){ console.error('fetch error(eventId):', e); }
 
     let payload = resp && (resp.detail || resp);
@@ -3713,7 +3714,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     // 2) うまく取れなければ id フォールバック
     if (!(resp?.status === 'ok') || list.length === 0){
       try{
-        const r2 = await api(`?attendanceReport=1&id=${encodeURIComponent(id)}&detail=1&admin=1`);
+        const r2 = await api(`?attendanceReport=1&id=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lid}`);
         const p2 = r2 && (r2.detail || r2);
         const l2 = pickRows(p2);
         if (r2?.status === 'ok' && l2.length){
