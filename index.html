@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.7.8";
+  const FRONT_VERSION = "Front v3.7.9";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbx2IGTJLOYpC0k-Csk3A3-o19OnSqILTqziT5cw0w0zTp51MDA9ZnUph8iCT1wYY_fU/exec";     // ←差し替え
 
@@ -3454,12 +3454,41 @@ function adminEdit(obj){
   };
 
   // 画面を開いたときに呼ぶ
-  async function initAdminReportPage(){
-    adminReport.mount();
-    await adminReport.loadMeta();
-    const box = document.querySelector("#repBox");
-    if (box) box.textContent = "公演を選択してください";
-  }
+  // 管理レポート初期化（公演メタ一覧の取得＆セレクト更新）
+    async function initAdminReportPage(){
+      if (!state.isAdmin){
+        document.getElementById('repBox').textContent = '権限がありません';
+        return;
+      }
+      const repBox = document.getElementById('repBox');
+      const sel    = document.getElementById('repEvent');
+      repBox.textContent = '公演一覧を取得中…';
+    
+      try{
+        const meta = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}&admin=1`);
+        if (meta?.status !== 'ok') throw new Error(meta?.message || '取得に失敗しました');
+    
+        const list = Array.isArray(meta.list) ? meta.list :
+                     Array.isArray(meta.meta) ? meta.meta : [];
+        state.reportMeta = list;
+    
+        const prev = sel?.value || '';
+        sel.innerHTML = '<option value="">（選択してください）</option>' + list.map(e => {
+          const id    = String(e.id || e.eventId || e.eid || '');
+          const date  = e.ymd || e.date || '';
+          const time  = e.hm || e.time || '';
+          const title = e.title || e.name || '';
+          return `<option value="${id}">${date}${time ? ` ${time}`:''}｜${title}</option>`;
+        }).join('');
+    
+        if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
+    
+        repBox.textContent = sel.value ? '読み込み中…' : '公演を選択してください';
+        if (sel.value) renderReport();  // 直前の選択が残っていれば自動描画
+      }catch(e){
+        repBox.textContent = e.message || String(e);
+      }
+    }
 <!-- ここまで置き換え -->
   
 // ===== 管理レポート再読込（互換エイリアス） =====
@@ -3545,138 +3574,92 @@ window.reportReload = function(){ initAdminReportPage(); };
     function labelFor(k){ return k==='yes'?'参加':k==='no'?'欠席':k==='maybe'?'未定':'未回答'; }
     
     async function renderReport(){
-  const box = document.getElementById('repBox');
-  const eventId = document.getElementById('repEvent')?.value || '';
- const filter = document.getElementById('repAttend')?.value || '';
+  const id = document.getElementById('repEvent')?.value;
+  const repBox = document.getElementById('repBox');
+  if (!id){
+    repBox.textContent = '公演を選択してください';
+    return;
+  }
 
-  if (!eventId){ box.innerHTML = '公演を選択してください'; return; }
-
-  // 詳細ロード（キャッシュ優先）
-  let detail = state.reportDetailMap[eventId] || state.reportCache?.[eventId];
-  if (detail && detail.status === 'error') detail = undefined; // 壊れキャッシュ無効化
-  if (!detail){
-    box.innerHTML = `読み込み中… <span class="spinner"></span>`;
-    // （detail が無い時の）詳細ロード部を↓で置き換え
-    try {
-      const r = await api(
-       `?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1`
-       + `&lineId=${esc(state.lineId)}&admin=1`
-     );
-     const payload = r.detail || (r.status === 'ok' ? r : null);
-      if (!payload) throw new Error(r?.message || 'API error');
-      detail = payload;
-      state.reportDetailMap[eventId] = detail;
-      state.reportCache[eventId] = detail;
-    } catch(e){
-      box.innerHTML = `<span class="err">読み込みに失敗しました: ${e.message || e}</span>`;
-      console.error("renderReport detail fetch error", e);
+  // キャッシュ→なければ管理者権限で取得（全員分）
+  let payload = state.reportDetailMap[id];
+  if (!payload){
+    repBox.textContent = '結果を取得中…';
+    const r = await api(`?attendanceReport=1&eventId=${esc(id)}&detail=1&lineId=${esc(state.lineId)}&admin=1`);
+    if (r?.status !== 'ok'){
+      repBox.textContent = r?.message || '取得に失敗しました';
       return;
     }
+    payload = r.detail || r;                  // 応答のゆらぎに対応
+    state.reportDetailMap[id] = payload;      // キャッシュ
   }
 
-  // 対象イベント情報
-  const selected = (state.events || []).find(e => String(e.eventId) === String(eventId)) || {};
-  const evSegNorm = normSeg(selected.segment || selected.attendSegment || selected.targetSegment || selected.segmentCode || '');
-
-  // 名簿（演奏者一覧）と区分マップ
-  const nameSegMap = buildNameSegMap(); // { [name]: 'adult'|'child'|'both' }
-  const performers = Array.from(new Set((state.members || []).map(m => m.performerName).filter(Boolean)));
-
-  // イベントの区分に合致する演奏者のみ対象（← Both ロジック対応）
-  const targets = performers.filter(n => matchSeg(nameSegMap[n], evSegNorm));
-
-  // 回答配列の取り出し（フォーマットゆらぎを吸収）
-  const ansArr =
-    Array.isArray(detail.answers) ? detail.answers :
-    Array.isArray(detail.list)    ? detail.list    :
-    (Array.isArray(state.answers?.[eventId]) ? state.answers[eventId] : []);
-
-  const byName = new Map(ansArr.map(a => {
-    const name   = String(a.performerName ?? a.name ?? '').trim();
-    const attend = (String(a.attend ?? a.answer ?? '').trim() || '未回答');
-    return [name, attend];
+  // ★ ここでは “自分のメンバー” で絞り込みしない！
+  const rawList = (payload.list || payload.answers || payload.detail || []);
+  const rows = rawList.map(x => ({
+    name:   x.name || x.member || x.performerName || '',
+    attend: (x.answer || x.attend || '').trim() || '未回答',
+    at:     x.updatedAt || x.time || '',
+    seg:    x.segment || x.seg || ''
   }));
 
-  // 表示行の生成（未回答補完）
-  let rows = targets.map(n => ({ name: n, attend: byName.get(n) || '未回答' }));
-
-  // フィルタ適用
-  if (filter){
-    rows = rows.filter(r => (filter === '未回答') ? (r.attend === '未回答') : (r.attend === filter));
-  }
-
-  // グループ分け（参加/欠席/未定/未回答）
-  const groups = {
-    '参加'  : [],
-    '欠席'  : [],
-    '未定'  : [],
-    '未回答': []
-  };
-  rows.forEach(r => {
-    if (r.attend === '参加') groups['参加'].push(r);
-    else if (r.attend === '欠席') groups['欠席'].push(r);
-    else if (r.attend === '未定') groups['未定'].push(r);
-    else groups['未回答'].push(r);
+  // 画面の出欠フィルタ
+  const f = document.getElementById('repAttend')?.value || '';
+  const view = rows.filter(r => {
+    if (!f) return true;
+    if (f === '未回答') return r.attend === '未回答';
+    return r.attend === f;
   });
 
-  // 件数
-  const counts = Object.fromEntries(Object.entries(groups).map(([k,v]) => [k, v.length]));
-  const total = rows.length;
+  // 集計
+  const cnt = {
+    yes:   rows.filter(r => r.attend === '参加').length,
+    no:    rows.filter(r => r.attend === '欠席').length,
+    maybe: rows.filter(r => r.attend === '未定').length,
+    na:    rows.filter(r => r.attend === '未回答').length,
+    all:   rows.length
+  };
 
-  // 見出し情報
-  const title  = selected.title || selected.name || '(無題)';
-  const ymd    = selected.date  || selected.ymd || '';
-  const hm     = selected.time  || selected.hm  || '';
-  const place  = selected.place || selected.venue || '';
-  const segLbl = dispSeg(evSegNorm) || '（区分未設定）';
+  const title = payload.title || payload.eventTitle || '';
+  const date  = payload.ymd   || payload.date || '';
+  const time  = payload.hm    || payload.time || '';
+  const place = payload.place || payload.venue || '';
+  const open  = (payload.isOpen ?? payload.open) ? true : false;
 
-  // HTML描画
-  const groupHtml = (label, list) => `
-    <div class="repGroup">
-      <div class="repGroupHead">
-        <span class="badge-att ${label==='参加'?'yes':label==='欠席'?'no':label==='未定'?'maybe':'na'}">${label}</span>
-        <span class="repCount">${list.length}名</span>
-      </div>
-      ${list.length ? list.map(r => `
-        <div class="repPersonRow">
-          <div class="repName">${r.name}</div>
-          <div class="repAt">${r.attend}</div>
+  const head = `
+    <div class="repHeader">
+      <div class="repLine repHeadRow">
+        <div class="repLeft">
+          <span class="repTitle">${title || '(無題)'}</span>
+          <span class="repSep">｜</span>
+          <span>${date}${time ? ` ${time}` : ''}</span>
+          ${place ? `<span class="repSep">｜</span><span class="repPlace">@${place}</span>` : ''}
         </div>
-      `).join('') : `<div class="repNA">該当者なし</div>`}
-    </div>
-  `;
-
-  // フィルタ指定があれば、そのグループだけを描く
-  const groupOrder = ['参加','欠席','未定','未回答'];
-  const bodyHtml = filter
-    ? groupHtml(filter, groups[filter])
-    : groupOrder.map(k => groupHtml(k, groups[k])).join('');
-
-  box.innerHTML = `
-    <div class="repCard">
-      <div class="repHeader">
-        <div class="repHeadRow repLine">
-          <div class="repLeft">
-            <span class="repTitle">${title}</span>
-            <span class="repSep">|</span>
-            <span class="repPlace">${ymd || ''}${hm ? ' ' + hm : ''}${place ? ' @' + place : ''}</span>
-            <span class="repSep">|</span>
-            <span class="seg-badge ${evSegNorm==='adult'?'seg-adult':evSegNorm==='child'?'seg-child':'seg-both'}">${segLbl}</span>
-          </div>
-          <div class="repRight">
-            <span class="badge-status ${total ? 'open':'closed'}">${total ? `表示 ${total} 名` : '該当者なし'}</span>
-          </div>
-        </div>
-        <div class="repLine" style="padding-top:6px;">
-          <span class="badge-att yes">参加 ${counts['参加']}名</span>
-          <span class="badge-att no">欠席 ${counts['欠席']}名</span>
-          <span class="badge-att maybe">未定 ${counts['未定']}名</span>
-          <span class="badge-att na">未回答 ${counts['未回答']}名</span>
+        <div class="repRight">
+          <span class="badge-status ${open ? 'open' : 'closed'}">${open ? '受付中' : '締切'}</span>
+          <span class="badge-att yes">参加 ${cnt.yes}</span>
+          <span class="badge-att maybe">未定 ${cnt.maybe}</span>
+          <span class="badge-att no">欠席 ${cnt.no}</span>
+          <span class="badge-att na">未回答 ${cnt.na}</span>
+          <span class="pill sm">${cnt.all} 名</span>
         </div>
       </div>
-      ${bodyHtml}
+    </div>`;
+
+  const body = view.length ? view.map(p => `
+    <div class="repPersonRow">
+      <div class="repName">${p.name}</div>
+      <div class="repAt">
+        <span class="badge-att ${
+          p.attend === '参加' ? 'yes' :
+          p.attend === '欠席' ? 'no' :
+          p.attend === '未定' ? 'maybe' : 'na'
+        }">${p.attend}</span>
+      </div>
     </div>
-  `;
+  `).join('') : `<div class="repNA">該当者がいません</div>`;
+
+  repBox.innerHTML = `<div class="repCard">${head}${body}</div>`;
 }
 </script> 
   
