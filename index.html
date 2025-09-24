@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.8.1";
+  const FRONT_VERSION = "Front v3.8.2";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbx2IGTJLOYpC0k-Csk3A3-o19OnSqILTqziT5cw0w0zTp51MDA9ZnUph8iCT1wYY_fU/exec";     // ←差し替え
 
@@ -3731,18 +3731,49 @@ window.reportReload = function(){ initAdminReportPage(); };
 
     // ★ 家族フィルタは一切しない（= 全員表示）
     const rows = list.map(mapRow);
+    
+    // ★ 追加：ロスターが返ってくる場合は未回答を合成
+    // イベント区分（detail→metaの順で取得）
+    const metaEv = (state.reportMeta || []).find(e => {
+      const eid = String(e.eventId ?? e.eventID ?? e.event_id ?? e.id ?? e.eid ?? '');
+      return eid === String(id);
+    }) || {};
+    const evSeg = normSeg(
+      payload.segment || payload.targetSegment || payload.attendSegment ||
+      metaEv.segment  || metaEv.targetSegment || ''
+    );
+    
+    // 1) 回答済みの名前集合
+    const answeredByName = new Set(rows.map(r => r.name).filter(Boolean));
+    
+    // 2) ロスター候補（サーバーが返していれば）
+    const rosterSrc = payload.members || payload.roster || payload.candidates || [];
+    const naRows = [];
+    for (const m of rosterSrc) {
+      const mName = m.name ?? m.member ?? m.performerName ?? '';
+      if (!mName) continue;
+      const mSeg  = m.segment ?? m.seg ?? m.category ?? m.区分 ?? '';
+      // イベント対象区分と名簿の区分を突き合わせ（両方はどちらにもマッチ）
+      if (!matchSeg(mSeg, evSeg)) continue;
+      if (!answeredByName.has(mName)) {
+        naRows.push({ name: mName, attend: '未回答', at: '', seg: normSeg(mSeg) });
+      }
+    }
+    
+    // rows を未回答で拡張
+    const rowsAll = rows.concat(naRows);
 
-    // フィルタ適用
+    // フィルタ
     const f = document.getElementById('repAttend')?.value || '';
-    const view = rows.filter(r => !f || (f === '未回答' ? r.attend === '未回答' : r.attend === f));
-
+    const view = rowsAll.filter(r => !f || (f === '未回答' ? r.attend === '未回答' : r.attend === f));
+    
     // 集計
     const cnt = {
-      yes:   rows.filter(r => r.attend === '参加').length,
-      no:    rows.filter(r => r.attend === '欠席').length,
-      maybe: rows.filter(r => r.attend === '未定').length,
-      na:    rows.filter(r => r.attend === '未回答').length,
-      all:   rows.length
+      yes:   rowsAll.filter(r => r.attend === '参加').length,
+      no:    rowsAll.filter(r => r.attend === '欠席').length,
+      maybe: rowsAll.filter(r => r.attend === '未定').length,
+      na:    rowsAll.filter(r => r.attend === '未回答').length,
+      all:   rowsAll.length
     };
 
     // ヘッダ情報
@@ -3795,15 +3826,21 @@ window.reportReload = function(){ initAdminReportPage(); };
     const sel = document.getElementById('repEvent');
     const box = document.getElementById('repBox');
     if (!sel) return;
-
+  
+    // 古いメタを一旦クリア（失敗時の取り違え防止）
+    state.reportMeta = [];
+  
     sel.disabled = true;
     sel.innerHTML = `<option value="">（読み込み中…）</option>`;
     try{
       // 認可の都合で lineId/admin を付けて取得
       const r = await api(`?attendanceReport=1&meta=1&lineId=${encodeURIComponent(state.lineId)}&admin=1`);
       if (r?.status === 'ok' && Array.isArray(r.list)){
+        // ★ ここで保存
+        state.reportMeta = r.list;
+  
         const opts = r.list.map(e=>{
-          // ★ value は eventId を最優先（なければ id/eid）
+          // value は eventId を最優先（なければ id/eid）
           const id = String(e.eventId ?? e.eventID ?? e.event_id ?? e.id ?? e.eid ?? '');
           const label = `${e.ymd || e.date || ''}${e.time ? ' ' + e.time : ''}  ${e.title || e.name || ''}`;
           return `<option value="${id}">${label}</option>`;
