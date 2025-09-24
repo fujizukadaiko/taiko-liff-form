@@ -3376,7 +3376,7 @@ function adminEdit(obj){
       sel.disabled = true;
       sel.innerHTML = `<option value="">（読み込み中…）</option>`;
       try{
-        const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}`);
+        const r = await api(`?attendanceReport=1&meta=1`);
         if (r.status==="ok" && Array.isArray(r.list)){
           state.reportMeta = r.list;
           sel.innerHTML = `<option value="">（選択してください）</option>` +
@@ -3410,7 +3410,7 @@ function adminEdit(obj){
       if (box) box.textContent = "読み込み中…";
       try{
         // ← detail=1 を明示して形を固定
-        const r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&lineId=${encodeURIComponent(state.lineId)}`);
+        const r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1`);
         // 返り値が {detail: {...}} / {...} どちらでもOKに
         const payload = r.detail || r;
         state.reportCache[id] = payload;
@@ -3536,7 +3536,7 @@ window.reportReload = function(){ initAdminReportPage(); };
   if (!detail){
     box.innerHTML = `読み込み中… <span class="spinner"></span>`;
     try {
-      const r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1&lineId=${encodeURIComponent(state.lineId)}`);
+      const r = await api(`?attendanceReport=1&eventId=${encodeURIComponent(eventId)}&detail=1`);
       const payload = r.detail || (r.status === 'ok' ? r : null);
       if (!payload) throw new Error(r.message || 'API error');
       detail = payload;
