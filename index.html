@@ -3527,7 +3527,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     async function renderReport(){
   const box = document.getElementById('repBox');
   const eventId = document.getElementById('repEvent')?.value || '';
-  const filter = document.getElementById('repAttend')?.value || ''; // '', '参加','欠席','未定','未回答'
+ const filter = document.getElementById('repAttend')?.value || '';
 
   if (!eventId){ box.innerHTML = '公演を選択してください'; return; }
 
