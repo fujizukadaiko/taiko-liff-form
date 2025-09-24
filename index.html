@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.7.7";
+  const FRONT_VERSION = "Front v3.7.8";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbx2IGTJLOYpC0k-Csk3A3-o19OnSqILTqziT5cw0w0zTp51MDA9ZnUph8iCT1wYY_fU/exec";     // ←差し替え
 
@@ -2051,6 +2051,17 @@ async function init(){
     await refreshData();
   }catch(err){
     $("#eventsBox").innerHTML = `<span class="err">初期化に失敗しました: ${err.message||err}</span>`;
+  }
+}
+
+// IDトークンを Authorization: Bearer で付ける
+function authHeaders(){
+  try{
+    const t = (typeof liff !== "undefined" && typeof liff.getIDToken === "function")
+      ? liff.getIDToken() : "";
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  }catch(_){
+    return {};
   }
 }
 
