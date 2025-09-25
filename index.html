@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.8.6";
+  const FRONT_VERSION = "Front v3.8.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4Iug7woXgpsQmi3WY9ysGSH03xLJYTfJRwlWR09EJa31CpddndV54xffcsuHKqltRrg/exec";     // ←差し替え
 
@@ -1821,6 +1821,24 @@ function updateSubmitButton(){
 
 /* ===== ユーティリティ ===== */
 const $ = s => document.querySelector(s);
+   /* --- 管理レポート：メタ読込の多重実行ガード --- */
+  async function ensureReportMetaLoaded(force = false){
+    // 既にロード済み＆forceでなければ即戻る
+    if (!force && Array.isArray(state.reportMeta) && state.reportMeta.length) return state.reportMeta;
+  
+    // 進行中のリクエストがあれば待つ（多重防止）
+    if (ensureReportMetaLoaded._pending) {
+      await ensureReportMetaLoaded._pending;
+      return state.reportMeta;
+    }
+    // 既存の loadReportMeta をそのまま使う
+    const p = (async ()=>{
+      try { await loadReportMeta(force); } finally { ensureReportMetaLoaded._pending = null; }
+    })();
+    ensureReportMetaLoaded._pending = p;
+    await p;
+    return state.reportMeta;
+  }
 /* ===== 区分(セグメント) 正規化 & 判定ヘルパー ===== */
 const INCLUDE_BOTH_FOR_ALL = true;
 // ↑②の仕様に合わせて false（＝常に『両方』は表示対象から除外）
@@ -3693,157 +3711,90 @@ window.reportReload = function(){ initAdminReportPage(); };
   }
 
   // 出欠結果の描画（#repEvent の value を eventId とみなして取得）
-  /* ▼ 置き換え：出欠結果の描画（キャッシュ対応版） */
-  async function renderReport(force = false){
-    const lid = encodeURIComponent(state.lineId || "");
-    const sel = document.getElementById('repEvent');
-    const box = document.getElementById('repBox');
-    if (!sel) return;
+/* ▼ 置き換え：出欠結果の描画（キャッシュ＋未回答復元版） */
+async function renderReport(force = false){
+  const sel = document.getElementById('repEvent');
+  const box = document.getElementById('repBox');
+  if (!sel || !box) return;
 
-    // ▼ メタ未取得なら先に読み込む（セレクトの候補を埋める）
-    if (sel.options.length <= 1 && (!state.reportMeta || state.reportMeta.length === 0)) {
-      await loadReportMeta();
+  // 1) メタが未ロードなら一度だけロード（多重防止付き）
+  if (sel.options.length <= 1 && (!state.reportMeta || state.reportMeta.length === 0)){
+    await ensureReportMetaLoaded(false);
+  }
+
+  // 2) メタ読込後に value を取り直す
+  let id = sel.value || '';
+  if (!id){
+    box.textContent = '公演を選択してください';
+    return;
+  }
+
+  // 3) フィルタ値取得（参加/欠席/未定/未回答/すべて）
+  const filter = (document.getElementById('repAttend')?.value || '').trim();
+
+  // 4) キャッシュを見る（forceでなければ再取得しない）
+  const cached = state.reportDetailMap[id];
+  if (cached && !force){
+    return renderReportFromData(id, cached, filter);
+  }
+
+  // 5) ネット取得は必要な時だけ
+  box.innerHTML = '結果を取得中… <span class="spinner"></span>';
+  try{
+    // ★ ここは“今まで使っていたAPI”に合わせてください
+    // 例：?attendanceReport=1&eventId=...
+    const j = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}`);
+    if (j && j.status === 'ok'){
+      const detail = j.report || j.detail || j.data || j;   // 柔軟に対応
+      state.reportDetailMap[id] = detail;                   // ← キャッシュ！
+      renderReportFromData(id, detail, filter);
+    }else{
+      box.textContent = j?.message || '取得に失敗しました';
     }
-  
-    // ▼ メタ読み込み後に value を取り直す（←重要）
-    let id = sel.value || '';
-    if (!id){
-      if (box) box.textContent = '公演を選択してください';
-      return;
-    }
-  
-    box.innerHTML = '結果を取得中… <span class="spinner"></span>';
-  
-    // まずキャッシュを見る
-    let payload, list, usedCache = false;
-  
-    if (!force && state.reportCache[id]) {
-      payload   = state.reportCache[id].payload;
-      list      = pickRows(payload);
-      usedCache = true;
-    }
-  
-    // キャッシュが無い/空のときだけ取得（eventId → id フォールバック）
-    if (!usedCache) {
-      // 1) eventId で取得
-      let resp;
-      try{
-        resp = await api(`?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lid}`);
-      }catch(e){ console.error('fetch error(eventId):', e); }
-  
-      payload = resp && (resp.detail || resp);
-      list    = pickRows(payload);
-  
-      // 2) うまく取れなければ id フォールバック
-      if (!(resp?.status === 'ok') || list.length === 0){
-        try{
-          const r2 = await api(`?attendanceReport=1&id=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lid}`);
-          const p2 = r2 && (r2.detail || r2);
-          const l2 = pickRows(p2);
-          if (r2?.status === 'ok'){
-            payload = p2; list = l2;
-          }
-        }catch(e){ console.error('fallback fetch error(id):', e); }
-      }
-  
-      // 取得に失敗
-      if (!payload || payload.status === 'error'){
-        box.textContent = (payload && payload.message) || '取得に失敗しました';
-        console.warn('report resp:', payload);
-        return;
-      }
-  
-      // 成功したらキャッシュ
-      state.reportCache[id] = { payload, ts: Date.now() };
-    }
-  
-    // ★ 家族フィルタなし（全員表示）
-    const rows = (list || []).map(mapRow);
-  
-    // ★ 追加：ロスターが返ってくる場合は未回答を合成
-    const metaEv = (state.reportMeta || []).find(e => {
-      const eid = String(e.eventId ?? e.eventID ?? e.event_id ?? e.id ?? e.eid ?? '');
-      return eid === String(id);
-    }) || {};
-    const evSeg = normSeg(
-      payload.segment || payload.targetSegment || payload.attendSegment ||
-      metaEv.segment  || metaEv.targetSegment || metaEv.attendSegment || metaEv['区分'] || ''
-    );
-  
-    // 回答済みの名前集合
-    const answeredByName = new Set(rows.map(r => r.name).filter(Boolean));
-  
-    // ロスター候補（サーバーが返していれば）
-    const rosterSrc = payload.members || payload.roster || payload.candidates || [];
-    const naRows = [];
-    for (const m of rosterSrc) {
-      const mName = m.name ?? m.member ?? m.performerName ?? '';
-      if (!mName) continue;
-      const mSeg  = m.segment ?? m.seg ?? m.category ?? m.区分 ?? '';
-      if (!matchSeg(mSeg, evSeg)) continue;               // 対象区分マッチのみ
-      if (!answeredByName.has(mName)) {
-        naRows.push({ name: mName, attend: '未回答', at: '', seg: normSeg(mSeg) });
-      }
-    }
-  
-    // rows を未回答で拡張
-    const rowsAll = rows.concat(naRows);
-  
-    // フィルタ
-    const f = document.getElementById('repAttend')?.value || '';
-    const view = rowsAll.filter(r => !f || (f === '未回答' ? r.attend === '未回答' : r.attend === f));
-  
-    // 集計
-    const cnt = {
-      yes:   rowsAll.filter(r => r.attend === '参加').length,
-      no:    rowsAll.filter(r => r.attend === '欠席').length,
-      maybe: rowsAll.filter(r => r.attend === '未定').length,
-      na:    rowsAll.filter(r => r.attend === '未回答').length,
-      all:   rowsAll.length
-    };
-  
-    // ヘッダ情報
-    const title = payload.title || payload.eventTitle || payload.name || '';
-    const date  = payload.ymd   || payload.date || '';
-    const time  = payload.hm    || payload.time || '';
-    const place = payload.place || payload.venue || '';
-    const open  = (payload.isOpen ?? payload.open ?? (payload.accepting === 'open') ?? (payload.status === 'open')) ? true : false;
-  
-    const head = `
-      <div class="repHeader">
-        <div class="repLine repHeadRow">
+  }catch(e){
+    box.textContent = `取得に失敗しました: ${e.message||e}`;
+  }
+}
+
+/* 省ネット再描画：フィルタ変更でも呼べる */
+function renderReportFromData(eventId, detail, filter){
+  const box = document.getElementById('repBox'); if (!box) return;
+  const meta = getMetaById(eventId);
+  const evSeg = getEventSegFromMeta(meta);
+
+  const { yes, no, maybe, na } = splitGroups(detail, evSeg);
+
+  // フィルタ適用
+  const groups = [];
+  if (!filter || filter === '参加')   groups.push(['yes',   yes]);
+  if (!filter || filter === '欠席')   groups.push(['no',    no]);
+  if (!filter || filter === '未定')   groups.push(['maybe', maybe]);
+  if (!filter || filter === '未回答') groups.push(['na',    na]);
+
+  // ヘッダ（タイトルはメタが持っている情報から組み立て）
+  const date = meta.ymd || meta.date || '';
+  const hm   = meta.hm || meta.time || '';
+  const place= meta.place || meta.venue || '';
+  const head  = `
+    <div class="repCard">
+      <div class="repHeader repHeadRow">
+        <div class="repLine">
           <div class="repLeft">
-            <span class="repTitle">${title || '(無題)'}</span>
-            <span class="repSep">｜</span>
-            <span>${date}${time ? ` ${time}` : ''}</span>
-            ${place ? `<span class="repSep">｜</span><span class="repPlace">@${place}</span>` : ''}
+            <span class="repTitle">${date || ''}${hm ? ` ${hm}`: ''}</span>
+            ${place ? `<span class="repSep">/</span><span class="repPlace">@ ${place}</span>` : ''}
           </div>
           <div class="repRight">
-            <span class="badge-status ${open ? 'open' : 'closed'}">${open ? '受付中' : '締切'}</span>
-            <span class="badge-att yes">参加 ${cnt.yes}</span>
-            <span class="badge-att maybe">未定 ${cnt.maybe}</span>
-            <span class="badge-att no">欠席 ${cnt.no}</span>
-            <span class="badge-att na">未回答 ${cnt.na}</span>
-            <span class="pill sm">${cnt.all} 名</span>
+            ${evSeg ? `<span class="seg-badge ${evSeg==='adult'?'seg-adult':evSeg==='child'?'seg-child':'seg-both'}">${dispSeg(evSeg)}</span>` : ''}
           </div>
         </div>
-      </div>`;
-  
-    const body = (view.length ? view.map(p => `
-      <div class="repPersonRow">
-        <div class="repName">${p.name}</div>
-        <div class="repAt">
-          <span class="badge-att ${
-            p.attend === '参加' ? 'yes' :
-            p.attend === '欠席' ? 'no' :
-            p.attend === '未定' ? 'maybe' : 'na'
-          }">${p.attend}</span>
-        </div>
-      </div>`).join('')
-    : `<div class="repNA">該当者がいません</div>`);
-  
-    box.innerHTML = `<div class="repCard">${head}${body}</div>`;
-  }
+      </div>
+      ${groups.map(([k, list]) => renderGroupHTML(k, list)).join('')}
+      ${(!groups.length || groups.every(([,list]) => list.length===0))
+        ? `<div class="repNA">該当するデータがありません</div>` : ''}
+    </div>
+  `;
+  box.innerHTML = head;
+}
 
   /* ▼ 置き換え推奨：再取得ボタンの挙動（選択中だけ強制再読込＆キャッシュ破棄） */
   window.reportReload = function(){
