@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.8.4";
+  const FRONT_VERSION = "Front v3.8.5";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4Iug7woXgpsQmi3WY9ysGSH03xLJYTfJRwlWR09EJa31CpddndV54xffcsuHKqltRrg/exec";     // ←差し替え
 
@@ -2179,6 +2179,76 @@ function cacheSet(k, data){
     localStorage.setItem(_cacheKey(k), JSON.stringify({ ts: Date.now(), data }));
   }catch(_){}
 }
+
+// ===== 管理レポート：メタ取得だけローカルキャッシュ対応（renderReportは触らない） =====
+const REP_META_KEY = "report:meta:v1";
+
+// #repEvent の <option> を描画（既存renderReportはそのまま）
+function renderRepEventOptions(meta){
+  const sel = document.getElementById('repEvent');
+  if (!sel) return;
+  const cur = sel.value; // 現在選択を保持
+
+  const toLabel = (x)=>{
+    const seg   = dispSeg(normSeg(x.segment || x.segmentCode || x.targetSegment || x.attendSegment || ""));
+    const d     = x.ymd || x.date || "";
+    const hm    = x.hm || x.time || "";
+    const place = x.place || x.venue || "";
+    const title = x.title || x.name || "";
+    const dt    = d && hm ? `${d} ${hm}` : (d || hm);
+    const left  = [dt, place].filter(Boolean).join(" @ ");
+    return [seg, left, title].filter(Boolean).join(" / ");
+  };
+
+  const opts = ['<option value="">（選択してください）</option>']
+    .concat((meta||[]).map(m => {
+      const id = String(m.eventId ?? m.id ?? "");
+      return `<option value="${id}">${toLabel(m)}</option>`;
+    }))
+    .join("");
+
+  sel.innerHTML = opts;
+
+  // 以前の選択IDがまだ存在するなら維持
+  if (cur && (meta || []).some(m => String(m.eventId ?? m.id ?? "") === cur)) {
+    sel.value = cur;
+  }
+}
+
+// 起動時/メニュー遷移時など、「まずキャッシュだけ即時反映」
+function loadReportMetaFromCache(){
+  const meta = cacheGet(REP_META_KEY);
+  if (Array.isArray(meta) && meta.length){
+    state.reportMeta = meta;
+    renderRepEventOptions(meta);
+  }
+}
+
+// ネット再取得（成功したら上書き＆キャッシュ保存）
+async function fetchReportMetaFresh(){
+  try{
+    // サーバー側が lineId を要求する構成に備えて常に付与（不要なら無視されます）
+    const q = `?attendanceReport=1&meta=1&id=${esc(state.lineId)}`;
+    const j = await fetchJsonWithTimeout(q, 15000);
+    const meta = j?.meta || j?.list || j?.data || [];
+    if (j?.status === "ok" && Array.isArray(meta)){
+      state.reportMeta = meta;
+      renderRepEventOptions(meta);
+      cacheSet(REP_META_KEY, meta);
+    }
+  }catch(_){}
+}
+
+// 既存バインドをそのまま活かすため、reportReload を“上書き定義”
+// - 先にキャッシュを即時表示
+// - 続けてネットで最新化
+window.reportReload = async function(){
+  loadReportMetaFromCache();
+  await fetchReportMetaFresh();
+};
+
+// フォーカス時にもキャッシュだけ先に見せる（初回体感をさらに改善）
+document.getElementById('repEvent')?.addEventListener('focus', loadReportMetaFromCache, { once:true });
 
 /* --- タイムアウト付きフェッチ（失敗時は1回だけリトライ） --- */
 async function fetchJsonWithTimeout(path, ms=15000){
