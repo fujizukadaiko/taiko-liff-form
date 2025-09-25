@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.8.6";
+  const FRONT_VERSION = "Front v3.8.7";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4Iug7woXgpsQmi3WY9ysGSH03xLJYTfJRwlWR09EJa31CpddndV54xffcsuHKqltRrg/exec";     // ←差し替え
 
@@ -3778,20 +3778,21 @@ window.reportReload = function(){ initAdminReportPage(); };
   
     const head = `
       <div class="repHeader">
-        <div class="repLine repHeadRow">
+        <!-- 1行目：タイトルのみ -->
+        <div class="repLine">
           <div class="repLeft">
             <span class="repTitle">${title || '(無題)'}</span>
-            <span class="repSep">｜</span>
+          </div>
+        </div>
+    
+        <!-- 2行目：日時・@場所（左）／受付中バッジ（右） -->
+        <div class="repLine repHeadRow">
+          <div class="repLeft">
             <span>${date}${time ? ` ${time}` : ''}</span>
-            ${place ? `<span class="repSep">｜</span><span class="repPlace">@${place}</span>` : ''}
+            ${place ? `<span class="repPlace"> @${place}</span>` : ''}
           </div>
           <div class="repRight">
             <span class="badge-status ${open ? 'open' : 'closed'}">${open ? '受付中' : '締切'}</span>
-            <span class="badge-att yes">参加 ${cnt.yes}</span>
-            <span class="badge-att maybe">未定 ${cnt.maybe}</span>
-            <span class="badge-att no">欠席 ${cnt.no}</span>
-            <span class="badge-att na">未回答 ${cnt.na}</span>
-            <span class="pill sm">${cnt.all} 名</span>
           </div>
         </div>
       </div>`;
