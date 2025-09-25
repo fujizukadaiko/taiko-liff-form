@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.8.7";
+  const FRONT_VERSION = "Front v3.8.8";  // 今の所のstable ver→v.3.8.7
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4Iug7woXgpsQmi3WY9ysGSH03xLJYTfJRwlWR09EJa31CpddndV54xffcsuHKqltRrg/exec";     // ←差し替え
 
@@ -3660,7 +3660,12 @@ window.reportReload = function(){ initAdminReportPage(); };
     for (const c of cands) if (Array.isArray(c)) return c;
     return [];
   }
-
+  // HTMLエスケープ（XSS/崩れ防止）
+  function h(s){
+    return String(s ?? '').replace(/[&<>"']/g, m => (
+      { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]
+    ));
+  }
   // 行の正規化
   function mapRow(x){
     const name   = x.name ?? x.member ?? x.performerName ?? x.performer ?? '';
@@ -3670,7 +3675,9 @@ window.reportReload = function(){ initAdminReportPage(); };
       : (String(raw || '').trim() || '未回答');
     const at     = x.updatedAt ?? x.updated ?? x.time ?? x.ts ?? '';
     const seg    = x.segment ?? x.seg ?? x.category ?? '';
-    return { name, attend, at, seg };
+    // ▼ コメント候補（サーバ差異を広めに吸収）
+    const comment = x.comment ?? x.eventComment ?? x.memo ?? x.note ?? x.remarks ?? x.remark ?? x.Comment ?? x['コメント'] ?? '';
+    return { name, attend, at, seg, comment };
   }
   // --- ②ブロックの上あたりに追加 ---
   function repFormatAt(at){
@@ -3815,7 +3822,10 @@ window.reportReload = function(){ initAdminReportPage(); };
           </div>
           ${arr.map(p=>`
             <div class="repPersonRow">
-              <div class="repName">${p.name}</div>
+              <div class="repName">
+                ${h(p.name)}
+                ${p.comment ? `<span class="repCom small muted">${h(p.comment)}</span>` : ''}
+              </div>
               <div class="repAt">${repFormatAt(p.at)}</div>
             </div>
           `).join("")}
