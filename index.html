@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.8.5";
+  const FRONT_VERSION = "Front v3.8.6";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4Iug7woXgpsQmi3WY9ysGSH03xLJYTfJRwlWR09EJa31CpddndV54xffcsuHKqltRrg/exec";     // ←差し替え
 
@@ -2098,7 +2098,7 @@ function bindHandlers(){
   $("#btnAdminMenuReport").onclick = ()=>{
     if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
     show("#view-admin-report");
-    reportReload();
+    initAdminReportPage();
   };
 
   // 管理画面
@@ -3698,8 +3698,19 @@ window.reportReload = function(){ initAdminReportPage(); };
     const lid = encodeURIComponent(state.lineId || "");
     const sel = document.getElementById('repEvent');
     const box = document.getElementById('repBox');
-    const id  = sel?.value || '';
-    if (!id){ if (box) box.textContent = '公演を選択してください'; return; }
+    if (!sel) return;
+
+    // ▼ メタ未取得なら先に読み込む（セレクトの候補を埋める）
+    if (sel.options.length <= 1 && (!state.reportMeta || state.reportMeta.length === 0)) {
+      await loadReportMeta();
+    }
+  
+    // ▼ メタ読み込み後に value を取り直す（←重要）
+    let id = sel.value || '';
+    if (!id){
+      if (box) box.textContent = '公演を選択してください';
+      return;
+    }
   
     box.innerHTML = '結果を取得中… <span class="spinner"></span>';
   
