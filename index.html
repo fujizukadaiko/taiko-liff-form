@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.8.5";
+  const FRONT_VERSION = "Front v3.8.6";
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4Iug7woXgpsQmi3WY9ysGSH03xLJYTfJRwlWR09EJa31CpddndV54xffcsuHKqltRrg/exec";     // ←差し替え
 
@@ -3642,95 +3642,6 @@ window.reportReload = function(){ initAdminReportPage(); };
       return groups;
     }
     function labelFor(k){ return k==='yes'?'参加':k==='no'?'欠席':k==='maybe'?'未定':'未回答'; }
-    
-    async function renderReport(){
-  const id = document.getElementById('repEvent')?.value;
-  const repBox = document.getElementById('repBox');
-  if (!id){
-    repBox.textContent = '公演を選択してください';
-    return;
-  }
-
-  // キャッシュ→なければ管理者権限で取得（全員分）
-  let payload = state.reportDetailMap[id];
-  if (!payload){
-    repBox.textContent = '結果を取得中…';
-    const r = await api(`?attendanceReport=1&eventId=${esc(id)}&detail=1&lineId=${esc(state.lineId)}&admin=1`);
-    if (r?.status !== 'ok'){
-      repBox.textContent = r?.message || '取得に失敗しました';
-      return;
-    }
-    payload = r.detail || r;                  // 応答のゆらぎに対応
-    state.reportDetailMap[id] = payload;      // キャッシュ
-  }
-
-  // ★ ここでは “自分のメンバー” で絞り込みしない！
-  const rawList = (payload.list || payload.answers || payload.detail || []);
-  const rows = rawList.map(x => ({
-    name:   x.name || x.member || x.performerName || '',
-    attend: (x.answer || x.attend || '').trim() || '未回答',
-    at:     x.updatedAt || x.time || '',
-    seg:    x.segment || x.seg || ''
-  }));
-
-  // 画面の出欠フィルタ
-  const f = document.getElementById('repAttend')?.value || '';
-  const view = rows.filter(r => {
-    if (!f) return true;
-    if (f === '未回答') return r.attend === '未回答';
-    return r.attend === f;
-  });
-
-  // 集計
-  const cnt = {
-    yes:   rows.filter(r => r.attend === '参加').length,
-    no:    rows.filter(r => r.attend === '欠席').length,
-    maybe: rows.filter(r => r.attend === '未定').length,
-    na:    rows.filter(r => r.attend === '未回答').length,
-    all:   rows.length
-  };
-
-  const title = payload.title || payload.eventTitle || '';
-  const date  = payload.ymd   || payload.date || '';
-  const time  = payload.hm    || payload.time || '';
-  const place = payload.place || payload.venue || '';
-  const open  = (payload.isOpen ?? payload.open) ? true : false;
-
-  const head = `
-    <div class="repHeader">
-      <div class="repLine repHeadRow">
-        <div class="repLeft">
-          <span class="repTitle">${title || '(無題)'}</span>
-          <span class="repSep">｜</span>
-          <span>${date}${time ? ` ${time}` : ''}</span>
-          ${place ? `<span class="repSep">｜</span><span class="repPlace">@${place}</span>` : ''}
-        </div>
-        <div class="repRight">
-          <span class="badge-status ${open ? 'open' : 'closed'}">${open ? '受付中' : '締切'}</span>
-          <span class="badge-att yes">参加 ${cnt.yes}</span>
-          <span class="badge-att maybe">未定 ${cnt.maybe}</span>
-          <span class="badge-att no">欠席 ${cnt.no}</span>
-          <span class="badge-att na">未回答 ${cnt.na}</span>
-          <span class="pill sm">${cnt.all} 名</span>
-        </div>
-      </div>
-    </div>`;
-
-  const body = view.length ? view.map(p => `
-    <div class="repPersonRow">
-      <div class="repName">${p.name}</div>
-      <div class="repAt">
-        <span class="badge-att ${
-          p.attend === '参加' ? 'yes' :
-          p.attend === '欠席' ? 'no' :
-          p.attend === '未定' ? 'maybe' : 'na'
-        }">${p.attend}</span>
-      </div>
-    </div>
-  `).join('') : `<div class="repNA">該当者がいません</div>`;
-
-  repBox.innerHTML = `<div class="repCard">${head}${body}</div>`;
-}
 
 /* ===== 管理レポート：メタ取得 → 1件詳細 → 描画（堅牢版） ===== */
 (function(){
@@ -3761,7 +3672,17 @@ window.reportReload = function(){ initAdminReportPage(); };
     const seg    = x.segment ?? x.seg ?? x.category ?? '';
     return { name, attend, at, seg };
   }
-
+  // --- ②ブロックの上あたりに追加 ---
+  function repFormatAt(at){
+    if (!at) return "";
+    const d = new Date(at);
+    if (isNaN(d)) return `回答：${String(at)}`;
+    const z = n => String(n).padStart(2,"0");
+    return `回答：${d.getFullYear()}/${z(d.getMonth()+1)}/${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
+  }
+  function badgeCls(att){
+    return att==='参加' ? 'yes' : att==='欠席' ? 'no' : att==='未定' ? 'maybe' : 'na';
+  }
   // 出欠結果の描画（#repEvent の value を eventId とみなして取得）
   async function renderReport(){
     const lid = encodeURIComponent(state.lineId || "");
@@ -3874,23 +3795,35 @@ window.reportReload = function(){ initAdminReportPage(); };
           </div>
         </div>
       </div>`;
-  
-    const body = (view.length ? view.map(p => `
-      <div class="repPersonRow">
-        <div class="repName">${p.name}</div>
-        <div class="repAt">
-          <span class="badge-att ${
-            p.attend === '参加' ? 'yes' :
-            p.attend === '欠席' ? 'no' :
-            p.attend === '未定' ? 'maybe' : 'na'
-          }">${p.attend}</span>
+
+    // 出欠ごとにグルーピング（画面フィルタを反映した view を対象に）
+    const by = { '参加':[], '未定':[], '欠席':[], '未回答':[] };
+    view.forEach(r => (by[r.attend] ? by[r.attend] : by['未回答']).push(r));
+    
+    // 表示順。フィルタがかかっている時はそのグループだけ出す
+    const order = (f ? [f] : ['参加','未定','欠席','未回答']);
+    
+    const body = order.map(k=>{
+      const arr = by[k] || [];
+      if (!arr.length) return "";
+      return `
+        <div class="repGroup">
+          <div class="repGroupHead">
+            <span class="badge-att ${badgeCls(k)}">${k}</span>
+            <span class="repCount">${arr.length}名</span>
+          </div>
+          ${arr.map(p=>`
+            <div class="repPersonRow">
+              <div class="repName">${p.name}</div>
+              <div class="repAt">${repFormatAt(p.at)}</div>
+            </div>
+          `).join("")}
         </div>
-      </div>`).join('')
-    : `<div class="repNA">該当者がいません</div>`);
-  
-    box.innerHTML = `<div class="repCard">${head}${body}</div>`;
-  
-    if (rows.length === 0) console.warn('report payload (no rows):', payload);
+      `;
+    }).join("") || `<div class="repNA">該当者がいません</div>`;
+    // ▲ ここまで置換
+    
+    repBox.innerHTML = `<div class="repCard">${head}${body}</div>`;
   }
 
   // 公演メタ（セレクトの選択肢）を取得して #repEvent を埋める
