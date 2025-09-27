@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.0.3";  // 今の所のstable ver→v4.0.0
+  const FRONT_VERSION = "Front v4.0.4";  // 今の所のstable ver→v4.0.0
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyRf_cPG1woZFvduyrrXaurIjoAkeUKrcePGvxwzpHAjpGkSyvi-jRJbyJVpf7DQgJ6qw/exec";     // ←差し替え
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaBEhKm3k1mWmgNi4yN-hjaOTYNvAIJrGvQBmi4UDN75o3jBA5QWtogrKedEC8J74LHQ/exec";     // ←差し替え
 
   // （オプション）設定チェック：重複定義や未設定を早期に気づけます
   (function(){
@@ -1140,6 +1140,17 @@
        flex: 0 0 auto;              /* 場所は“右端寄せしない”固定幅 */
        white-space:nowrap;
        margin-left: 0;              /* 念のため明示 */
+    }
+    /* 最後に置く（!important で確実に） */
+    .fRow2{ display:flex; align-items:baseline; gap:6px; }
+    .fRow2 .t-title{
+      flex:1 1 auto; min-width:0;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .fRow2 .t-place{
+      flex:0 0 auto;
+      white-space:nowrap;
+      margin-left:0 !important;   /* ← 右寄せ解除 */
     }
   </style>
   
