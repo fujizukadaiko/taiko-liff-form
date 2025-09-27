@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.0.5";  // 今の所のstable ver→v4.0.0
+  const FRONT_VERSION = "Front v4.0.6";  // 今の所のstable ver→v4.0.5
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaBEhKm3k1mWmgNi4yN-hjaOTYNvAIJrGvQBmi4UDN75o3jBA5QWtogrKedEC8J74LHQ/exec";     // ←差し替え
 
@@ -1143,6 +1143,19 @@
       flex: 0 0 auto !important;
       white-space: nowrap;
       margin-left: .5em;            /* タイトルとの間に少し余白（お好みで） */
+    }
+    /* === 出欠フォーム見出し（2行目）：タイトルと @場所の調整 === */
+    .fRow2 .t-title{
+      /* タイトルを少し小さく＋太字 */
+      font-size: 15px !important;   /* お好みで 14〜16px に調整OK */
+      font-weight: 700 !important;  /* 太字 */
+    }
+    
+    .fRow2 .t-place{
+      /* @場所は少し小さく＋太字にしない（前の700指定を上書き） */
+      font-size: 14px !important;   /* お好みで 13〜15px に調整OK */
+      font-weight: 400 !important;  /* ← normal に戻す */
+      margin-left: .5em;            /* タイトルとの間を少し空ける（任意） */
     }
   </style>
   
