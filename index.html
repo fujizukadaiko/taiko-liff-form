@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.9.9";  // 今の所のstable ver→v.3.8.9
+  const FRONT_VERSION = "Front v4.0.0";  // 今の所のstable ver→v.3.9.9
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyRf_cPG1woZFvduyrrXaurIjoAkeUKrcePGvxwzpHAjpGkSyvi-jRJbyJVpf7DQgJ6qw/exec";     // ←差し替え
 
@@ -1091,7 +1091,22 @@
     
     /* 右が空なら非表示（見た目のズレ防止） */
     #view-admin-report .repPersonRow .repAt:empty { display:none; }
+    /* コメントの前に薄い「｜」を表示 */
+    #view-admin-report .repPersonRow .repAt{
+      display:flex;              /* 既に指定済みなら不要 */
+      align-items:baseline;
+    }
     
+    #view-admin-report .repComment{
+      position:relative;
+    }
+    
+    #view-admin-report .repComment::before{
+      content: "｜";             /* 全角バー */
+      color: var(--c-muted);     /* 薄い色で */
+      margin-right: .5em;        /* バーと文字の間隔 */
+      opacity: .7;               /* さらに薄くしたい時は 0.5〜0.7 で調整 */
+    }
   </style>
   
   <!-- LIFF SDK -->
