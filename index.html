@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.0.1";  // 今の所のstable ver→v4.0.0
+  const FRONT_VERSION = "Front v4.0.2";  // 今の所のstable ver→v4.0.0
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyRf_cPG1woZFvduyrrXaurIjoAkeUKrcePGvxwzpHAjpGkSyvi-jRJbyJVpf7DQgJ6qw/exec";     // ←差し替え
 
@@ -1124,6 +1124,21 @@
       margin-right: .5em;        /* バーと文字の間隔 */
       opacity: .7;               /* さらに薄くしたい時は 0.5〜0.7 で調整 */
     }
+    /* 1行目：左=日付時刻／右=区分バッジ */
+    .fRow1 { display:flex; align-items:baseline; gap:6px; }
+    .fRow1 .t-date { white-space:nowrap; }
+    /* ← コレが決め手：区分バッジを右端へ */
+    .fRow1 .seg-badge { margin-left:auto !important; }
+    /* 2行目：左=タイトル ／ 右=@場所 */
+    .fRow2 { display:flex; align-items:baseline; gap:6px; }
+    .fRow2 .t-title{
+      flex:1 1 auto; min-width:0;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .fRow2 .t-place{
+      margin-left:auto;            /* 右端寄せ */
+      white-space:nowrap; flex:0 0 auto;
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1812,25 +1827,47 @@ function draftGetComment(evId){
   const d = draft.byEvent[String(evId)];
   return d ? (d.comment || "") : "";
 }
+
+// 現在の state.events から「存在する eventId 集合」を作る
+function getOpenEventIdSet(){
+  return new Set((state.events||[]).map(e => String(e.eventId ?? e.id ?? "")));
+}
+
+// 画面に存在しない（=終了/削除された）イベントのドラフトを掃除する
+function pruneDraftAgainstCurrentEvents(){
+  const allow = getOpenEventIdSet();
+  const byEv = draft.byEvent || {};
+  let removed = 0;
+  for (const k of Object.keys(byEv)){
+    if (!allow.has(String(k))){
+      delete byEv[k];
+      removed++;
+    }
+  }
+  if (removed > 0){
+    draftSave();
+    updateSubmitButton();
+    console.info(`[draft] pruned ${removed} stale drafts`);
+  }
+  return removed;
+}
+  
 function draftBuildPayloads(){
-  // まとめて送信用に {eventId, performerName, attend, _eventComment(先頭のみ/触った時だけ)} を組み立て
+  // 送信直前に「今あるイベントID以外は送らない」二重安全策
+  const allowed = getOpenEventIdSet();
+
   const result = [];
   for (const [eventId, block] of Object.entries(draft.byEvent || {})){
-    const names = Object.keys(block.members || {});
-    const touched = !!block.commentTouched;      // ★ 触ったかどうか
-    if (names.length === 0 && !touched) continue; // 何も変更がないイベントは送らない
+    if (!allowed.has(String(eventId))) continue;     // ← 終了/削除されたIDは破棄
+
+    const names   = Object.keys(block.members || {});
+    const touched = !!block.commentTouched;
+    if (names.length === 0 && !touched) continue;    // 何も変更なしは送らない
 
     const com = block.comment || "";
-    names.forEach((name, idx)=>{
-      const payload = {
-        eventId,
-        performerName: name,
-        attend: block.members[name] || ""
-      };
-      // ★ コメントは「触った時だけ」先頭レコードに添付
-      if (touched && idx === 0) {
-        payload._eventComment = com;
-      }
+    names.forEach((name, idx) => {
+      const payload = { eventId, performerName: name, attend: block.members[name] || "" };
+      if (touched && idx === 0) payload._eventComment = com; // コメントは先頭1件だけ
       result.push(payload);
     });
   }
@@ -2411,6 +2448,8 @@ async function refreshData(){
   }catch(_){}
 
   state.events  = (eventsResp?.status==="ok" && Array.isArray(eventsResp.events)) ? eventsResp.events : (state.events||[]);
+  // ★ 取得済みのイベントでドラフトを剪定
+  pruneDraftAgainstCurrentEvents();
   state.members = (whoResp?.status==="ok" ? (whoResp.members||[]) : (state.members||[]));
   // ★ notify を同期（値が無い時は true を既定に）
   state.notify  = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
@@ -2590,8 +2629,8 @@ function renderAttendSelectHTML(evId, name, current){
             </div>
     
             <!-- 2行目：タイトル ＠場所 -->
-            <div class="fRow2" title="${(ev.title||ev.name||'')}${place?` @ ${place}`:''}">
-              ${ev.title || ev.name ? `<span class="t-title">${ev.title || ev.name}</span>` : `<span class="t-title"></span>`}
+            <div class="fRow2" title="${(ev.title||'')}${place?` @ ${place}`:''}">
+              <span class="t-title">${ev.title || ''}</span>
               ${place ? `<span class="t-place">@ ${place}</span>` : ``}
             </div>
           </div>
@@ -2613,6 +2652,9 @@ function renderAttendSelectHTML(evId, name, current){
 
   // ===== 既存の buildFormView を置換（renderAttendEvent を使用） =====
   window.buildFormView = function(){
+    // ← 追加：このタイミングで “今あるイベント以外のドラフト” を掃除
+    pruneDraftAgainstCurrentEvents();
+    
     const boxHeader = $("#formEventsBox");
     const box = $("#formFields");
     box.innerHTML = "";
@@ -2644,7 +2686,7 @@ function renderAttendSelectHTML(evId, name, current){
         place   : e.place || "",
         deadline: e.deadline || "",
         segment : e.segment || e.targetSegment || e.attendSegment || "",
-        title   : e.title || e.name || ""    // ← 追加
+        title   : e.title || e.eventTitle || e.name || e.eventName || ""
       }, {
         uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet
       });
@@ -2701,6 +2743,9 @@ async function onSubmit(){
   window.addEventListener("beforeunload", navGuard);
 
   try{
+    // ★ 念のためここでも古いドラフトは掃除
+    pruneDraftAgainstCurrentEvents();
+    
     const payloads = draftBuildPayloads();
     if (!payloads.length){ alert("送信する内容がありません（出欠の選択が未入力です）"); return; }
 
@@ -2719,7 +2764,11 @@ async function onSubmit(){
         touchedEventSet.add(p.eventId);
       }
     }
-
+    
+    // ★ 追加：集計用
+    let closedCleaned = [];   // 受付終了で掃除した eventId
+    let successCount  = 0;    // 正常送信できたイベント数
+    
     // イベント単位で送信（merge=1 を付ける）
     for (const [eventId, list] of Object.entries(grouped)) {
       const eCom    = String(eventCommentMap[eventId] || "");
@@ -2740,8 +2789,33 @@ async function onSubmit(){
       const r = await fetch(url);
       const j = await r.json();
       if (j.status !== "ok") {
+        // ★ ここで「受付終了」を検知して、そのイベントのドラフトだけ掃除して続行
+        const msg = String(j.message || j.error || "");
+        if (/受付.*終了|締切.*過ぎ|公開.*終了|closed/i.test(msg)) {
+          if (draft.byEvent && draft.byEvent[eventId]) {
+            delete draft.byEvent[eventId];
+            closedCleaned.push(String(eventId));
+          }
+          // 次のイベントへ（throwしない）
+          continue;
+        }
+        // それ以外の失敗は従来通りエラー扱い
         throw new Error(`送信失敗（${eventId}）: ${j.message || "unknown"}`);
       }
+      successCount++;
+    }
+    
+    if (closedCleaned.length){
+        draftSave();           // ← 削除の永続化
+        updateSubmitButton();  // ← 送信ボタンの活性/非活性を反映
+        logForm(`締切済みの未保存データ（${closedCleaned.length}件）を自動削除しました。`);
+      }
+    
+    // ★ 全件「受付終了」で送れなかった場合
+    if (successCount === 0){
+      alert("すべて受付終了のため送信できる内容がありませんでした。");
+      buildFormView(); // 表示を最新化
+      return;
     }
 
     alert("送信しました");
