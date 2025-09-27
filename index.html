@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.0.4";  // 今の所のstable ver→v4.0.0
+  const FRONT_VERSION = "Front v4.0.5";  // 今の所のstable ver→v4.0.0
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaBEhKm3k1mWmgNi4yN-hjaOTYNvAIJrGvQBmi4UDN75o3jBA5QWtogrKedEC8J74LHQ/exec";     // ←差し替え
 
@@ -1129,28 +1129,20 @@
     .fRow1 .t-date { white-space:nowrap; }
     /* ← コレが決め手：区分バッジを右端へ */
     .fRow1 .seg-badge { margin-left:auto !important; }
-    /* 2行目：左=タイトル ／ 右=@場所 */
-    .fRow2 { display:flex; align-items:baseline; gap:6px; }
-    .fRow2 .t-title{
-       flex: 1 1 auto;              /* タイトルを可変にして */
-       min-width:0;
-       overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-     }
-     .fRow2 .t-place{
-       flex: 0 0 auto;              /* 場所は“右端寄せしない”固定幅 */
-       white-space:nowrap;
-       margin-left: 0;              /* 念のため明示 */
-    }
     /* 最後に置く（!important で確実に） */
     .fRow2{ display:flex; align-items:baseline; gap:6px; }
+    /* 2行目：タイトルの伸長を止めて、@場所を右端へ押し出さない */
     .fRow2 .t-title{
-      flex:1 1 auto; min-width:0;
-      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+      flex: 0 1 auto !important;   /* ← ここがポイント（grow させない） */
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .fRow2 .t-place{
-      flex:0 0 auto;
-      white-space:nowrap;
-      margin-left:0 !important;   /* ← 右寄せ解除 */
+      flex: 0 0 auto !important;
+      white-space: nowrap;
+      margin-left: .5em;            /* タイトルとの間に少し余白（お好みで） */
     }
   </style>
   
