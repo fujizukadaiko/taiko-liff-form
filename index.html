@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.0.0";  // 今の所のstable ver→v.3.9.9
+  const FRONT_VERSION = "Front v4.0.1";  // 今の所のstable ver→v4.0.0
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyRf_cPG1woZFvduyrrXaurIjoAkeUKrcePGvxwzpHAjpGkSyvi-jRJbyJVpf7DQgJ6qw/exec";     // ←差し替え
 
@@ -232,6 +232,23 @@
       outline: none;
       box-shadow: 0 0 0 3px rgba(127,106,165,.18);
     }
+    /* === 出欠フォーム ヘッダー2行化 === */
+    .fRow1, .fRow2{ display:flex; align-items:baseline; gap:6px; }
+    
+    /* 1行目：左=日付時刻 / 右=区分バッジ */
+    .fRow1 .t-date{ white-space:nowrap; }
+    .fRow1 .seg-badge{ margin-left:auto; }    /* 右端寄せ */
+    
+    /* 2行目：左=タイトル（省略可） / 右= @場所（1行固定） */
+    .fRow2 .t-title{
+      min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .fRow2 .t-place{ white-space:nowrap; }
+    
+    /* 既存の太字指定を新レイアウトにも適用（サイズ変更なし） */
+    .fRow1 .t-date,
+    .fRow2 .t-place{ font-weight:700; }
+    
     /* ===== ガイドの赤強調 ===== */
     .em-red{
       color: var(--c-err);
@@ -2565,19 +2582,25 @@ function renderAttendSelectHTML(evId, name, current){
       <div class="fEvent" data-evt="${ev.eventId}" data-seg="${evSegNorm || 'both'}">
         <div class="fHead">
           <div class="fTitle">
-            <!-- ★ 区分バッジを独立行で先頭に -->
-            ${segBadgeLabel ? `<div style="margin-bottom:4px;"><span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span></div>` : ``}
-
-            <!-- 日付・時間・場所の行 -->
-            <div class="fTitleRow" title="${dateDisp} ${timeDisp} @ ${place}">
-              <span class="t-date">${dateDisp} <small>${timeDisp||""}</small> @</span>
-              <span class="t-place">${place||""}</span>
-              ${hasUnsaved ? `<span class="badge-unsaved">未保存</span>` : ``}
+            <!-- 1行目：日付 時間 ／ 右端=区分バッジ -->
+            <div class="fRow1" title="${dateDisp} ${timeDisp}">
+              <span class="t-date">${dateDisp}${timeDisp ? ` <small>${timeDisp}</small>` : ``}</span>
+              ${hasUnsaved ? `<span class="badge-unsaved" style="margin-left:8px;">未保存</span>` : ``}
+              ${segBadgeLabel ? `<span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span>` : ``}
+            </div>
+    
+            <!-- 2行目：タイトル ＠場所 -->
+            <div class="fRow2" title="${(ev.title||ev.name||'')}${place?` @ ${place}`:''}">
+              ${ev.title || ev.name ? `<span class="t-title">${ev.title || ev.name}</span>` : `<span class="t-title"></span>`}
+              ${place ? `<span class="t-place">@ ${place}</span>` : ``}
             </div>
           </div>
+    
+          <!-- ↓ここ以降は変更なし（回答チップ行・締切） -->
           <div class="fStatusRow">${pills}</div>
           <div class="fSub">${ev.deadline ? `締切：${ev.deadline}` : "締切：—"}</div>
         </div>
+    
         <div class="fBody">
           ${rows}
           <div class="line"></div>
@@ -2621,6 +2644,7 @@ function renderAttendSelectHTML(evId, name, current){
         place   : e.place || "",
         deadline: e.deadline || "",
         segment : e.segment || e.targetSegment || e.attendSegment || ""
+        title   : e.title || e.name || ""    // ← 追加
       }, {
         uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet
       });
