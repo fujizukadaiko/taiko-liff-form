@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.0.2";  // 今の所のstable ver→v4.0.0
+  const FRONT_VERSION = "Front v4.0.3";  // 今の所のstable ver→v4.0.0
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyRf_cPG1woZFvduyrrXaurIjoAkeUKrcePGvxwzpHAjpGkSyvi-jRJbyJVpf7DQgJ6qw/exec";     // ←差し替え
 
@@ -1132,12 +1132,14 @@
     /* 2行目：左=タイトル ／ 右=@場所 */
     .fRow2 { display:flex; align-items:baseline; gap:6px; }
     .fRow2 .t-title{
-      flex:1 1 auto; min-width:0;
-      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    }
-    .fRow2 .t-place{
-      margin-left:auto;            /* 右端寄せ */
-      white-space:nowrap; flex:0 0 auto;
+       flex: 1 1 auto;              /* タイトルを可変にして */
+       min-width:0;
+       overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+     }
+     .fRow2 .t-place{
+       flex: 0 0 auto;              /* 場所は“右端寄せしない”固定幅 */
+       white-space:nowrap;
+       margin-left: 0;              /* 念のため明示 */
     }
   </style>
   
@@ -2569,6 +2571,8 @@ function renderAttendSelectHTML(evId, name, current){
     const dateDisp = ymdDow(parseYmdStrict(ev.date));
     const timeDisp = hmFromTimeCell(ev.time);
     const place    = ev.place || "";
+    // ★ 追加：タイトルを安全に取得（API差異の吸収）
+    const titleStr = String(ev.title ?? ev.name ?? ev.eventName ?? ev.subject ?? "").trim();
     const evSegNorm = normSeg(ev.segment || ev.targetSegment || ev.attendSegment || "");
     const segBadgeLabel = dispSeg(evSegNorm);
     const segBadgeCls = evSegNorm==="adult" ? "seg-adult" : evSegNorm==="child" ? "seg-child" : "seg-both";
@@ -2629,8 +2633,8 @@ function renderAttendSelectHTML(evId, name, current){
             </div>
     
             <!-- 2行目：タイトル ＠場所 -->
-            <div class="fRow2" title="${(ev.title||'')}${place?` @ ${place}`:''}">
-              <span class="t-title">${ev.title || ''}</span>
+            <div class="fRow2" title="${titleStr}${place?` @ ${place}`:''}">
+            <span class="t-title">${titleStr || '（無題）'}</span>
               ${place ? `<span class="t-place">@ ${place}</span>` : ``}
             </div>
           </div>
