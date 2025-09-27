@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.9.7";  // 今の所のstable ver→v.3.8.9
+  const FRONT_VERSION = "Front v3.9.8";  // 今の所のstable ver→v.3.8.9
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyRf_cPG1woZFvduyrrXaurIjoAkeUKrcePGvxwzpHAjpGkSyvi-jRJbyJVpf7DQgJ6qw/exec";     // ←差し替え
 
@@ -1077,25 +1077,20 @@
       box-shadow: 0 1px 3px rgba(127,106,165,0.08);
     }
 
-    /* 管理レポート：名前とコメントの間隔を広げる（本命） */
+    /* 管理レポート：名前⇔コメントの間を固定ギャップで */
     #view-admin-report .repPersonRow{
-      justify-content: flex-start !important;  /* space-between を無効化 */
-      column-gap: 16px;                         /* ←お好みで 12–20px */
-      gap: 16px;
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-start; /* space-between をやめる */
+      gap: 16px;                   /* ← お好みで 12–20px */
     }
     
-    /* 左=名前 / 右=コメント のレイアウト安定化 */
-    #view-admin-report .repPersonRow .repName{ 
-      flex: 0 0 auto;            /* 名前は内容幅のまま */
-    }
-    #view-admin-report .repPersonRow .repAt{
-      flex: 1 1 auto;            /* コメント側は伸縮可 */
-      min-width: 0;
-      overflow-wrap: anywhere;   /* 長文でも折り返す */
-    }
+    /* 左（名前）は内容幅のまま / 右（コメント）は伸縮＆折り返し */
+    #view-admin-report .repPersonRow .repName { flex: 0 0 auto; }
+    #view-admin-report .repPersonRow .repAt   { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
     
-    /* 旧ブラウザ向けフォールバック（gapが効かない時） */
-    #view-admin-report .repPersonRow .repName{ margin-right: 16px; }
+    /* 右が空なら非表示（見た目のズレ防止） */
+    #view-admin-report .repPersonRow .repAt:empty { display:none; }
 
     #view-admin-report .repPersonRow{ outline: 1px solid red; }
     #view-admin-report .repPersonRow .repAt{ outline: 1px dashed blue; }
@@ -3844,15 +3839,16 @@ window.reportReload = function(){ initAdminReportPage(); };
             <span class="badge-att ${badgeCls(k)}">${k}</span>
             <span class="repCount">${arr.length}名</span>
           </div>
-          ${arr.map(p=>`
-            <div class="repPersonRow">
-              <div class="repName">
-                ${h(p.name)}
-                ${p.comment ? `<span class="repCom small muted">${h(p.comment)}</span>` : ''}
-              </div>
-              <div class="repAt">${repFormatAt(p.at)}</div>
-            </div>
-          `).join("")}
+         ${arr.map(p => `
+          <div class="repPersonRow">
+            <div class="repName">${h(p.name)}</div>
+            <div class="repAt">${
+              (p.comment && `<span class="repComment">${h(String(p.comment).trim())}</span>`)
+              || repFormatAt(p.at)
+              || ''
+            }</div>
+          </div>
+        `).join("")}
         </div>
       `;
     }).join("") || `<div class="repNA">該当者がいません</div>`;
