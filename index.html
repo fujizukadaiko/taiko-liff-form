@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v3.9.5";  // 今の所のstable ver→v.3.8.9
+  const FRONT_VERSION = "Front v3.9.6";  // 今の所のstable ver→v.3.8.9
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyRf_cPG1woZFvduyrrXaurIjoAkeUKrcePGvxwzpHAjpGkSyvi-jRJbyJVpf7DQgJ6qw/exec";     // ←差し替え
 
@@ -1076,24 +1076,26 @@
       border-radius: 9px !important;
       box-shadow: 0 1px 3px rgba(127,106,165,0.08);
     }
-    /* 管理レポート */
-     /* 名前とコメントの“間”を広げる本命 */
-    #view-admin-report .repPersonRow { justify-content: flex-start; }
-    #view-admin-report .repPersonRow .repLeft{
-      display:flex;
-      align-items: baseline;
-      gap: 16px;          /* ← ここを好みで 12–20px */
-      min-width: 0;
-    }
-    /* コメントが長いときの折り返し安定 */
-    #view-admin-report .repPersonRow .repComment{
-      flex: 1 1 auto;
-      min-width: 0;
-      overflow-wrap: anywhere;
-    }
 
-    #view-admin-report .repPersonRow .repName{ margin-right:16px; }
-    #view-admin-report .repPersonRow { justify-content:flex-start !important; }
+    /* 管理レポート：名前とコメントの間隔を広げる（本命） */
+    #view-admin-report .repPersonRow{
+      justify-content: flex-start !important;  /* space-between を無効化 */
+      column-gap: 16px;                         /* ←お好みで 12–20px */
+      gap: 16px;
+    }
+    
+    /* 左=名前 / 右=コメント のレイアウト安定化 */
+    #view-admin-report .repPersonRow .repName{ 
+      flex: 0 0 auto;            /* 名前は内容幅のまま */
+    }
+    #view-admin-report .repPersonRow .repAt{
+      flex: 1 1 auto;            /* コメント側は伸縮可 */
+      min-width: 0;
+      overflow-wrap: anywhere;   /* 長文でも折り返す */
+    }
+    
+    /* 旧ブラウザ向けフォールバック（gapが効かない時） */
+    #view-admin-report .repPersonRow .repName{ margin-right: 16px; }
   </style>
   
   <!-- LIFF SDK -->
