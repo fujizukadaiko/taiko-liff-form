@@ -1513,7 +1513,7 @@
     <!-- ===== カスタム通知（管理者） ===== -->
     <section id="view-custom-push" data-view>
       <div class="row-space">
-        <div class="sectionTitle">カスタム通知（任意メッセージ）</div>
+        <div class="sectionTitle">カスタム通知</div>
         <button class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
       </div>
     
@@ -4252,8 +4252,10 @@ window.reportReload = function(){ initAdminReportPage(); };
       const url = new URL(API_ENDPOINT);
       url.searchParams.set('attendanceReport','1');
       url.searchParams.set('meta','1');
-      const lid = myLineId();
-      if (lid) url.searchParams.set('lineId', lid);
+      const lid = await myLineIdAsync();
+      if (!lid) { selEvent.innerHTML = `<option value="">取得エラー：lineId未取得</option>`; setBusy(false); return; }
+      url.searchParams.set('lineId', lid);
+      url.searchParams.set('admin','1'); // 念のため
   
       let r;
       try { r = await fetch(url).then(r=>r.json()); }
@@ -4262,6 +4264,7 @@ window.reportReload = function(){ initAdminReportPage(); };
       const list = (r && (r.list || r.meta || r.data)) || [];
       if (r.status !== 'ok' || !Array.isArray(list)) {
         selEvent.innerHTML = `<option value="">取得エラー${r.message?`：${r.message}`:''}</option>`;
+        console.warn('meta error', r);
         setBusy(false);
         return;
       }
@@ -4299,7 +4302,8 @@ window.reportReload = function(){ initAdminReportPage(); };
       catch { r = {status:'error'}; }
   
       if (r.status !== 'ok') {
-        selExtra.innerHTML = `<option value="">取得エラー</option>`;
+        selExtra.innerHTML = `<option value="">取得エラー${r.message?`：${r.message}`:''}</option>`;
+        console.warn('report error', r);
         sec.__report = null;
         renderTargetsFromReport();
         setBusy(false);
@@ -4376,7 +4380,7 @@ window.reportReload = function(){ initAdminReportPage(); };
       url.searchParams.set('senderLineId', data.senderLineId);
       url.searchParams.set('senderName', data.senderName);
       url.searchParams.set('admin','1');
-      if (data.senderLineId) url.searchParams.set('lineId', data.senderLineId);
+      url.searchParams.set('lineId', data.senderLineId); // 常に付与
   
       return fetch(url).then(r=>r.json());
     }
@@ -4474,6 +4478,26 @@ window.reportReload = function(){ initAdminReportPage(); };
         await new Promise(r=>setTimeout(r,100));
       }
       return ''; // 取れない場合は空（呼び出し側でハンドリング）
+    }
+      // 置き換え：lineId を必ず拾う
+    async function myLineIdAsync(){
+      // 1) 既存のヘルパ
+      if (window.getMyLineId_) {
+        try { const v = await window.getMyLineId_(); if (v) return v; } catch(e){}
+      }
+      // 2) 画面状態
+      const v2 = window.__ME__?.lineId || window.state?.lineId || window.state?.me?.lineId || '';
+      if (v2) return v2;
+    
+      // 3) LIFF から
+      if (window.liff?.isLoggedIn && window.liff.isLoggedIn()) {
+        try { const p = await window.liff.getProfile(); if (p?.userId) return p.userId; } catch(e){}
+      }
+    
+      // 4) URL パラメータ ?lineId=xxx
+      const q = new URLSearchParams(location.search);
+      const v4 = q.get('lineId') || '';
+      return v4;
     }
 </script> 
   
