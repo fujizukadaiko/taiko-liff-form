@@ -4164,8 +4164,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     async function fillEventList(){
       selEvent.innerHTML = `<option value="">読み込み中…</option>`;
       const lid = window.getMyLineId_ ? await getMyLineId_() : (window.state?.lineId||'');
-      const url = `${API_ENDPOINT}?attendanceReport=1&meta=1&admin=1`
-                  `&lineId=${encodeURIComponent(lid)}&id=${encodeURIComponent(lid)}`;
+      const url = API_ENDPOINT + `?attendanceReport=1&meta=1&admin=1&id=${encodeURIComponent(lid)}`;
       const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
       if (r.status !== 'ok' || !Array.isArray(r.list)) {
         selEvent.innerHTML = `<option value="">取得エラー</option>`;
@@ -4186,7 +4185,7 @@ window.reportReload = function(){ initAdminReportPage(); };
       if (!evId) return;
   
       const lid = window.getMyLineId_ ? await getMyLineId_() : (window.state?.lineId||'');
-      const url = `${API_ENDPOINT}?attendanceReport=1&eventId=${encodeURIComponent(evId)}&admin=1&lineId=${encodeURIComponent(lid)}`;
+      const url = API_ENDPOINT + `?attendanceReport=1&eventId=${encodeURIComponent(evId)}&admin=1&lineId=${encodeURIComponent(lid)}`;
       const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
       if (r.status !== 'ok') { selExtra.innerHTML = `<option>取得エラー</option>`; return; }
   
