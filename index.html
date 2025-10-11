@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.1.0";  // stable ver→v4.0.8, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.1.1";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4NDQSQYVski8OcYajrOS2Ya1fJ0rz1LyYB1-q-3jRn8iN8iqS_I8Mr7nHmrurp3yb1w/exec";     // GAS v106.0 （PROD v1.0.1未反映）
 
@@ -4204,7 +4204,7 @@ window.reportReload = function(){ initAdminReportPage(); };
       const url = new URL(API_ENDPOINT);
       url.searchParams.set('attendanceReport', '1');
       url.searchParams.set('meta', '1');
-      if (lid) url.searchParams.set('id', lid);
+      if (lid) url.searchParams.set('lineId', lid);
     
       let r;
       try {
@@ -4246,7 +4246,7 @@ window.reportReload = function(){ initAdminReportPage(); };
       const url = new URL(API_ENDPOINT);
       url.searchParams.set('attendanceReport', '1');
       url.searchParams.set('eventId', evId);
-      if (lid) url.searchParams.set('id', lid);    // ← id= に統一
+      if (lid) url.searchParams.set('lineId', lid);
     
       let r;
       try {
