@@ -4200,43 +4200,70 @@ window.reportReload = function(){ initAdminReportPage(); };
     // イベント候補を取得
     async function fillEventList(){
     selEvent.innerHTML = `<option value="">読み込み中…</option>`;
-    const lid = window.state?.lineId || '';
-    const url = `${API_ENDPOINT}?attendanceReport=1&meta=1&admin=1&lineId=${encodeURIComponent(lid)}`;
-    const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-    const list = (r && (r.list || r.meta || r.data)) || [];
-    if (r.status !== 'ok' || !Array.isArray(list)) {
-      selEvent.innerHTML = `<option value="">取得エラー</option>`;
-      return;
+     const lid = window.state?.lineId || '';
+      const url = new URL(API_ENDPOINT);
+      url.searchParams.set('attendanceReport', '1');
+      url.searchParams.set('meta', '1');
+      if (lid) url.searchParams.set('id', lid);
+    
+      let r;
+      try {
+        r = await fetch(url).then(r=>r.json());
+      } catch {
+        r = { status:'error', message:'fetch失敗' };
+      }
+    
+      const list = (r && (r.list || r.meta || r.data)) || [];
+    
+      if (r.status !== 'ok') {
+        selEvent.innerHTML = `<option value="">取得エラー${r.message?`：${r.message}`:''}</option>`;
+        return;
+      }
+      if (!Array.isArray(list) || list.length===0){
+        selEvent.innerHTML = `<option value="">（対象イベントなし）</option>`;
+        return;
+      }
+    
+      const map = {};
+      const opts = list.map(e=>{
+        const id = String(e.eventId ?? e.id ?? '');
+        map[id]  = e;                       // テンプレ差し込み用に保持
+        const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
+        const tt = e.title || e.name || '';
+        return `<option value="${id}">${dt}  ${tt}</option>`;
+      }).join('');
+      sec.__eventMap = map;
+      selEvent.innerHTML = `<option value="">（選択してください）</option>` + opts;
     }
-
-    const map = {};
-    const opts = list.map(e=>{
-      const id = String(e.eventId ?? e.id ?? '');
-      map[id]  = e; // ← 後述テンプレ差し込みで使う
-      const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
-      const tt = e.title || e.name || '';
-      return `<option value="${id}">${dt}  ${tt}</option>`;
-    }).join('');
-    sec.__eventMap = map;
-    selEvent.innerHTML = `<option value="">（選択してください）</option>` + opts;
-  }
-  
+      
     // 追加対象（自動対象に含まれない人）の候補更新
     async function refreshExtra(){
       selExtra.innerHTML = '';
       const evId = selEvent.value;
       if (!evId) return;
-  
-      const lid = window.getMyLineId_ ? await getMyLineId_() : (window.state?.lineId||'');
-      const url = API_ENDPOINT + `?attendanceReport=1&eventId=${encodeURIComponent(evId)}&admin=1&lineId=${encodeURIComponent(lid)}`;
-      const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-      if (r.status !== 'ok') { selExtra.innerHTML = `<option>取得エラー</option>`; return; }
-  
+    
+      const lid = window.state?.lineId || '';
+      const url = new URL(API_ENDPOINT);
+      url.searchParams.set('attendanceReport', '1');
+      url.searchParams.set('eventId', evId);
+      if (lid) url.searchParams.set('id', lid);    // ← id= に統一
+    
+      let r;
+      try {
+        r = await fetch(url).then(r=>r.json());
+      } catch {
+        r = { status:'error' };
+      }
+      if (r.status !== 'ok') {
+        selExtra.innerHTML = `<option value="">取得エラー</option>`;
+        return;
+      }
+    
       const checked = new Set(getChecked()); // '参加','未定','未回答','欠席'
       const autoNames = new Set((r.rows||[]).filter(x=>checked.has(x.attend||'未回答')).map(x=>x.name));
       const nameToId  = new Map((r.rows||[]).map(x => [x.name, x.lineId||'']));
       const candidates = (r.roster||[]).filter(nm => !autoNames.has(nm));
-  
+    
       selExtra.innerHTML = candidates.map(nm=>{
         const id = nameToId.get(nm)||'';
         return `<option value="${id}" ${id?'':'disabled'}>${nm}${id?'':'（ID不明）'}</option>`;
