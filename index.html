@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.0.9";  // stable ver→v4.0.8, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.1.0";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4NDQSQYVski8OcYajrOS2Ya1fJ0rz1LyYB1-q-3jRn8iN8iqS_I8Mr7nHmrurp3yb1w/exec";     // GAS v106.0 （PROD v1.0.1未反映）
 
@@ -513,6 +513,14 @@
     .seg-both  {
       color:#6d5a93; background:#f1eaff; border-color:#bda8ea; /* 紫系 */
     }
+    #view-custom-push .card{
+      max-width: 720px;
+      margin: 12px auto;
+      padding: 16px;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.06);
+    }
+    #view-custom-push .sectionTitle{ margin-bottom: 8px; }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -4118,17 +4126,18 @@ window.reportReload = function(){ initAdminReportPage(); };
   (function CustomPushWire(){
     const $ = (s, p=document) => p.querySelector(s);
   
-    const sec      = $('#secCustomPush');             // セクション（同一ページの場合）
+    const sec      = document.getElementById('view-custom-push');
     const selEvent = $('#cp_event');
-    const boxStat  = $('#cp_statuses');
     const selExtra = $('#cp_extra');
     const taMsg    = $('#cp_msg');
-    const cnt      = $('#cp_counter');
-    const areaPrev = $('#cp_preview');
     const btnOpen  = $('#btnCustomPush');
-    const btnPrev  = $('#cp_btnPreview');
-    const btnSend  = $('#cp_btnSend');
-    const btnBack  = $('#cp_btnBack');
+    const taMsg    = document.getElementById('cp_body');
+    const cnt      = document.getElementById('cp_count');
+    const areaPrev = document.getElementById('cp_result');   // ← 結果表示枠
+    const btnPrev  = document.getElementById('cp_preview');  // ← プレビューボタン
+    const btnSend  = document.getElementById('cp_send');     // ← 送信ボタン
+    const btnBack  = document.querySelector('[data-view-target="view-home"]'); // 戻るボタン
+
   
     // 文字数カウンタ（LINEのテキスト上限は5000文字）
     taMsg?.addEventListener('input', ()=>{
@@ -4250,10 +4259,10 @@ window.reportReload = function(){ initAdminReportPage(); };
       // 2) rows…現在の出欠 rows（attend含む）
       // 3) チェックされたステータスに該当する人は“自動対象”側に回るので候補から外す
   
-      const checked = getCheckedStatuses_(); // ['Y','S',...]
+      const checked = getCheckedStatuses_(); // ['参加','未定',...]
       const autoNames = new Set(r.rows.filter(x=>checked.includes(x.attend||'NONE')).map(x=>x.name));
   
-      const candidates = r.roster.filter(nm => !autoNames.has(nm));
+      const candidates = (r.roster || []).filter(nm => !autoNames.has(nm));
   
       // ★重要：追加対象は氏名ではなく LINE ID を送る必要があります
       // そのため attendanceReport の rows に lineId を返すように GAS を1行だけ拡張してください。
@@ -4270,7 +4279,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     }
   
     function getCheckedStatuses_(){
-      return Array.from(boxStat.querySelectorAll('input[type=checkbox]:checked'))
+      return Array.from(document.querySelectorAll('#view-custom-push .cp_stat:checked'))
         .map(i=>i.value);
     }
   
@@ -4302,9 +4311,38 @@ window.reportReload = function(){ initAdminReportPage(); };
     // 既存の表示切替に合わせて適宜差し替え
     function showSection_(el){ el?.removeAttribute('hidden'); window.scrollTo(0,0); }
     function hideSection_(el){ el?.setAttribute('hidden',''); }
-  
+    
+    // --- CustomPushWire の一番最後に追加 ---
+    window.initCustomPushPage = async function(){
+      // イベント候補を読み込み
+      if (typeof fillEventList_ === 'function') await fillEventList_();
+    
+      // 初期値：対象ステータスは「参加のみON」
+      document.querySelectorAll('#view-custom-push .cp_stat')
+        .forEach(i => i.checked = (i.value === '参加'));
+    
+      // 文字数カウンタとプレビューをリセット
+      const ta = document.getElementById('cp_body');
+      const cnt = document.getElementById('cp_count');
+      const res = document.getElementById('cp_result');
+      if (ta)  ta.value = '';
+      if (cnt) cnt.textContent = '0 / 2000';
+      if (res) res.textContent = '';
+    };
   })();
-  
+      document.addEventListener('DOMContentLoaded', async () => {
+      // カスタム通知ページを直接開いたときも候補読込
+      const sec = document.getElementById('view-custom-push'); // ← ここを修正
+      if (!sec) return;
+    
+      try {
+        // SPAの遷移ボタンから来る場合は、表示時に別途 initCustomPushPage() を呼べばOK。
+        // 直接URLでこの画面が開かれていて非表示でなければ初期化しておく。
+        if (!sec.hasAttribute('hidden') && typeof window.initCustomPushPage === 'function') {
+          await window.initCustomPushPage();
+        }
+      } catch(e){ console.error(e); }
+    });
 </script> 
   
 <script>
