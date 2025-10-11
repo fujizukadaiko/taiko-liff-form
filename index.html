@@ -1555,18 +1555,27 @@
       });
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
-    document.addEventListener('DOMContentLoaded', () => {
-      document.querySelectorAll('[data-view-target]').forEach(el => {
-        el.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          const target = el.getAttribute('data-view-target');
-          if (target) showView(target);
+    (function bootWhenReady(){
+      function tryBoot(){
+        if (typeof window.init === 'function') {
+          window.init();
+          return true;
+        }
+        return false;
+      }
+      // 既にパース済みなら即、まだならDOMContentLoadedで
+      if (!tryBoot()){
+        document.addEventListener('DOMContentLoaded', () => {
+          if (tryBoot()) return;
+          // まれに後続スクリプトの評価が遅れる場合に備えて少しだけ待つ
+          let n = 0;
+          const iv = setInterval(() => {
+            if (tryBoot() || ++n > 60) clearInterval(iv); // 最大 ~3秒
+          }, 50);
         });
-      });
-      document.getElementById('btnReload')?.addEventListener('click', () => location.reload());
-      // ← 起動（これを追加）
-      init();
-    });
+      }
+    })();
+
   </script>
 
   <!-- ===== HomeEventsUI v7 ===== -->
