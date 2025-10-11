@@ -1554,6 +1554,10 @@
         v.classList.toggle('show', v.id === id);
       });
       window.scrollTo({ top: 0, behavior: 'auto' });
+      // ✅ カスタム通知ページが表示されたタイミングで初期化
+      if (id === 'view-custom-push') {
+         window.initCustomPushPage?.();
+      }
     }
     (function bootWhenReady(){
       function tryBoot(){
@@ -4160,7 +4164,8 @@ window.reportReload = function(){ initAdminReportPage(); };
     async function fillEventList(){
       selEvent.innerHTML = `<option value="">読み込み中…</option>`;
       const lid = window.getMyLineId_ ? await getMyLineId_() : (window.state?.lineId||'');
-      const url = `${API_ENDPOINT}?attendanceReport=1&meta=1&id=${encodeURIComponent(lid)}`;
+      const url = `${API_ENDPOINT}?attendanceReport=1&meta=1&admin=1`
+                  `&lineId=${encodeURIComponent(lid)}&id=${encodeURIComponent(lid)}`;
       const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
       if (r.status !== 'ok' || !Array.isArray(r.list)) {
         selEvent.innerHTML = `<option value="">取得エラー</option>`;
@@ -4274,19 +4279,6 @@ window.reportReload = function(){ initAdminReportPage(); };
       out.textContent=''; btnSend.disabled=true;
     };
   })();
-      document.addEventListener('DOMContentLoaded', async () => {
-      // カスタム通知ページを直接開いたときも候補読込
-      const sec = document.getElementById('view-custom-push'); // ← ここを修正
-      if (!sec) return;
-    
-      try {
-        // SPAの遷移ボタンから来る場合は、表示時に別途 initCustomPushPage() を呼べばOK。
-        // 直接URLでこの画面が開かれていて非表示でなければ初期化しておく。
-        if (!sec.hasAttribute('hidden') && typeof window.initCustomPushPage === 'function') {
-          await window.initCustomPushPage();
-        }
-      } catch(e){ console.error(e); }
-    });
 </script> 
   
 <script>
