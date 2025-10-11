@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.0.7";  // 今の所のstable ver→v4.0.5
+  const FRONT_VERSION = "Front v4.0.8";  // 今の所のstable ver→v4.0.7
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaBEhKm3k1mWmgNi4yN-hjaOTYNvAIJrGvQBmi4UDN75o3jBA5QWtogrKedEC8J74LHQ/exec";     // ←差し替え
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwsbaQEWrD8xlstY5h-I6okPXzaJe8CTUl6sA8TgEO-_LpuXajivn_zkb-PwoNjlymTLA/exec";     // ←差し替え
 
   // （オプション）設定チェック：重複定義や未設定を早期に気づけます
   (function(){
@@ -1402,7 +1402,7 @@
             <label>出欠対象（発表のみ）</label>
             <select id="ad_attendTarget" class="selectBtn">
               <option value="Y">Y</option>
-              <option value="N" selected>N</option>
+              <option value="N">N</option>
             </select>
           </div>
           <div><label>締切日</label><input id="ad_deadline" type="date"></div>
@@ -3217,6 +3217,12 @@ function adminTypeChangeAdapt(){
   hm?.addEventListener('input',   ()=> hm.dataset.autofilled   = "0", { once:true });
   place?.addEventListener('input',()=> place.dataset.autofilled= "0", { once:true });
 
+  // ★ 追加：出欠対象プルダウンをユーザーが触ったかを記録（1回だけ）
+  if (attend && !attend.__touchBound){
+    attend.addEventListener('change', () => { attend.dataset.touched = "1"; }, { once:true });
+    attend.__touchBound = true;
+  }
+  
   if (t === "練習"){
     // 無効化（色はCSSで統一）
     $("#ad_meetAt").value    = "";  meetAt.disabled    = true;
@@ -3241,6 +3247,12 @@ function adminTypeChangeAdapt(){
     attend.disabled    = false;
     deadline.disabled  = false;
     updateFlagOptions({ type:t, forceN:false, disable:false });
+
+    // ★ 追加：新規作成時のみ、かつ未タッチなら Y を既定セット
+    if (typeof adminMode !== "undefined" && adminMode === "create" &&
+        attend && attend.dataset.touched !== "1"){
+      attend.value = "Y";
+    }
 
     // ★ 練習以外に戻したとき：自動入力だった分だけクリア
     if (hm?.dataset.autofilled === "1"){ hm.value = ""; }
