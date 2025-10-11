@@ -1558,6 +1558,16 @@
       }
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
+    document.addEventListener('click', (ev) => {
+      const el = ev.target.closest('[data-view-target]');
+      if (!el) return;
+      ev.preventDefault();
+      const id = el.getAttribute('data-view-target');
+      if (!id) return;
+      showView(id);
+      // カスタム通知を開く時だけ初期化を走らせる
+      if (id === 'view-custom-push') window.initCustomPushPage?.();
+    });
     
     (function bootWhenReady(){
       function tryBoot(){
@@ -4142,9 +4152,9 @@ window.reportReload = function(){ initAdminReportPage(); };
 
   // ===== CustomPush: 結線（起動・プレビュー・送信） v2 =====
   (function(){
-    if (window.__CustomPushV__ >= 2) return;   // ← 重複実行ガード
-    window.__CustomPushV__ = 2;
-  
+    if (window.__CustomPushV__ >= 3) return;   // バージョン上げて重複防止
+    window.__CustomPushV__ = 3;
+
     const sec       = document.getElementById('view-custom-push');
     const selEvent  = document.getElementById('cp_event');
     const selExtra  = document.getElementById('cp_extra');
@@ -4153,7 +4163,10 @@ window.reportReload = function(){ initAdminReportPage(); };
     const btnPrev   = document.getElementById('cp_preview'); // ← これはボタン
     const btnSend   = document.getElementById('cp_send');
     const out       = document.getElementById('cp_result');
-  
+
+    // ここにイベントメタのキャッシュを保持（テンプレ差し込み用）
+    sec.__eventMap = {};
+    
     // チェック中のステータス
     const getChecked = () =>
       Array.from(sec.querySelectorAll('.cp_stat:checked')).map(i=>i.value);
@@ -4164,24 +4177,49 @@ window.reportReload = function(){ initAdminReportPage(); };
       lblCount.textContent = `${n} / 2000`;
       lblCount.style.color = n > 2000 ? 'red' : '';
     });
+    // ▼ テンプレート → 本文へ差し込み
+    const selTpl = document.getElementById('cp_tpl');
+    selTpl?.addEventListener('change', ()=>{
+      const t = selTpl.value || '';
+      // テンプレ解除（なし）→ 本文は触らない or クリアしたければ taBody.value='' に
+      if (!t) return;
   
+      const ev  = (sec.__eventMap || {})[selEvent.value] || {};
+      const rep = s => String(s ?? '');
+  
+      const txt = t
+        .replace(/\{DATE\}/g,     rep(ev.ymd || ev.date))
+        .replace(/\{TIME\}/g,     rep(ev.hm  || ev.time))
+        .replace(/\{TITLE\}/g,    rep(ev.title || ev.name))
+        .replace(/\{PLACE\}/g,    rep(ev.place || ev.venue))
+        .replace(/\{DEADLINE\}/g, rep(ev.deadline || ev.limit || ev.deadlineYmd));
+  
+      taBody.value = txt;
+      taBody.dispatchEvent(new Event('input')); // カウント更新
+    });
     // イベント候補を取得
     async function fillEventList(){
-      selEvent.innerHTML = `<option value="">読み込み中…</option>`;
-      const lid = window.getMyLineId_ ? await getMyLineId_() : (window.state?.lineId||'');
-      const url = API_ENDPOINT + `?attendanceReport=1&meta=1&admin=1&id=${encodeURIComponent(lid)}`;
-      const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-      if (r.status !== 'ok' || !Array.isArray(r.list)) {
-        selEvent.innerHTML = `<option value="">取得エラー</option>`;
-        return;
-      }
-      selEvent.innerHTML = `<option value="">選択してください</option>` +
-        r.list.map(e=>{
-          const id = String(e.eventId ?? e.id ?? '');
-          const dt = [e.ymd||e.date||'', e.time||''].filter(Boolean).join(' ');
-          return `<option value="${id}">${dt}  ${e.title||e.name||''}</option>`;
-        }).join('');
+    selEvent.innerHTML = `<option value="">読み込み中…</option>`;
+    const lid = window.state?.lineId || '';
+    const url = `${API_ENDPOINT}?attendanceReport=1&meta=1&admin=1&lineId=${encodeURIComponent(lid)}`;
+    const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
+    const list = (r && (r.list || r.meta || r.data)) || [];
+    if (r.status !== 'ok' || !Array.isArray(list)) {
+      selEvent.innerHTML = `<option value="">取得エラー</option>`;
+      return;
     }
+
+    const map = {};
+    const opts = list.map(e=>{
+      const id = String(e.eventId ?? e.id ?? '');
+      map[id]  = e; // ← 後述テンプレ差し込みで使う
+      const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
+      const tt = e.title || e.name || '';
+      return `<option value="${id}">${dt}  ${tt}</option>`;
+    }).join('');
+    sec.__eventMap = map;
+    selEvent.innerHTML = `<option value="">（選択してください）</option>` + opts;
+  }
   
     // 追加対象（自動対象に含まれない人）の候補更新
     async function refreshExtra(){
