@@ -1184,6 +1184,19 @@
       font-weight: 400 !important;  /* ← normal に戻す */
       margin-left: .5em;            /* タイトルとの間を少し空ける（任意） */
     }
+    /* CustomPush: ヘッダー行もカードと同じ幅・中央寄せに */
+    #view-custom-push > .row-space,
+    #view-custom-push > .card {
+      max-width: 720px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    /* ヘッダー行の上下余白を他ページと揃える（お好みで） */
+    #view-custom-push > .row-space{
+      margin-top: 6px;
+      margin-bottom: 8px;
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1553,22 +1566,24 @@
       document.querySelectorAll('[data-view]').forEach(v => {
         v.classList.toggle('show', v.id === id);
       });
-      if (id === 'view-custom-push' && typeof window.initCustomPushPage === 'function') {
-        window.initCustomPushPage();   // await不要
-      }
       window.scrollTo({ top: 0, behavior: 'auto' });
-    }
-    document.addEventListener('click', (ev) => {
-      const el = ev.target.closest('[data-view-target]');
-      if (!el) return;
-      ev.preventDefault();
-      const id = el.getAttribute('data-view-target');
-      if (!id) return;
-      showView(id);
-      // カスタム通知を開く時だけ初期化を走らせる
-      if (id === 'view-custom-push') window.initCustomPushPage?.();
-    });
     
+      if (id === 'view-custom-push'){
+        // 初回だけ読み込み（何度押しても害はない）
+        window.initCustomPushPage?.();
+      }
+    }
+    
+    // 念のため、ボタン直結でも呼ぶ（トップ>カスタム通知のボタン）
+    document.querySelectorAll('[data-view-target="view-custom-push"]')
+      .forEach(el => el.addEventListener('click', () => {
+        setTimeout(()=> window.initCustomPushPage?.(), 0);
+      }));
+
+    // 「トップに戻る」が効かない場合の保険（カスタム通知セクション内の該当ボタンにバインド）
+    document.querySelector('#view-custom-push [data-view-target="view-home"]')
+      ?.addEventListener('click', (e)=>{ e.preventDefault(); showView('view-home'); });
+        
     (function bootWhenReady(){
       function tryBoot(){
         if (typeof window.init === 'function') {
@@ -4199,35 +4214,29 @@ window.reportReload = function(){ initAdminReportPage(); };
     });
     // イベント候補を取得
     async function fillEventList(){
-    selEvent.innerHTML = `<option value="">読み込み中…</option>`;
-     const lid = window.state?.lineId || '';
+      selEvent.innerHTML = `<option value="">読み込み中…</option>`;
+      const lid = await getLineIdSafe_();
+      if (!lid){ selEvent.innerHTML = `<option value="">取得エラー：ログイン待機中</option>`; return; }
+    
       const url = new URL(API_ENDPOINT);
-      url.searchParams.set('attendanceReport', '1');
-      url.searchParams.set('meta', '1');
-      if (lid) url.searchParams.set('lineId', lid);
+      url.searchParams.set('attendanceReport','1');
+      url.searchParams.set('meta','1');
+      url.searchParams.set('lineId', lid);
     
       let r;
-      try {
-        r = await fetch(url).then(r=>r.json());
-      } catch {
-        r = { status:'error', message:'fetch失敗' };
-      }
+      try { r = await fetch(url).then(r=>r.json()); }
+      catch { r = {status:'error',message:'fetch失敗'}; }
     
       const list = (r && (r.list || r.meta || r.data)) || [];
-    
-      if (r.status !== 'ok') {
+      if (r.status !== 'ok' || !Array.isArray(list)){
         selEvent.innerHTML = `<option value="">取得エラー${r.message?`：${r.message}`:''}</option>`;
-        return;
-      }
-      if (!Array.isArray(list) || list.length===0){
-        selEvent.innerHTML = `<option value="">（対象イベントなし）</option>`;
         return;
       }
     
       const map = {};
       const opts = list.map(e=>{
         const id = String(e.eventId ?? e.id ?? '');
-        map[id]  = e;                       // テンプレ差し込み用に保持
+        map[id]  = e;
         const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
         const tt = e.title || e.name || '';
         return `<option value="${id}">${dt}  ${tt}</option>`;
@@ -4235,31 +4244,25 @@ window.reportReload = function(){ initAdminReportPage(); };
       sec.__eventMap = map;
       selEvent.innerHTML = `<option value="">（選択してください）</option>` + opts;
     }
-      
-    // 追加対象（自動対象に含まれない人）の候補更新
+    
     async function refreshExtra(){
       selExtra.innerHTML = '';
       const evId = selEvent.value;
       if (!evId) return;
     
-      const lid = window.state?.lineId || '';
+      const lid = await getLineIdSafe_();
+      if (!lid){ selExtra.innerHTML = `<option value="">取得エラー：ログイン待機中</option>`; return; }
+    
       const url = new URL(API_ENDPOINT);
       url.searchParams.set('attendanceReport', '1');
       url.searchParams.set('eventId', evId);
-      if (lid) url.searchParams.set('lineId', lid);
+      url.searchParams.set('lineId', lid);
     
       let r;
-      try {
-        r = await fetch(url).then(r=>r.json());
-      } catch {
-        r = { status:'error' };
-      }
-      if (r.status !== 'ok') {
-        selExtra.innerHTML = `<option value="">取得エラー</option>`;
-        return;
-      }
+      try { r = await fetch(url).then(r=>r.json()); } catch { r = {status:'error'}; }
+      if (r.status !== 'ok'){ selExtra.innerHTML = `<option value="">取得エラー</option>`; return; }
     
-      const checked = new Set(getChecked()); // '参加','未定','未回答','欠席'
+      const checked = new Set(getChecked());
       const autoNames = new Set((r.rows||[]).filter(x=>checked.has(x.attend||'未回答')).map(x=>x.name));
       const nameToId  = new Map((r.rows||[]).map(x => [x.name, x.lineId||'']));
       const candidates = (r.roster||[]).filter(nm => !autoNames.has(nm));
@@ -4348,6 +4351,28 @@ window.reportReload = function(){ initAdminReportPage(); };
       out.textContent=''; btnSend.disabled=true;
     };
   })();
+  
+    // ……CustomPush 即時関数の中に追加して使ってOK（外でも可）
+    async function getLineIdSafe_(){
+      // 既存ヘルパがあればそれを使用
+      if (typeof window.getMyLineId_ === 'function') return await window.getMyLineId_();
+  
+      // state / LIFF から待って取得（最大4秒）
+      const tryOnce = () => {
+        if (window.state?.lineId) return window.state.lineId;
+        try{
+          const idt = window.liff?.getDecodedIDToken?.();
+          if (idt?.sub){ window.state = window.state||{}; window.state.lineId = idt.sub; return idt.sub; }
+        }catch(_){}
+        return '';
+      };
+      for (let i=0;i<40;i++){           // 100ms x 40 = 4s
+        const id = tryOnce();
+        if (id) return id;
+        await new Promise(r=>setTimeout(r,100));
+      }
+      return ''; // 取れない場合は空（呼び出し側でハンドリング）
+    }
 </script> 
   
 <script>
