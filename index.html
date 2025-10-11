@@ -1558,6 +1558,7 @@
       }
       window.scrollTo({ top: 0, behavior: 'auto' });
     }
+    
     (function bootWhenReady(){
       function tryBoot(){
         if (typeof window.init === 'function') {
@@ -2285,7 +2286,12 @@ function bindHandlers(){
     show("#view-admin-report");
     reportReload();
   };
-
+  // 管理メニュー：カスタム通知
+  $("#btnAdminCustomPush").onclick = () => {
+    if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
+    show("#view-custom-push");                 // 画面表示
+    window.initCustomPushPage?.();             // 初期化（イベント候補読込・参加のみONなど）
+  };
   // 管理画面
   $("#btnAdminBack").onclick = ()=> show("#view-home");
   document.getElementById('btnAdminReload')
