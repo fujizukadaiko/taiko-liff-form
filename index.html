@@ -1553,11 +1553,10 @@
       document.querySelectorAll('[data-view]').forEach(v => {
         v.classList.toggle('show', v.id === id);
       });
-      window.scrollTo({ top: 0, behavior: 'auto' });
-      // ✅ カスタム通知ページが表示されたタイミングで初期化
-      if (id === 'view-custom-push') {
-         window.initCustomPushPage?.();
+      if (id === 'view-custom-push' && typeof window.initCustomPushPage === 'function') {
+        window.initCustomPushPage();   // await不要
       }
+      window.scrollTo({ top: 0, behavior: 'auto' });
     }
     (function bootWhenReady(){
       function tryBoot(){
