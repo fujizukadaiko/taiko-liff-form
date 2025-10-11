@@ -4131,56 +4131,97 @@ window.reportReload = function(){ initAdminReportPage(); };
   window.reportReload = function(){ initAdminReportPage(); };
 })();
 
-  // ===== CustomPush: 結線（起動・プレビュー・送信） =====
-  (function CustomPushWire(){
-    const $ = (s, p=document) => p.querySelector(s);
+  // ===== CustomPush: 結線（起動・プレビュー・送信） v2 =====
+  (function(){
+    if (window.__CustomPushV__ >= 2) return;   // ← 重複実行ガード
+    window.__CustomPushV__ = 2;
   
-    const sec      = document.getElementById('view-custom-push');
-    const selEvent = $('#cp_event');
-    const selExtra = $('#cp_extra');
-    const taMsg    = $('#cp_msg');
-    const btnOpen  = $('#btnCustomPush');
-    const taMsg    = document.getElementById('cp_body');
-    const cnt      = document.getElementById('cp_count');
-    const areaPrev = document.getElementById('cp_result');   // ← 結果表示枠
-    const btnPrev  = document.getElementById('cp_preview');  // ← プレビューボタン
-    const btnSend  = document.getElementById('cp_send');     // ← 送信ボタン
-    const btnBack  = document.querySelector('[data-view-target="view-home"]'); // 戻るボタン
-
+    const sec       = document.getElementById('view-custom-push');
+    const selEvent  = document.getElementById('cp_event');
+    const selExtra  = document.getElementById('cp_extra');
+    const taBody    = document.getElementById('cp_body');   // ← idに合わせて修正
+    const lblCount  = document.getElementById('cp_count');
+    const btnPrev   = document.getElementById('cp_preview'); // ← これはボタン
+    const btnSend   = document.getElementById('cp_send');
+    const out       = document.getElementById('cp_result');
   
-    // 文字数カウンタ（LINEのテキスト上限は5000文字）
-    taMsg?.addEventListener('input', ()=>{
-      const n = taMsg.value.length;
-      cnt.textContent = `${n} / 5000`;
-      cnt.style.color = (n > 5000 ? 'red' : '');
+    // チェック中のステータス
+    const getChecked = () =>
+      Array.from(sec.querySelectorAll('.cp_stat:checked')).map(i=>i.value);
+  
+    // 文字数カウンタ（2000）
+    taBody?.addEventListener('input', ()=>{
+      const n = taBody.value.length;
+      lblCount.textContent = `${n} / 2000`;
+      lblCount.style.color = n > 2000 ? 'red' : '';
     });
   
-    // 起動：イベント一覧を取得してセレクトを埋める
-    btnOpen?.addEventListener('click', async ()=>{
-      // 別ページ派：location.href = './custom-push.html';
-      // 同一ページ派：セクション表示
-      showSection_(sec); // ← あなたの既存show/hide関数に合わせて変えてOK
+    // イベント候補を取得
+    async function fillEventList(){
+      selEvent.innerHTML = `<option value="">読み込み中…</option>`;
+      const lid = window.getMyLineId_ ? await getMyLineId_() : (window.state?.lineId||'');
+      const url = `${API_ENDPOINT}?attendanceReport=1&meta=1&id=${encodeURIComponent(lid)}`;
+      const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
+      if (r.status !== 'ok' || !Array.isArray(r.list)) {
+        selEvent.innerHTML = `<option value="">取得エラー</option>`;
+        return;
+      }
+      selEvent.innerHTML = `<option value="">選択してください</option>` +
+        r.list.map(e=>{
+          const id = String(e.eventId ?? e.id ?? '');
+          const dt = [e.ymd||e.date||'', e.time||''].filter(Boolean).join(' ');
+          return `<option value="${id}">${dt}  ${e.title||e.name||''}</option>`;
+        }).join('');
+    }
   
-      await fillEventList_();
-      areaPrev.innerHTML = '';
-      btnSend.disabled = true;
-    });
+    // 追加対象（自動対象に含まれない人）の候補更新
+    async function refreshExtra(){
+      selExtra.innerHTML = '';
+      const evId = selEvent.value;
+      if (!evId) return;
   
-    // イベント変更→候補更新
-    selEvent?.addEventListener('change', async ()=>{
-      await refreshRosterAndExtra_();
-      areaPrev.innerHTML = '';
-      btnSend.disabled = true;
-    });
+      const lid = window.getMyLineId_ ? await getMyLineId_() : (window.state?.lineId||'');
+      const url = `${API_ENDPOINT}?attendanceReport=1&eventId=${encodeURIComponent(evId)}&admin=1&lineId=${encodeURIComponent(lid)}`;
+      const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
+      if (r.status !== 'ok') { selExtra.innerHTML = `<option>取得エラー</option>`; return; }
+  
+      const checked = new Set(getChecked()); // '参加','未定','未回答','欠席'
+      const autoNames = new Set((r.rows||[]).filter(x=>checked.has(x.attend||'未回答')).map(x=>x.name));
+      const nameToId  = new Map((r.rows||[]).map(x => [x.name, x.lineId||'']));
+      const candidates = (r.roster||[]).filter(nm => !autoNames.has(nm));
+  
+      selExtra.innerHTML = candidates.map(nm=>{
+        const id = nameToId.get(nm)||'';
+        return `<option value="${id}" ${id?'':'disabled'}>${nm}${id?'':'（ID不明）'}</option>`;
+      }).join('');
+    }
+  
+    function buildPayload(){
+      const eventId = selEvent.value;
+      if (!eventId){ alert('イベントを選択してください'); return null; }
+  
+      const statuses = getChecked();
+      if (!statuses.length){ alert('対象ステータスを選んでください'); return null; }
+  
+      const message = taBody.value.trim();
+      if (!message){ alert('本文を入力してください'); return null; }
+  
+      const extraLineIds = Array.from(selExtra.selectedOptions).map(o=>o.value).filter(Boolean);
+  
+      return {
+        eventId,
+        statuses,
+        extraLineIds,
+        message,
+        senderLineId: window.__ME__?.lineId || window.state?.lineId || '',
+        senderName  : window.__ME__?.displayName || window.state?.name || ''
+      };
+    }
   
     // プレビュー
     btnPrev?.addEventListener('click', async ()=>{
-      const data = buildPayload_();
-      if (!data) return;
-  
-      // GETだとURL長制限にかかる恐れがあるので、可能なら doPost 化推奨
-      // 既存doGetを使う場合↓
-      const url = new URL(API_ENDPOINT);
+      const data = buildPayload(); if (!data) return;
+      const url  = new URL(API_ENDPOINT);
       url.searchParams.set('customPushPreview','1');
       url.searchParams.set('eventId', data.eventId);
       url.searchParams.set('statuses', JSON.stringify(data.statuses));
@@ -4190,29 +4231,15 @@ window.reportReload = function(){ initAdminReportPage(); };
       url.searchParams.set('senderName', data.senderName);
   
       const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-      if (r.status !== 'ok') {
-        areaPrev.innerHTML = `<div class="err">プレビュー失敗：${r.message||'unknown'}</div>`;
-        btnSend.disabled = true;
-        return;
-      }
-      // r 例：{ status:'ok', autoN, extraN, total, sampleNames:[...], warn:'' }
-      areaPrev.innerHTML = `
-        <div>自動対象: ${r.autoN} / 追加: ${r.extraN} / 合計: <b>${r.total}</b></div>
-        ${r.warn ? `<div class="warn">${r.warn}</div>`:''}
-      `;
-      btnSend.disabled = (r.total<=0) || (taMsg.value.length===0) || (taMsg.value.length>5000);
+      if (r.status!=='ok'){ out.textContent = `プレビュー失敗：${r.message||'unknown'}`; return; }
+      out.innerHTML = `自動対象: ${r.autoN} / 追加: ${r.extraN} / 合計: <b>${r.total}</b>` + (r.warn?`<div class="warn">${r.warn}</div>`:'');
+      btnSend.disabled = (r.total<=0) || (taBody.value.length===0) || (taBody.value.length>2000);
     });
   
     // 送信
     btnSend?.addEventListener('click', async ()=>{
-      const data = buildPayload_();
-      if (!data) return;
-  
-      const totalStr = areaPrev.textContent?.match(/合計:\s*(\d+)/)?.[1] || '';
-      const ok = confirm(`この内容で送信します。受信予定 ${totalStr} 人。よろしいですか？`);
-      if (!ok) return;
-  
-      const url = new URL(API_ENDPOINT);
+      const data = buildPayload(); if (!data) return;
+      const url  = new URL(API_ENDPOINT);
       url.searchParams.set('customPushSend','1');
       url.searchParams.set('eventId', data.eventId);
       url.searchParams.set('statuses', JSON.stringify(data.statuses));
@@ -4222,121 +4249,29 @@ window.reportReload = function(){ initAdminReportPage(); };
       url.searchParams.set('senderName', data.senderName);
   
       const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-      if (r.status !== 'ok') {
-        alert(`送信失敗：${r.message||'unknown'}`);
-        return;
-      }
+      if (r.status!=='ok'){ alert(`送信失敗：${r.message||'unknown'}`); return; }
       alert(`送信完了：${r.total||0}件`);
-      // 必要ならフォームをリセット
-      // taMsg.value = ''; cnt.textContent = '0 / 5000'; btnSend.disabled = true;
     });
   
-    btnBack?.addEventListener('click', ()=>{
-      hideSection_(sec); // ← 既存の戻る処理に合わせる
+    // イベント選択・ステータス変更で候補更新
+    selEvent?.addEventListener('change', refreshExtra);
+    sec?.addEventListener('change', (e)=>{
+      if (e.target.classList?.contains('cp_stat')) refreshExtra();
     });
   
-    // --- helpers ---
+    // 表示時の初期化（参加のみON & 候補取得）
+    document.addEventListener('DOMContentLoaded', async ()=>{
+      if (!sec) return;
+      sec.querySelectorAll('.cp_stat').forEach(i => i.checked = (i.value==='参加'));
+      await fillEventList();
+      out.textContent=''; btnSend.disabled=true;
+    });
   
-    async function fillEventList_(){
-      selEvent.innerHTML = `<option value="">読み込み中…</option>`;
-      const lid = await getMyLineId_(); // 既存の自分のLINE ID取得関数を想定
-      const url = `${API_ENDPOINT}?attendanceReport=1&meta=1&lineId=${encodeURIComponent(lid)}`;
-      const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-      if (r.status!=='ok') {
-        selEvent.innerHTML = `<option value="">取得エラー</option>`;
-        return;
-      }
-      selEvent.innerHTML = `<option value="">選択してください</option>` +
-        r.list.map(it=>`<option value="${it.id}">${it.ymd} ${it.time||''} ${it.title}</option>`).join('');
-    }
-  
-    async function refreshRosterAndExtra_(){
-      selExtra.innerHTML = '';
-      const evId = selEvent.value;
-      if (!evId) return;
-  
-      const lid = await getMyLineId_();
-      const url = `${API_ENDPOINT}?attendanceReport=1&eventId=${encodeURIComponent(evId)}&lineId=${encodeURIComponent(lid)}`;
-      const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-      if (r.status!=='ok') {
-        selExtra.innerHTML = `<option value="">取得エラー</option>`;
-        return;
-      }
-  
-      // 候補の作り方：
-      // 1) roster…イベント対象区分に適合する「氏名」一覧
-      // 2) rows…現在の出欠 rows（attend含む）
-      // 3) チェックされたステータスに該当する人は“自動対象”側に回るので候補から外す
-  
-      const checked = getCheckedStatuses_(); // ['参加','未定',...]
-      const autoNames = new Set(r.rows.filter(x=>checked.includes(x.attend||'NONE')).map(x=>x.name));
-  
-      const candidates = (r.roster || []).filter(nm => !autoNames.has(nm));
-  
-      // ★重要：追加対象は氏名ではなく LINE ID を送る必要があります
-      // そのため attendanceReport の rows に lineId を返すように GAS を1行だけ拡張してください。
-      // 例） rowsAll.push({ lineId, name: nm, ... });
-      // ここでは name→lineId の逆引きを rows から作ります。
-      const nameToId = new Map();
-      (r.rows||[]).forEach(x=>{ if (x.name && x.lineId) nameToId.set(x.name, x.lineId); });
-  
-      selExtra.innerHTML = candidates.map(nm=>{
-        const lid = nameToId.get(nm)||''; // 未回答者などで rows に出ていない場合は空になる
-        // rows に無い氏名の lineId は、プレビューAPI側で解決できるようサーバ実装を足すのが安全
-        return `<option value="${lid}" ${lid?'':'disabled'}>${nm}${lid?'':'（ID不明）'}</option>`;
-      }).join('');
-    }
-  
-    function getCheckedStatuses_(){
-      return Array.from(document.querySelectorAll('#view-custom-push .cp_stat:checked'))
-        .map(i=>i.value);
-    }
-  
-    function buildPayload_(){
-      const eventId = selEvent.value;
-      if (!eventId) { alert('イベントを選択してください'); return null; }
-  
-      const statuses = getCheckedStatuses_();
-      if (statuses.length===0){ alert('対象ステータスを選択してください'); return null; }
-  
-      const message = taMsg.value || '';
-      if (!message.trim()){ alert('メッセージを入力してください'); return null; }
-      if (message.length>5000){ alert('メッセージが長すぎます（5000文字まで）'); return null; }
-  
-      const extraLineIds = Array.from(selExtra.selectedOptions)
-        .map(o=>o.value)
-        .filter(v=>v); // disabledや空IDを除外
-  
-      return {
-        eventId,
-        statuses,
-        extraLineIds,
-        message,
-        senderLineId: window.__ME__?.lineId || '',  // 既存の自分情報を利用
-        senderName  : window.__ME__?.displayName || ''
-      };
-    }
-  
-    // 既存の表示切替に合わせて適宜差し替え
-    function showSection_(el){ el?.removeAttribute('hidden'); window.scrollTo(0,0); }
-    function hideSection_(el){ el?.setAttribute('hidden',''); }
-    
-    // --- CustomPushWire の一番最後に追加 ---
-    window.initCustomPushPage = async function(){
-      // イベント候補を読み込み
-      if (typeof fillEventList_ === 'function') await fillEventList_();
-    
-      // 初期値：対象ステータスは「参加のみON」
-      document.querySelectorAll('#view-custom-push .cp_stat')
-        .forEach(i => i.checked = (i.value === '参加'));
-    
-      // 文字数カウンタとプレビューをリセット
-      const ta = document.getElementById('cp_body');
-      const cnt = document.getElementById('cp_count');
-      const res = document.getElementById('cp_result');
-      if (ta)  ta.value = '';
-      if (cnt) cnt.textContent = '0 / 2000';
-      if (res) res.textContent = '';
+    // ほかの場所から呼びたい場合用
+    window.initCustomPushPage = async ()=>{
+      sec?.querySelectorAll('.cp_stat').forEach(i => i.checked = (i.value==='参加'));
+      await fillEventList();
+      out.textContent=''; btnSend.disabled=true;
     };
   })();
       document.addEventListener('DOMContentLoaded', async () => {
