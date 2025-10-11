@@ -1184,24 +1184,16 @@
       font-weight: 400 !important;  /* ← normal に戻す */
       margin-left: .5em;            /* タイトルとの間を少し空ける（任意） */
     }
-    /* CustomPush: ヘッダー行もカードと同じ幅・中央寄せに */
-    /* カスタム通知ページ：他ページと同じ横幅/余白にそろえる */
-    #view-custom-push > .row-space{         /* タイトル行も中央寄せ */
-      max-width: 720px;
-      margin: 0 auto 8px auto;
-      padding: 0 2px;
-    }
-    #view-custom-push .card{                 /* カードも中央寄せ＆標準余白 */
-      max-width: 720px;
-      margin: 12px auto;
-      padding: 14px;
+    /* === CustomPush：左右余白＆センタリング強制 === */
+    #view-custom-push > .row-space,
+    #view-custom-push > .card {
+      max-width: 720px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
     }
     
-    /* 追加対象の文字が切れないように少し小さめに＆余白調整 */
-    #cp_extra{
-      font-size: 14px;         /* 既定より少し小さく */
-      line-height: 1.3;
-    }
+    /* 追加対象セレクト（ページ内表示の見切れ対策：iOSの全画面ピッカーはOS仕様で不可） */
+    #cp_extra { font-size: 14px; line-height: 1.25; }
   </style>
   
   <!-- LIFF SDK -->
@@ -4171,239 +4163,216 @@ window.reportReload = function(){ initAdminReportPage(); };
   window.reportReload = function(){ initAdminReportPage(); };
 })();
 
-   // ===== CustomPush: 結線（起動・プレビュー・送信） v3 =====
-    (function(){
-      if (window.__CustomPushV__ >= 4) return;
-      window.__CustomPushV__ = 4;
-    
-      const sec       = document.getElementById('view-custom-push');
-      const selEvent  = document.getElementById('cp_event');
-      const selExtra  = document.getElementById('cp_extra');
-      const selTpl    = document.getElementById('cp_tpl');
-      const taBody    = document.getElementById('cp_body');
-      const lblCount  = document.getElementById('cp_count');
-      const btnPrev   = document.getElementById('cp_preview');
-      const btnSend   = document.getElementById('cp_send');
-      const out       = document.getElementById('cp_result');
-      const autoBox   = document.getElementById('cp_autoBox'); // ★ 宛先プレビュー行
-    
-      // テンプレ差し込み用のイベントメタ
-      sec.__eventMap = {};
-    
-      const getChecked = () =>
-        Array.from(sec.querySelectorAll('.cp_stat:checked')).map(i=>i.value);
-    
-      // 文字数カウンタ
-      taBody?.addEventListener('input', ()=>{
-        const n = taBody.value.length;
-        lblCount.textContent = `${n} / 2000`;
-        lblCount.style.color = n > 2000 ? 'red' : '';
-      });
-    
-      // ▼ テンプレ→本文
-      selTpl?.addEventListener('change', ()=>{
-        const t = selTpl.value || '';
-        if (!t) return;
-        const ev  = (sec.__eventMap || {})[selEvent.value] || {};
-        const rep = s => String(s ?? '');
-        const txt = t
-          .replace(/\{DATE\}/g,     rep(ev.ymd || ev.date))
-          .replace(/\{TIME\}/g,     rep(ev.hm  || ev.time))
-          .replace(/\{TITLE\}/g,    rep(ev.title || ev.name))
-          .replace(/\{PLACE\}/g,    rep(ev.place || ev.venue))
-          .replace(/\{DEADLINE\}/g, rep(ev.deadline || ev.limit || ev.deadlineYmd));
-        taBody.value = txt;
-        taBody.dispatchEvent(new Event('input'));
-      });
-    
-      // イベント一覧取得（meta=1 は lineId 必須の実装想定）
-      async function fillEventList(){
-        selEvent.innerHTML = `<option value="">読み込み中…</option>`;
-        const lid = window.state?.lineId || '';
-        const url = new URL(API_ENDPOINT);
-        url.searchParams.set('attendanceReport', '1');
-        url.searchParams.set('meta', '1');
-        if (lid) url.searchParams.set('lineId', lid);
-    
-        let r;
-        try{ r = await fetch(url).then(r=>r.json()); }catch{ r = {status:'error'}; }
-    
-        const list = (r && (r.list || r.meta || r.data)) || [];
-        if (r.status !== 'ok'){
-          selEvent.innerHTML = `<option value="">取得エラー${r.message?`：${r.message}`:''}</option>`;
-          return;
-        }
-        if (!Array.isArray(list) || !list.length){
-          selEvent.innerHTML = `<option value="">（対象イベントなし）</option>`;
-          return;
-        }
-    
-        const map = {};
-        const opts = list.map(e=>{
-          const id = String(e.eventId ?? e.id ?? '');
-          map[id]  = e;
-          const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
-          const tt = e.title || e.name || '';
-          return `<option value="${id}">${dt}　${tt}</option>`;
-        }).join('');
-        sec.__eventMap = map;
-        selEvent.innerHTML = `<option value="">（選択してください）</option>` + opts;
+  // ❶ lineId が確定するまで待つ
+  async function waitLineId(timeoutMs = 4000){
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline){
+      let lid = (window.state && window.state.lineId) || "";
+      if (!lid && window.liff?.getDecodedIDToken) {
+        try { lid = liff.getDecodedIDToken()?.sub || ""; } catch(_) {}
       }
-    
-      // ★ 宛先候補の更新（自動対象の名前の表示＆追加対象の生成）
-      async function refreshExtra(){
-        selExtra.innerHTML = '';
-        autoBox.textContent = '（計算中…）';
-    
-        const evId = selEvent.value;
-        if (!evId){ autoBox.textContent=''; return; }
-    
-        const lid = window.state?.lineId || '';
-        const url = new URL(API_ENDPOINT);
-        url.searchParams.set('attendanceReport', '1');
-        url.searchParams.set('eventId', evId);
-        if (lid) url.searchParams.set('lineId', lid);
-    
-        let r;
-        try{ r = await fetch(url).then(r=>r.json()); }catch{ r = {status:'error'}; }
-        if (r.status !== 'ok'){
-          autoBox.textContent = '取得エラー';
-          return;
-        }
-    
-        // 自動対象の名前（チェックに該当する人）
-        const checked = new Set(getChecked()); // '参加','未定','未回答','欠席'
-        const rows = Array.isArray(r.rows) ? r.rows : [];
-        const autoNames = rows.filter(x=>checked.has(x.attend || '未回答'))
-                              .map(x=>x.name).filter(Boolean);
-        const sample = autoNames.slice(0, 12).join('、');
-        const more   = autoNames.length > 12 ? ` ほか${autoNames.length-12}名` : '';
-        autoBox.textContent = autoNames.length
-          ? `自動対象（宛先例）：${sample}${more}`
-          : '自動対象：なし';
-    
-        // 追加対象（自動対象に含まれない人）
-        const roster = Array.isArray(r.roster) ? r.roster : [];
-        const nameToId = new Map(rows.map(x => [x.name, x.lineId || '']));
-    
-        // ★ IDが無い人も選べるようにする（value で区別）
-        //   - id:xxxxxxxx     → 追加LineID
-        //   - name:山田太郎   → 追加「氏名」（サーバー側で解決してね！）
-        const opts = roster
-          .filter(nm => !autoNames.includes(nm))
-          .map(nm=>{
-            const lid = nameToId.get(nm) || '';
-            const v   = lid ? `id:${lid}` : `name:${nm}`;
-            const label = lid ? nm : `${nm}（ID不明）`;
-            return `<option value="${v}">${label}</option>`;
-          }).join('');
-        selExtra.innerHTML = opts || `<option value="">（追加対象なし）</option>`;
-      }
-    
-      function buildPayload(){
-        const eventId = selEvent.value;
-        if (!eventId){ alert('イベントを選択してください'); return null; }
-    
-        const statuses = getChecked();
-        if (!statuses.length){ alert('対象ステータスを選んでください'); return null; }
-    
-        const message = (taBody.value || '').trim();
-        if (!message){ alert('本文を入力してください'); return null; }
-        if (message.length > 2000){ alert('本文は2000文字までです'); return null; }
-    
-        // ★ 追加対象：id: / name: を分離
-        const selected = Array.from(selExtra.selectedOptions).map(o=>o.value);
-        const extraLineIds = selected.filter(v=>v.startsWith('id:')).map(v=>v.slice(3));
-        const extraNames   = selected.filter(v=>v.startsWith('name:')).map(v=>v.slice(5));
-    
-        return {
-          eventId, statuses, message, extraLineIds, extraNames,
-          senderLineId: window.__ME__?.lineId || window.state?.lineId || '',
-          senderName  : window.__ME__?.displayName || window.state?.name || ''
-        };
-      }
-    
-      // プレビュー
-      btnPrev?.addEventListener('click', async ()=>{
-        const data = buildPayload(); if (!data) return;
-    
-        const url  = new URL(API_ENDPOINT);
-        url.searchParams.set('customPushPreview','1');
-        url.searchParams.set('eventId', data.eventId);
-        url.searchParams.set('statuses', JSON.stringify(data.statuses));
-        url.searchParams.set('message', data.message);
-        url.searchParams.set('senderLineId', data.senderLineId);
-        url.searchParams.set('senderName', data.senderName);
-        url.searchParams.set('lineId', data.senderLineId); // ★ 一部GASは lineId を見る
-        url.searchParams.set('admin','1');                 // ★ 必要なら見る
-    
-        if (data.extraLineIds.length)
-          url.searchParams.set('extraLineIds', JSON.stringify(data.extraLineIds));
-        if (data.extraNames.length)
-          url.searchParams.set('extraNames', JSON.stringify(data.extraNames)); // ★ 追加
-    
-        const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-        if (r.status !== 'ok'){
-          out.textContent = `プレビュー失敗：${r.message || 'bad request'}`;
-          btnSend.disabled = true;
-          return;
-        }
-    
-        const sample = (r.sampleNames||[]).slice(0,12).join('、');
-        const more   = r.total > 12 ? ` ほか${r.total-12}名` : '';
-        out.innerHTML =
-          `自動対象: ${r.autoN} / 追加: ${r.extraN} / 合計: <b>${r.total}</b>` +
-          (sample ? `<div class="small muted">宛先例：${sample}${more}</div>` : '') +
-          (r.warn ? `<div class="warn">${r.warn}</div>` : '');
-        btnSend.disabled = (r.total<=0);
-      });
-    
-      // 送信
-      btnSend?.addEventListener('click', async ()=>{
-        const data = buildPayload(); if (!data) return;
-        const ok = confirm('この内容で送信します。よろしいですか？'); if (!ok) return;
-    
-        const url  = new URL(API_ENDPOINT);
-        url.searchParams.set('customPushSend','1');
-        url.searchParams.set('eventId', data.eventId);
-        url.searchParams.set('statuses', JSON.stringify(data.statuses));
-        url.searchParams.set('message', data.message);
-        url.searchParams.set('senderLineId', data.senderLineId);
-        url.searchParams.set('senderName', data.senderName);
-        url.searchParams.set('lineId', data.senderLineId);
-        url.searchParams.set('admin','1');
-        if (data.extraLineIds.length)
-          url.searchParams.set('extraLineIds', JSON.stringify(data.extraLineIds));
-        if (data.extraNames.length)
-          url.searchParams.set('extraNames', JSON.stringify(data.extraNames));
-    
-        const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
-        if (r.status!=='ok'){ alert(`送信失敗：${r.message||'unknown'}`); return; }
-        alert(`送信完了：${r.total||0}件`);
-      });
-    
-      // イベント変更・ステータス変更で候補更新＋宛先表示を即反映
-      selEvent?.addEventListener('change', refreshExtra);
-      sec?.addEventListener('change', (e)=>{
-        if (e.target.classList?.contains('cp_stat')) refreshExtra();
-      });
-    
-      // 初期化
-      document.addEventListener('DOMContentLoaded', async ()=>{
-        if (!sec) return;
-        sec.querySelectorAll('.cp_stat').forEach(i => i.checked = (i.value==='参加'));
-        await fillEventList();
-        out.textContent=''; btnSend.disabled=true;
-      });
-    
-      // 外部からも呼べる初期化
-      window.initCustomPushPage = async ()=>{
-        sec?.querySelectorAll('.cp_stat').forEach(i => i.checked = (i.value==='参加'));
-        await fillEventList();
-        out.textContent=''; btnSend.disabled=true;
-      };
-    })();
+      if (lid) return lid;
+      await new Promise(r => setTimeout(r, 120));
+    }
+    return "";
+  }
+
+  // ===== CustomPush: 結線（起動・プレビュー・送信） =====
+  (function(){
+    if (window.__CustomPushV__ >= 4) return;     // ← バージョン上げ
+    window.__CustomPushV__ = 4;
   
+    const sec      = document.getElementById('view-custom-push');
+    const selEvent = document.getElementById('cp_event');
+    const selExtra = document.getElementById('cp_extra');
+    const taBody   = document.getElementById('cp_body');
+    const lblCount = document.getElementById('cp_count');
+    const btnPrev  = document.getElementById('cp_preview');
+    const btnSend  = document.getElementById('cp_send');
+    const out      = document.getElementById('cp_result');
+  
+    sec.__eventMap = {};
+  
+    const getChecked = () => Array.from(sec.querySelectorAll('.cp_stat:checked')).map(i=>i.value);
+  
+    taBody?.addEventListener('input', ()=>{
+      const n = taBody.value.length;
+      lblCount.textContent = `${n} / 2000`;
+      lblCount.style.color = n > 2000 ? 'red' : '';
+    });
+  
+    // テンプレ差し込み
+    const selTpl = document.getElementById('cp_tpl');
+    selTpl?.addEventListener('change', ()=>{
+      const t = selTpl.value || ''; if (!t) return;
+      const ev  = (sec.__eventMap || {})[selEvent.value] || {};
+      const rep = s => String(s ?? '');
+      taBody.value = t
+        .replace(/\{DATE\}/g,     rep(ev.ymd || ev.date))
+        .replace(/\{TIME\}/g,     rep(ev.hm  || ev.time))
+        .replace(/\{TITLE\}/g,    rep(ev.title || ev.name))
+        .replace(/\{PLACE\}/g,    rep(ev.place || ev.venue))
+        .replace(/\{DEADLINE\}/g, rep(ev.deadline || ev.limit || ev.deadlineYmd));
+      taBody.dispatchEvent(new Event('input'));
+    });
+  
+    // ❷ イベント一覧（meta）
+    async function fillEventList(){
+      selEvent.innerHTML = `<option value="">読み込み中…</option>`;
+      const lid = await waitLineId();
+      if (!lid){ selEvent.innerHTML = `<option value="">取得エラー：lineId未取得</option>`; return; }
+  
+      const url = new URL(API_ENDPOINT);
+      url.searchParams.set('attendanceReport', '1');
+      url.searchParams.set('meta', '1');
+      url.searchParams.set('admin', '1');           // ← 必要なら
+      url.searchParams.set('lineId', lid);
+  
+      let r;
+      try { r = await fetch(url).then(r=>r.json()); } catch { r = {status:'error', message:'fetch失敗'}; }
+  
+      const list = (r && (r.list || r.meta || r.data)) || [];
+      if (r.status !== 'ok'){
+        selEvent.innerHTML = `<option value="">取得エラー${r.message?`：${r.message}`:''}</option>`;
+        return;
+      }
+      if (!Array.isArray(list) || list.length===0){
+        selEvent.innerHTML = `<option value="">（対象イベントなし）</option>`; return;
+      }
+  
+      const map = {};
+      const opts = list.map(e=>{
+        const id = String(e.eventId ?? e.id ?? '');
+        map[id]  = e;
+        const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
+        const tt = e.title || e.name || '';
+        return `<option value="${id}">${dt}  ${tt}</option>`;
+      }).join('');
+      sec.__eventMap = map;
+      selEvent.innerHTML = `<option value="">（選択してください）</option>` + opts;
+    }
+  
+    // ❸ ステータス変更時の「宛先名プレビュー」＋追加候補
+    async function refreshExtra(){
+      selExtra.innerHTML = '';
+      const evId = selEvent.value;
+      if (!evId) { out.textContent = ''; return; }
+  
+      const lid = await waitLineId();
+      if (!lid){ out.textContent = '宛先取得エラー（lineId未取得）'; return; }
+  
+      const url = new URL(API_ENDPOINT);
+      url.searchParams.set('attendanceReport', '1');
+      url.searchParams.set('eventId', evId);
+      url.searchParams.set('admin', '1');           // ← 必要なら
+      url.searchParams.set('lineId', lid);
+  
+      let r; try { r = await fetch(url).then(r=>r.json()); } catch { r = {status:'error'}; }
+      if (r.status !== 'ok'){ out.textContent = '取得エラー'; return; }
+  
+      const checked = new Set(getChecked()); // '参加','未定','未回答','欠席'
+      const rows = Array.isArray(r.rows) ? r.rows : [];
+  
+      // 宛先名プレビュー（自動対象）
+      const autoRows  = rows.filter(x => checked.has((x.attend||'').trim() || '未回答'));
+      const autoNames = autoRows.map(x => x.name).filter(Boolean);
+      out.innerHTML = autoNames.length
+        ? `宛先（選択ステータス）：<br>${autoNames.join('、')}`
+        : '宛先（選択ステータス）：—';
+  
+      // 追加候補（自動対象に含まれない入力者）
+      const autoSet  = new Set(autoNames);
+      const getId = (x)=> x.lineId || x.line_id || x.inputterLineId || x.ownerId || x.uid || '';
+      const nameToId = new Map(rows.map(x => [x.name, getId(x)]));
+      const roster   = Array.isArray(r.roster) ? r.roster : [];
+      const candidates = roster.filter(nm => !autoSet.has(nm));
+  
+      selExtra.innerHTML = candidates.map(nm=>{
+        const id = nameToId.get(nm)||'';
+        // id がない場合は選べない（送れない）ので disabled のまま
+        return `<option value="${id}" ${id?'':'disabled'}>${nm}${id?'':'（ID不明）'}</option>`;
+      }).join('');
+    }
+  
+    function buildPayload(){
+      const eventId = selEvent.value;
+      if (!eventId){ alert('イベントを選択してください'); return null; }
+      const statuses = getChecked();
+      if (!statuses.length){ alert('対象ステータスを選んでください'); return null; }
+      const message = taBody.value.trim();
+      if (!message){ alert('本文を入力してください'); return null; }
+      const extraLineIds = Array.from(selExtra.selectedOptions).map(o=>o.value).filter(Boolean);
+      return {
+        eventId, statuses, extraLineIds, message,
+        senderLineId: window.__ME__?.lineId || window.state?.lineId || '',
+        senderName  : window.__ME__?.displayName || window.state?.name || ''
+      };
+    }
+  
+    // ❹ プレビュー
+    btnPrev?.addEventListener('click', async ()=>{
+      const data = buildPayload(); if (!data) return;
+      const lid = await waitLineId(); if (!lid){ out.textContent='プレビュー失敗：lineId未取得'; return; }
+  
+      const url  = new URL(API_ENDPOINT);
+      url.searchParams.set('customPushPreview','1');
+      url.searchParams.set('admin','1');            // ← 必要なら
+      url.searchParams.set('lineId', lid);          // ← 追加
+      url.searchParams.set('eventId', data.eventId);
+      url.searchParams.set('statuses', JSON.stringify(data.statuses));
+      url.searchParams.set('extraLineIds', JSON.stringify(data.extraLineIds));
+      url.searchParams.set('message', data.message);
+      url.searchParams.set('senderLineId', data.senderLineId);
+      url.searchParams.set('senderName', data.senderName);
+  
+      const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
+      if (r.status!=='ok'){ out.textContent = `プレビュー失敗：${r.message||'bad request'}`; return; }
+      out.innerHTML = `自動対象: ${r.autoN} / 追加: ${r.extraN} / 合計: <b>${r.total}</b>` + (r.warn?`<div class="warn">${r.warn}</div>`:'');
+      btnSend.disabled = (r.total<=0) || (taBody.value.length===0) || (taBody.value.length>2000);
+    });
+  
+    // ❺ 送信
+    btnSend?.addEventListener('click', async ()=>{
+      const data = buildPayload(); if (!data) return;
+      const lid = await waitLineId(); if (!lid){ alert('送信失敗：lineId未取得'); return; }
+  
+      const url  = new URL(API_ENDPOINT);
+      url.searchParams.set('customPushSend','1');
+      url.searchParams.set('admin','1');            // ← 必要なら
+      url.searchParams.set('lineId', lid);          // ← 追加
+      url.searchParams.set('eventId', data.eventId);
+      url.searchParams.set('statuses', JSON.stringify(data.statuses));
+      url.searchParams.set('extraLineIds', JSON.stringify(data.extraLineIds));
+      url.searchParams.set('message', data.message);
+      url.searchParams.set('senderLineId', data.senderLineId);
+      url.searchParams.set('senderName', data.senderName);
+  
+      const r = await fetch(url).then(r=>r.json()).catch(()=>({status:'error'}));
+      if (r.status!=='ok'){ alert(`送信失敗：${r.message||'bad request'}`); return; }
+      alert(`送信完了：${r.total||0}件`);
+    });
+  
+    // 画面操作で再計算
+    selEvent?.addEventListener('change', refreshExtra);
+    sec?.addEventListener('change', (e)=>{
+      if (e.target.classList?.contains('cp_stat')) refreshExtra();
+    });
+  
+    // SPA 遷移での初期化（HOME→カスタム通知）
+    window.initCustomPushPage = async ()=>{
+      sec?.querySelectorAll('.cp_stat').forEach(i => i.checked = (i.value==='参加'));
+      await fillEventList();
+      out.textContent=''; btnSend.disabled=true;
+    };
+  
+    // 直接URLでこの画面に来た場合の初期化
+    document.addEventListener('DOMContentLoaded', async ()=>{
+      if (!sec) return;
+      sec.querySelectorAll('.cp_stat').forEach(i => i.checked = (i.value==='参加'));
+      await fillEventList();
+      out.textContent=''; btnSend.disabled=true;
+    });
+  })();
     // ……CustomPush 即時関数の中に追加して使ってOK（外でも可）
     async function getLineIdSafe_(){
       // 既存ヘルパがあればそれを使用
