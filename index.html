@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.1.3";  // stable ver→v4.0.8, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.1.4";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4NDQSQYVski8OcYajrOS2Ya1fJ0rz1LyYB1-q-3jRn8iN8iqS_I8Mr7nHmrurp3yb1w/exec";     // GAS v106.0 （PROD v1.0.1未反映）
 
@@ -1511,95 +1511,222 @@
   </main>
   
     <!-- ===== カスタム通知（管理者） ===== -->
-    <section id="view-custom-push" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">カスタム通知</div>
-        <button class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
+  <section id="view-custom-push" data-view class="cp-container">
+    <h2 class="cp-title">カスタム通知</h2>
+  
+    <!-- イベント -->
+    <div class="cp-field">
+      <label class="cp-label" for="cp_event">イベント</label>
+      <select id="cp_event" class="cp-select">
+        <option value="">イベントを選ぶ</option>
+      </select>
+    </div>
+  
+    <!-- 対象ステータス -->
+    <div class="cp-field">
+      <div class="cp-label">対象ステータス</div>
+      <div class="cp-checkrow">
+        <label class="cp-check"><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
+        <label class="cp-check"><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
+        <label class="cp-check"><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
+        <label class="cp-check"><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
       </div>
-    
-      <div class="card">
-        <label>イベント</label>
-        <select id="cp_event" class="selectBtn schedSel">
-          <option value="">（選択してください）</option>
-        </select>
-    
-        <label style="margin-top:8px;">対象ステータス</label>
-        <p id="cp_targets" class="small muted">（チェックに合致する宛先はここに表示）</p>
-        <div class="row" style="gap:10px;">
-          <label><input type="checkbox" class="cp_stat" value="参加" checked> 参加</label>
-          <label><input type="checkbox" class="cp_stat" value="未定" checked> 未定</label>
-          <label><input type="checkbox" class="cp_stat" value="未回答" checked> 未回答</label>
-          <label><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
+    </div>
+  
+    <!-- 宛先追加（手動） -->
+    <div class="cp-field">
+      <label class="cp-label">宛先追加（手動）</label>
+  
+      <!-- 見た目だけの複数選択ドロップダウン（チェック式） -->
+      <details class="cp-mselect" id="cp_extra_ui">
+        <summary>選択してください</summary>
+        <div class="cp-mselect-panel">
+          <!-- 中身は後で配線するのでダミーを入れておきます -->
+          <label class="cp-mopt"><input type="checkbox" disabled>（候補がここに並びます）</label>
+          <label class="cp-mopt"><input type="checkbox" disabled>（候補）</label>
+          <label class="cp-mopt"><input type="checkbox" disabled>（候補）</label>
         </div>
-        <p class="small muted" style="margin:6px 0 12px;">
-          宛先（選択ステータス）：<span id="cp_targets">（該当なし）</span>
-        </p>
-        <label style="margin-top:8px;">テンプレート</label>
-        <select id="cp_tpl" class="selectBtn">
-          <option value="">（なし）</option>
-          <option value="【お知らせ】{DATE} の「{TITLE}」は雨天のため中止となりました。">雨天中止の連絡</option>
-          <option value="【集合時間変更】{DATE}「{TITLE}」の集合時間は {TIME} に変更になりました。">集合時間の変更</option>
-        </select>
-    
-        <label style="margin-top:8px;">本文（2000文字まで・{DATE}{TIME}{TITLE}{PLACE}{DEADLINE} 差し込み可）</label>
-        <textarea id="cp_body" rows="6" maxlength="2000"></textarea>
-        <div class="small muted" id="cp_count">0 / 2000</div>
-    
-        <label style="margin-top:8px;">追加対象（自動対象に含まれない入力者）</label>
-        <select id="cp_extra" multiple size="8" style="width:100%; max-height:220px; overflow:auto;"></select>
-    
-        <div class="row" style="gap:8px; margin-top:10px;">
-          <button id="cp_preview" class="btn btn-ghost btn-sm">プレビュー更新</button>
-          <button id="cp_send" class="btn btn-primary">送信する</button>
-        </div>
-        <div id="cp_result" class="muted" style="margin-top:8px;"></div>
+      </details>
+  
+      <!-- 後でJSから使えるように、実体のselectも置いておきます（今は非表示） -->
+      <select id="cp_extra" multiple class="cp-select" style="display:none;"></select>
+    </div>
+  
+    <!-- 自動選択 / 手動追加 の表示（編集不可の薄紫枠） -->
+    <div class="cp-field-grid">
+      <div class="cp-pill" aria-disabled="true">
+        <div class="cp-pill-title">自動選択（対象ステータス）</div>
+        <div id="cp_targets_auto" class="cp-pill-body">（該当なし）</div>
       </div>
-    </section>
-  <!-- ===== 共通：SPA切替 ===== -->
-  <script>
-    function showView(id){
-      document.querySelectorAll('[data-view]').forEach(v => {
-        v.classList.toggle('show', v.id === id);
-      });
-      window.scrollTo({ top: 0, behavior: 'auto' });
-    
-      if (id === 'view-custom-push'){
-        // 初回だけ読み込み（何度押しても害はない）
-        window.initCustomPushPage?.();
-      }
+      <div class="cp-pill" aria-disabled="true">
+        <div class="cp-pill-title">手動追加（選択済み）</div>
+        <div id="cp_targets_manual" class="cp-pill-body">（未選択）</div>
+      </div>
+    </div>
+  
+    <!-- テンプレート -->
+    <div class="cp-field">
+      <label class="cp-label" for="cp_tpl">テンプレート</label>
+      <select id="cp_tpl" class="cp-select">
+        <option value="">なし</option>
+        <option value="rain">雨天中止時</option>
+        <option value="time">時間変更時</option>
+      </select>
+    </div>
+  
+    <!-- 本文 -->
+    <div class="cp-field">
+      <div class="cp-label">本文（2000文字まで）</div>
+      <textarea id="cp_body" rows="8" maxlength="2000" class="cp-textarea" placeholder=""></textarea>
+    </div>
+  
+    <!-- ボタン -->
+    <div class="cp-actions">
+      <button type="button" class="cp-btn cp-btn-outline" id="cp_reset">リセット</button>
+      <button type="button" class="cp-btn cp-btn-primary" id="cp_send">送信する</button>
+    </div>
+  </section>
+  
+  <style>
+    /* ========== Theme ==========\ */
+    :root{
+      --cp-accent: #6B4EFF;     /* メイン紫 */
+      --cp-accent-weak: #EFEAFF;/* 薄紫 */
+      --cp-text: #1B1B1F;
+      --cp-muted: #6B7280;
+      --cp-border: #E5E7EB;
+      --cp-white: #fff;
     }
-    
-    // 念のため、ボタン直結でも呼ぶ（トップ>カスタム通知のボタン）
-    document.querySelectorAll('[data-view-target="view-custom-push"]')
-      .forEach(el => el.addEventListener('click', () => {
-        setTimeout(()=> window.initCustomPushPage?.(), 0);
-      }));
-
-    // 「トップに戻る」が効かない場合の保険（カスタム通知セクション内の該当ボタンにバインド）
-    document.querySelector('#view-custom-push [data-view-target="view-home"]')
-      ?.addEventListener('click', (e)=>{ e.preventDefault(); showView('view-home'); });
-        
-    (function bootWhenReady(){
-      function tryBoot(){
-        if (typeof window.init === 'function') {
-          window.init();
-          return true;
-        }
-        return false;
-      }
-      // 既にパース済みなら即、まだならDOMContentLoadedで
-      if (!tryBoot()){
-        document.addEventListener('DOMContentLoaded', () => {
-          if (tryBoot()) return;
-          // まれに後続スクリプトの評価が遅れる場合に備えて少しだけ待つ
-          let n = 0;
-          const iv = setInterval(() => {
-            if (tryBoot() || ++n > 60) clearInterval(iv); // 最大 ~3秒
-          }, 50);
-        });
-      }
-    })();
-
+  
+    /* ========== Layout ==========\ */
+    .cp-container{
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 0 16px;          /* ページ左右の余白 */
+    }
+    .cp-title{
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin: 18px 0 16px;
+      color: var(--cp-text);
+    }
+    .cp-field{ margin: 14px 0; }
+    .cp-field-grid{
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 720px){
+      .cp-field-grid{ grid-template-columns: 1fr 1fr; }
+    }
+    .cp-label{
+      display:block;
+      font-size: .92rem;
+      color: var(--cp-text);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+  
+    /* ========== Inputs ==========\ */
+    .cp-select,
+    .cp-textarea{
+      width: 100%;
+      border: 2px solid var(--cp-accent);
+      border-radius: 10px;
+      background: var(--cp-white);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      color: var(--cp-text);
+      outline: none;
+    }
+    .cp-textarea{ resize: vertical; min-height: 140px; }
+  
+    .cp-checkrow{
+      display:flex; flex-wrap:wrap; gap: 12px;
+    }
+    .cp-check{
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:.95rem; color: var(--cp-text);
+    }
+  
+    /* ========== Multi-select (見た目だけ) ==========\ */
+    .cp-mselect{
+      border: 1px solid var(--cp-border);
+      border-radius: 10px;
+      background: var(--cp-white);
+      padding: 0;
+      width: 100%;
+    }
+    .cp-mselect > summary{
+      list-style: none;
+      cursor: default;          /* まだ操作しない前提なので pointer にはしない */
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 2px solid var(--cp-accent);
+      background: var(--cp-white);
+      color: var(--cp-text);
+    }
+    .cp-mselect[open] > summary{ border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+    .cp-mselect-panel{
+      border: 2px solid var(--cp-accent);
+      border-top: none;
+      border-bottom-left-radius: 10px;
+      border-bottom-right-radius: 10px;
+      padding: 8px 10px;
+      background: var(--cp-white);
+    }
+    .cp-mopt{
+      display:flex; align-items:center; gap:8px;
+      padding:6px 4px; font-size:.95rem; color:var(--cp-text);
+    }
+  
+    /* ========== Readonly target display ==========\ */
+    .cp-pill{
+      background: var(--cp-accent-weak);
+      border: 1px dashed var(--cp-accent);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .cp-pill[aria-disabled="true"]{
+      opacity: 0.9; 
+      cursor: not-allowed;
+    }
+    .cp-pill-title{
+      font-weight: 700;
+      font-size: .9rem;
+      color: var(--cp-text);
+      margin-bottom: 6px;
+    }
+    .cp-pill-body{
+      min-height: 38px;
+      line-height: 1.7;
+      color: var(--cp-muted);
+      word-break: break-all;
+    }
+  
+    /* ========== Buttons ==========\ */
+    .cp-actions{
+      display:flex; gap:10px; justify-content:flex-end; margin: 18px 0 28px;
+    }
+    .cp-btn{
+      appearance: none;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-weight: 700;
+      font-size: .95rem;
+      border: 2px solid transparent;
+      cursor: default;          /* まだ配線しないのでデフォルト */
+    }
+    .cp-btn-primary{
+      background: var(--cp-accent);
+      color: var(--cp-white);
+    }
+    .cp-btn-outline{
+      background: var(--cp-white);
+      color: var(--cp-accent);
+      border-color: var(--cp-accent);
+    }
+  </style>
   </script>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -4173,280 +4300,6 @@ window.reportReload = function(){ initAdminReportPage(); };
     }
     return "";
   }
-
-/* ===== CustomPush v4 (fixed) ===== */
-(function(){
-  if (window.__CustomPushV__ >= 5) return;
-  window.__CustomPushV__ = 5;
-
-  const sec = document.getElementById('view-custom-push');
-  if (!sec) return;
-
-  const selEvent = document.getElementById('cp_event');
-  const selExtra = document.getElementById('cp_extra');
-  const selTpl   = document.getElementById('cp_tpl');
-  const taBody   = document.getElementById('cp_body');
-  const lblCount = document.getElementById('cp_count');
-  const btnPrev  = document.getElementById('cp_preview');
-  const btnSend  = document.getElementById('cp_send');
-  const out      = document.getElementById('cp_result');
-  const spanTargets = document.getElementById('cp_targets');
-
-  // 画面内キャッシュ
-  sec.__eventMap = {};
-  sec.__report   = {rows:[], roster:[]};
-
-  // ---- helpers（IIFEの中だけに1回）----
-  const getChecked = () =>
-    Array.from(sec.querySelectorAll('.cp_stat:checked')).map(i=>i.value);
-
-  async function myLineIdAsync(){
-    if (typeof window.getMyLineId_ === 'function') {
-      try { const id = await window.getMyLineId_(); if (id) return id; } catch(_){}
-    }
-    for (let i=0;i<40;i++){
-      const id = window.__ME__?.lineId
-              || window.state?.lineId
-              || (window.liff?.getDecodedIDToken?.()?.sub || '');
-      if (id){ (window.state ||= {}).lineId = id; return id; }
-      await new Promise(r=>setTimeout(r,100));
-    }
-    return '';
-  }
-
-  let busy = false;
-  function setBusy(v){
-    busy = v;
-    [selEvent, selTpl, taBody, selExtra, btnPrev, btnSend, ...sec.querySelectorAll('.cp_stat')]
-      .forEach(el => { if (el) el.disabled = v; });
-    sec.classList.toggle('is-busy', v);
-  }
-
-  // 文字数カウント
-  taBody?.addEventListener('input', ()=>{
-    const n = taBody.value.length;
-    lblCount.textContent = `${n} / 2000`;
-    lblCount.style.color = n > 2000 ? 'red' : '';
-  });
-
-  // テンプレ差し込み
-  selTpl?.addEventListener('change', ()=>{
-    const t = selTpl.value || '';
-    if (!t) return;
-    const ev = (sec.__eventMap || {})[selEvent.value] || {};
-    const rep = s => String(s ?? '');
-    taBody.value = t
-      .replace(/\{DATE\}/g,     rep(ev.ymd || ev.date))
-      .replace(/\{TIME\}/g,     rep(ev.hm  || ev.time))
-      .replace(/\{TITLE\}/g,    rep(ev.title || ev.name))
-      .replace(/\{PLACE\}/g,    rep(ev.place || ev.venue))
-      .replace(/\{DEADLINE\}/g, rep(ev.deadline || ev.limit || ev.deadlineYmd));
-    taBody.dispatchEvent(new Event('input'));
-  });
-
-  // 宛先（選択ステータス）表示
-  function renderTargetsFromReport(){
-    if (!spanTargets) return;
-    const checked = new Set(getChecked());
-    const names = (sec.__report.rows || [])
-      .filter(x => checked.has(x.attend || '未回答'))
-      .filter(x => x.lineId) // 送信できる人だけ
-      .map(x => x.name)
-      .filter(Boolean);
-    spanTargets.textContent = names.length ? names.join('、') : '（該当なし）';
-  }
-
-  // イベント一覧を取得
-  async function fillEventList(){
-    selEvent.disabled = true;
-    selEvent.innerHTML = `<option value="">読み込み中…</option>`;
-    const lid = await myLineIdAsync();
-    if (!lid){ selEvent.innerHTML=`<option value="">取得エラー：lineId</option>`; return; }
-
-    const url = new URL(API_ENDPOINT);
-    url.searchParams.set('attendanceReport','1');
-    url.searchParams.set('meta','1');
-    url.searchParams.set('admin','1');
-    url.searchParams.set('lineId', lid);
-
-    let r;
-    try { r = await fetch(url).then(r=>r.json()); } catch { r = {status:'error'}; }
-    const list = (r && (r.list || r.meta || r.data)) || [];
-    if (r.status!=='ok' || !Array.isArray(list) || !list.length){
-      selEvent.innerHTML = `<option value="">（対象イベントなし）</option>`;
-      selEvent.disabled = false;
-      // イベント無しでも、名簿(roster)が取れれば追加対象のみで運用可
-      sec.querySelectorAll('.cp_stat').forEach(i => i.disabled = true);
-      await loadReportAndRefresh();
-      return;
-    }
-
-    const map = {};
-    selEvent.innerHTML = `<option value="">（選択してください）</option>` +
-      list.map(e=>{
-        const id = String(e.eventId ?? e.id ?? '');
-        map[id] = e;
-        const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
-        const tt = e.title || e.name || '';
-        return `<option value="${id}">${dt}  ${tt}</option>`;
-      }).join('');
-    sec.__eventMap = map;
-    selEvent.disabled = false;
-  }
-
-  // 出欠レポート取得＋宛先／追加対象を更新
-  async function loadReportAndRefresh(){
-    if (spanTargets) spanTargets.textContent = '（読込中…）';
-    selExtra.innerHTML = '';
-    selExtra.disabled = true;
-
-    const lid = await myLineIdAsync();
-    if (!lid){ if (spanTargets) spanTargets.textContent='（lineId未取得）'; return; }
-
-    const evId = selEvent.value;
-    const url = new URL(API_ENDPOINT);
-    url.searchParams.set('attendanceReport','1');
-    url.searchParams.set('admin','1');
-    url.searchParams.set('lineId', lid);
-    if (evId) url.searchParams.set('eventId', evId);
-    else      url.searchParams.set('meta','1');  // イベント未選択時は必須
-
-    let r;
-    try { r = await fetch(url).then(r=>r.json()); } catch { r = {status:'error'}; }
-    if (r.status!=='ok'){
-      if (spanTargets) spanTargets.textContent = '（取得エラー）';
-      selExtra.innerHTML = `<option value="" disabled>取得エラー${r.message?`：${r.message}`:''}</option>`;
-      return;
-    }
-
-    sec.__report = {
-      rows: Array.isArray(r.rows)? r.rows : [],
-      roster: Array.isArray(r.roster)? r.roster : []
-    };
-
-    // 宛先（自動対象）
-    renderTargetsFromReport();
-
-    // 追加対象（自動対象に含まれず、lineIdのある人のみ）
-    const checked = new Set(getChecked());
-    const autoNames = new Set(sec.__report.rows
-      .filter(x => checked.has(x.attend || '未回答'))
-      .map(x => x.name)
-    );
-    const nameToId = new Map(sec.__report.rows.map(x => [x.name, x.lineId || '']));
-    const candidates = (sec.__report.roster || []).filter(nm => !autoNames.has(nm) && nameToId.get(nm));
-
-    selExtra.innerHTML = candidates.map(nm=>{
-      const id = nameToId.get(nm);
-      return `<option value="${id}">${nm}</option>`;
-    }).join('') || `<option value="" disabled>オプションなし</option>`;
-
-    selExtra.disabled = false;
-  }
-
-  // 送信ペイロード
-  function buildPayload(){
-    const eventId = selEvent.value;
-    const statuses = getChecked();
-    const message = taBody.value.trim();
-    const extraLineIds = Array.from(selExtra.selectedOptions).map(o=>o.value).filter(Boolean);
-
-    if (!message){ alert('本文を入力してください'); return null; }
-    if (eventId){
-      if (!statuses.length && extraLineIds.length===0){ alert('対象を選んでください'); return null; }
-    } else {
-      if (extraLineIds.length===0){ alert('イベント無しの場合は追加対象を選んでください'); return null; }
-    }
-    return {
-      eventId, statuses, extraLineIds, message,
-      senderLineId: window.__ME__?.lineId || window.state?.lineId || '',
-      senderName  : window.__ME__?.displayName || window.state?.name || ''
-    };
-  }
-
-  // API
-  async function apiPreview(data){
-    const url = new URL(API_ENDPOINT);
-    url.searchParams.set('customPushPreview','1');
-    if (data.eventId) url.searchParams.set('eventId', data.eventId);
-    url.searchParams.set('statuses', JSON.stringify(data.statuses));
-    url.searchParams.set('extraLineIds', JSON.stringify(data.extraLineIds));
-    url.searchParams.set('message', data.message);
-    url.searchParams.set('senderLineId', data.senderLineId);
-    url.searchParams.set('senderName', data.senderName);
-    url.searchParams.set('admin','1');
-    if (data.senderLineId) url.searchParams.set('lineId', data.senderLineId);
-    return fetch(url).then(r=>r.json());
-  }
-  async function apiSend(data){
-    const url = new URL(API_ENDPOINT);
-    url.searchParams.set('customPushSend','1');
-    if (data.eventId) url.searchParams.set('eventId', data.eventId);
-    url.searchParams.set('statuses', JSON.stringify(data.statuses));
-    url.searchParams.set('extraLineIds', JSON.stringify(data.extraLineIds));
-    url.searchParams.set('message', data.message);
-    url.searchParams.set('senderLineId', data.senderLineId);
-    url.searchParams.set('senderName', data.senderName);
-    url.searchParams.set('admin','1');
-    if (data.senderLineId) url.searchParams.set('lineId', data.senderLineId);
-    return fetch(url).then(r=>r.json());
-  }
-
-  // リスナー
-  sec.addEventListener('change', (e)=>{
-    if (e.target.classList?.contains('cp_stat')) {
-      renderTargetsFromReport();
-      loadReportAndRefresh();
-    }
-  });
-  selEvent?.addEventListener('change', loadReportAndRefresh);
-
-  btnPrev?.addEventListener('click', async ()=>{
-    if (busy) return;
-    const data = buildPayload(); if (!data) return;
-    setBusy(true);
-    out.textContent = '計算中…';
-    let r;
-    try { r = await apiPreview(data); } catch { r = {status:'error', message:'network'}; }
-    if (r.status!=='ok'){
-      out.textContent = `プレビュー失敗：${r.message||'bad request'}`;
-      btnSend.disabled = true;
-      setBusy(false);
-      return;
-    }
-    out.innerHTML = `自動対象: ${r.autoN} / 追加: ${r.extraN} / 合計: <b>${r.total}</b>` + (r.warn?`<div class="warn">${r.warn}</div>`:'');
-    btnSend.disabled = (r.total<=0);
-    setBusy(false);
-  });
-
-  btnSend?.addEventListener('click', async ()=>{
-    if (busy) return;
-    const data = buildPayload(); if (!data) return;
-    if (!confirm('この内容で送信します。よろしいですか？')) return;
-    setBusy(true);
-    let r;
-    try { r = await apiSend(data); } catch { r = {status:'error', message:'network'}; }
-    setBusy(false);
-    if (r.status!=='ok'){ alert(`送信失敗：${r.message||'unknown'}`); return; }
-    alert(`送信完了：${r.total||0}件`);
-  });
-
-  // 初期化
-  document.addEventListener('DOMContentLoaded', async ()=>{
-    sec.querySelectorAll('.cp_stat').forEach(i => i.checked = (i.value==='参加'));
-    btnSend.disabled = true;
-    await fillEventList();
-    await loadReportAndRefresh();
-  });
-
-  // 外部から再初期化
-  window.initCustomPushPage = async ()=>{
-    sec.querySelectorAll('.cp_stat').forEach(i => i.checked = (i.value==='参加'));
-    btnSend.disabled = true;
-    await fillEventList();
-    await loadReportAndRefresh();
-  };
-})();
    
 </script> 
   
