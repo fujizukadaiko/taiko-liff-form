@@ -1511,220 +1511,183 @@
   </main>
   
     <!-- ===== カスタム通知（管理者） ===== -->
-  <section id="view-custom-push" data-view class="cp-container">
-    <h2 class="cp-title">カスタム通知</h2>
-  
-    <!-- イベント -->
-    <div class="cp-field">
-      <label class="cp-label" for="cp_event">イベント</label>
-      <select id="cp_event" class="cp-select">
-        <option value="">イベントを選ぶ</option>
-      </select>
-    </div>
-  
-    <!-- 対象ステータス -->
-    <div class="cp-field">
-      <div class="cp-label">対象ステータス</div>
-      <div class="cp-checkrow">
-        <label class="cp-check"><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
-        <label class="cp-check"><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
-        <label class="cp-check"><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
-        <label class="cp-check"><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
+     <section id="view-custom-push" data-view>
+      <!-- タイトル行：左に見出し、右にトップへ -->
+      <div class="cp-header">
+        <h2 class="cp-title">カスタム通知</h2>
+        <button class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
       </div>
-    </div>
-  
-    <!-- 宛先追加（手動） -->
-    <div class="cp-field">
-      <label class="cp-label">宛先追加（手動）</label>
-  
-      <!-- 見た目だけの複数選択ドロップダウン（チェック式） -->
-      <details class="cp-mselect" id="cp_extra_ui">
-        <summary>選択してください</summary>
-        <div class="cp-mselect-panel">
-          <!-- 中身は後で配線するのでダミーを入れておきます -->
-          <label class="cp-mopt"><input type="checkbox" disabled>（候補がここに並びます）</label>
-          <label class="cp-mopt"><input type="checkbox" disabled>（候補）</label>
-          <label class="cp-mopt"><input type="checkbox" disabled>（候補）</label>
+    
+      <!-- イベント（行内右寄せプルダウン） -->
+      <div class="field-row">
+        <label for="cp_event">イベント</label>
+        <select id="cp_event" class="select">
+          <option value="">イベントを選ぶ</option>
+        </select>
+      </div>
+    
+      <!-- ここから白背景カード -->
+      <div class="card">
+    
+        <!-- 対象ステータス（行内配置） -->
+        <div class="field-row">
+          <label>対象ステータス</label>
+          <div class="checks">
+            <label><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
+            <label><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
+            <label><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
+            <label><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
+          </div>
         </div>
-      </details>
-  
-      <!-- 後でJSから使えるように、実体のselectも置いておきます（今は非表示） -->
-      <select id="cp_extra" multiple class="cp-select" style="display:none;"></select>
-    </div>
-  
-    <!-- 自動選択 / 手動追加 の表示（編集不可の薄紫枠） -->
-    <div class="cp-field-grid">
-      <div class="cp-pill" aria-disabled="true">
-        <div class="cp-pill-title">自動選択（対象ステータス）</div>
-        <div id="cp_targets_auto" class="cp-pill-body">（該当なし）</div>
-      </div>
-      <div class="cp-pill" aria-disabled="true">
-        <div class="cp-pill-title">手動追加（選択済み）</div>
-        <div id="cp_targets_manual" class="cp-pill-body">（未選択）</div>
-      </div>
-    </div>
-  
-    <!-- テンプレート -->
-    <div class="cp-field">
-      <label class="cp-label" for="cp_tpl">テンプレート</label>
-      <select id="cp_tpl" class="cp-select">
-        <option value="">なし</option>
-        <option value="rain">雨天中止時</option>
-        <option value="time">時間変更時</option>
-      </select>
-    </div>
-  
-    <!-- 本文 -->
-    <div class="cp-field">
-      <div class="cp-label">本文（2000文字まで）</div>
-      <textarea id="cp_body" rows="8" maxlength="2000" class="cp-textarea" placeholder=""></textarea>
-    </div>
-  
-    <!-- ボタン -->
-    <div class="cp-actions">
-      <button type="button" class="cp-btn cp-btn-outline" id="cp_reset">リセット</button>
-      <button type="button" class="cp-btn cp-btn-primary" id="cp_send">送信する</button>
-    </div>
-  </section>
+    
+        <!-- 宛先追加（手動）：行内右寄せプルダウン -->
+        <div class="field-row">
+          <label for="cp_extra">宛先追加（手動）</label>
+          <select id="cp_extra" class="select" multiple>
+            <!-- 後で実装：複数選択（チェック式UIは後でJSで置換予定） -->
+            <option value="">選択してください</option>
+          </select>
+        </div>
+    
+        <!-- 自動選択 / 手動追加 の表示エリア（操作不可の薄紫） -->
+        <div class="pillbox">
+          <div class="pillbox-title">自動選択（対象ステータス）</div>
+          <div class="pillbox-body" id="cp_auto">（該当なし）</div>
+        </div>
+        <div class="pillbox">
+          <div class="pillbox-title">手動追加（選択済み）</div>
+          <div class="pillbox-body" id="cp_manual">（未選択）</div>
+        </div>
+    
+        <!-- テンプレート：行内右寄せプルダウン -->
+        <div class="field-row">
+          <label for="cp_tpl">テンプレート</label>
+          <select id="cp_tpl" class="select">
+            <option value="">なし</option>
+            <option value="雨天中止">雨天中止時</option>
+            <option value="時間変更">時間変更時</option>
+          </select>
+        </div>
+    
+        <!-- 本文 -->
+        <div class="field-col">
+          <label for="cp_body">本文（2000文字まで）</label>
+          <textarea id="cp_body" rows="7" maxlength="2000" class="textarea"></textarea>
+        </div>
+    
+        <!-- ボタン行：左にリセット（白背景・紫枠）、右に送信（紫塗り） -->
+        <div class="actions">
+          <button id="cp_reset" class="btn btn-ghost">リセット</button>
+          <button id="cp_send" class="btn btn-primary">送信する</button>
+        </div>
+    
+      </div><!-- /card -->
+    </section>
   
   <style>
-    /* ========== Theme ==========\ */
-    :root{
-      --cp-accent: #6B4EFF;     /* メイン紫 */
-      --cp-accent-weak: #EFEAFF;/* 薄紫 */
-      --cp-text: #1B1B1F;
-      --cp-muted: #6B7280;
-      --cp-border: #E5E7EB;
-      --cp-white: #fff;
+    /* ===== Custom Push UI style (scoped) ===== */
+    #view-custom-push {
+      --violet: #6F4BD8;
+      --violet-500: #6F4BD8;
+      --violet-600: #5c3bcf;
+      --violet-100: #F2EEFF;
+      --ink: #2b2346;
+      --muted: #6b6b86;
+      padding: 16px;
+      background: linear-gradient(180deg, #f7f5ff 0%, #f9f9ff 100%);
     }
-  
-    /* ========== Layout ==========\ */
-    .cp-container{
-      max-width: 920px;
-      margin: 0 auto;
-      padding: 0 16px;          /* ページ左右の余白 */
+    
+    /* タイトル行 */
+    #view-custom-push .cp-header{
+      display:flex; align-items:center; justify-content:space-between;
+      margin: 8px 0 16px;
     }
-    .cp-title{
-      font-size: 1.35rem;
-      font-weight: 700;
-      margin: 18px 0 16px;
-      color: var(--cp-text);
+    #view-custom-push .cp-title{
+      font-size: 22px; font-weight: 700; color: var(--ink); margin: 0;
     }
-    .cp-field{ margin: 14px 0; }
-    .cp-field-grid{
-      display: grid;
-      gap: 12px;
-      grid-template-columns: 1fr;
+    
+    /* ボタン */
+    #view-custom-push .btn{
+      border-radius: 12px; padding: 10px 16px; font-weight: 700;
+      border: 2px solid transparent; transition: .2s;
     }
-    @media (min-width: 720px){
-      .cp-field-grid{ grid-template-columns: 1fr 1fr; }
+    #view-custom-push .btn-sm{ padding: 8px 12px; font-size: 14px; }
+    #view-custom-push .btn-ghost{
+      background: #fff; color: var(--violet-600); border-color: var(--violet-500);
     }
-    .cp-label{
-      display:block;
-      font-size: .92rem;
-      color: var(--cp-text);
-      margin-bottom: 6px;
-      font-weight: 600;
+    #view-custom-push .btn-ghost:active{ transform: translateY(1px); }
+    #view-custom-push .btn-primary{
+      background: var(--violet-500); color:#fff; border-color: var(--violet-500);
+      box-shadow: 0 6px 16px rgba(111,75,216,.25);
     }
-  
-    /* ========== Inputs ==========\ */
-    .cp-select,
-    .cp-textarea{
-      width: 100%;
-      border: 2px solid var(--cp-accent);
-      border-radius: 10px;
-      background: var(--cp-white);
-      padding: 10px 12px;
-      font-size: 0.95rem;
-      color: var(--cp-text);
-      outline: none;
+    #view-custom-push .btn-primary:active{ transform: translateY(1px); }
+    
+    /* 行：ラベル左、入力右 */
+    #view-custom-push .field-row{
+      display:flex; align-items:center; justify-content:space-between; gap:14px;
+      margin: 14px 0;
     }
-    .cp-textarea{ resize: vertical; min-height: 140px; }
-  
-    .cp-checkrow{
-      display:flex; flex-wrap:wrap; gap: 12px;
+    #view-custom-push .field-row > label{
+      font-weight: 700; color: var(--ink); letter-spacing:.02em;
     }
-    .cp-check{
-      display:inline-flex; align-items:center; gap:6px;
-      font-size:.95rem; color: var(--cp-text);
+    /* 縦方向のフィールド（本文用） */
+    #view-custom-push .field-col{
+      display:flex; flex-direction:column; gap:8px; margin: 14px 0;
     }
-  
-    /* ========== Multi-select (見た目だけ) ==========\ */
-    .cp-mselect{
-      border: 1px solid var(--cp-border);
-      border-radius: 10px;
-      background: var(--cp-white);
-      padding: 0;
-      width: 100%;
+    #view-custom-push .field-col > label{ font-weight:700; color:var(--ink); }
+    
+    /* セレクト/テキストエリアの共通 */
+    #view-custom-push .select, 
+    #view-custom-push .textarea{
+      flex:1 1 auto; width: 64%;
+      border:2px solid var(--violet-500); border-radius:14px;
+      background:#fff; color:#1f1637;
+      padding:12px 14px; font-size:16px; outline:none;
     }
-    .cp-mselect > summary{
-      list-style: none;
-      cursor: default;          /* まだ操作しない前提なので pointer にはしない */
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 2px solid var(--cp-accent);
-      background: var(--cp-white);
-      color: var(--cp-text);
+    #view-custom-push .select:focus, 
+    #view-custom-push .textarea:focus{
+      border-color: var(--violet-600); box-shadow: 0 0 0 3px rgba(111,75,216,.15);
     }
-    .cp-mselect[open] > summary{ border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-    .cp-mselect-panel{
-      border: 2px solid var(--cp-accent);
-      border-top: none;
-      border-bottom-left-radius: 10px;
-      border-bottom-right-radius: 10px;
-      padding: 8px 10px;
-      background: var(--cp-white);
+    
+    /* チェック群（対象ステータス） */
+    #view-custom-push .checks{
+      display:flex; flex-wrap:wrap; gap:18px; justify-content:flex-end; width:64%;
+      color:#2b2346;
     }
-    .cp-mopt{
-      display:flex; align-items:center; gap:8px;
-      padding:6px 4px; font-size:.95rem; color:var(--cp-text);
+    #view-custom-push .checks label{ display:flex; align-items:center; gap:8px; }
+    
+    /* 白カード */
+    #view-custom-push .card{
+      background:#fff; border-radius:16px; padding:18px;
+      box-shadow: 0 6px 24px rgba(0,0,0,.06);
+      margin-top: 14px;
     }
-  
-    /* ========== Readonly target display ==========\ */
-    .cp-pill{
-      background: var(--cp-accent-weak);
-      border: 1px dashed var(--cp-accent);
-      border-radius: 12px;
-      padding: 10px 12px;
+    
+    /* 宛先の“読み取り専用”表示（薄紫の操作不可感） */
+    #view-custom-push .pillbox{
+      border:2px dashed var(--violet-500);
+      background: var(--violet-100);
+      border-radius:16px; padding:14px; margin:12px 0;
     }
-    .cp-pill[aria-disabled="true"]{
-      opacity: 0.9; 
-      cursor: not-allowed;
+    #view-custom-push .pillbox-title{
+      font-weight: 800; color: var(--ink); margin-bottom:6px;
     }
-    .cp-pill-title{
-      font-weight: 700;
-      font-size: .9rem;
-      color: var(--cp-text);
-      margin-bottom: 6px;
+    #view-custom-push .pillbox-body{
+      color:#8a84a6;
     }
-    .cp-pill-body{
-      min-height: 38px;
-      line-height: 1.7;
-      color: var(--cp-muted);
-      word-break: break-all;
+    
+    /* 本文 */
+    #view-custom-push .textarea{ min-height: 180px; }
+    
+    /* アクション行 */
+    #view-custom-push .actions{
+      display:flex; gap:12px; justify-content:flex-end; margin-top:16px;
     }
-  
-    /* ========== Buttons ==========\ */
-    .cp-actions{
-      display:flex; gap:10px; justify-content:flex-end; margin: 18px 0 28px;
-    }
-    .cp-btn{
-      appearance: none;
-      border-radius: 12px;
-      padding: 10px 16px;
-      font-weight: 700;
-      font-size: .95rem;
-      border: 2px solid transparent;
-      cursor: default;          /* まだ配線しないのでデフォルト */
-    }
-    .cp-btn-primary{
-      background: var(--cp-accent);
-      color: var(--cp-white);
-    }
-    .cp-btn-outline{
-      background: var(--cp-white);
-      color: var(--cp-accent);
-      border-color: var(--cp-accent);
+    
+    /* モバイルで右側が窮屈にならないように */
+    @media (max-width: 420px){
+      #view-custom-push .select, 
+      #view-custom-push .checks{ width: 60%; }
     }
   </style>
   </script>
