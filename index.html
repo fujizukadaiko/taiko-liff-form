@@ -1612,13 +1612,18 @@
         </div>
     
         <!-- 宛先追加（手動） ラベル左 / セレクト右（※要望③：角丸） -->
-        <div class="row-att" style="margin:12px 0;">
-          <label for="cp_extra" class="repLabel">宛先追加（手動）</label>
-          <select id="cp_extra" class="selectBtn" multiple>
-            <option value="">選択してください</option>
+        <div class="row-att" style="margin:6px 0 12px;">
+          <label for="cp_event" class="repLabel">宛先の選び方</label>
+          <select id="cp_event" class="selectBtn schedSel">
+            <option value="manual">手動で宛先を選ぶ</option>
+            <optgroup label="イベントから選ぶ">
+              <!-- ここは後でJSで差し替え／追加。今はダミーを置いておいてOK -->
+              <option value="ev1">イベント１</option>
+              <option value="ev2">イベント２</option>
+            </optgroup>
           </select>
         </div>
-    
+            
         <!-- 自動選択 / 手動追加（表示のみ・薄紫） -->
         <div class="cp-pill">
           <div class="cp-pill-title">自動選択（対象ステータス）</div>
@@ -4336,7 +4341,25 @@ window.reportReload = function(){ initAdminReportPage(); };
     }
     return "";
   }
-   
+
+    (function(){
+    const sec      = document.getElementById('view-custom-push');
+    if (!sec) return;
+    const selEvent = document.getElementById('cp_event');
+    const autoBox  = document.getElementById('cp_auto');
+
+    function applyModeUI(){
+      const isManual = (selEvent.value === 'manual' || !selEvent.value);
+      // 対象ステータスは手動モードでは使わない → 無効化
+      sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = isManual);
+      // 自動選択の表示
+      autoBox.textContent = isManual
+        ? '（イベント未選択のため自動選択は利用しません）'
+        : '（該当なし）';
+    }
+    selEvent.addEventListener('change', applyModeUI);
+    applyModeUI(); // 初期反映
+  })();
 </script> 
   
 <script>
