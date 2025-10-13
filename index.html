@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.1.5";  // stable ver→v4.0.8, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.1.6";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4NDQSQYVski8OcYajrOS2Ya1fJ0rz1LyYB1-q-3jRn8iN8iqS_I8Mr7nHmrurp3yb1w/exec";     // GAS v106.0 （PROD v1.0.1未反映）
 
@@ -1283,6 +1283,9 @@
       border-radius:999px; padding:2px 8px; margin-left:8px;
     }
     #view-custom-push .statWrap .lockTag[hidden]{ display:none !important; }
+
+    #view-custom-push #cp_event{ font-size:13px; }
+    
   </style>
   
   <!-- LIFF SDK -->
@@ -1622,9 +1625,94 @@
           <select id="cp_event" class="selectBtn schedSel">
             <option value="manual">手動のみで宛先を選ぶ</option>
             <optgroup label="イベントから選ぶ">
-              <!-- ここは後でJSで差し替え／追加。今はダミーを置いておいてOK -->
-              <option value="ev1">イベント１</option>
-              <option value="ev2">イベント２</option>
+              <script>
+                (function(){
+                  const sec = document.getElementById('view-custom-push');
+                  const selEvent = document.getElementById('cp_event');
+                  const statWrap = document.getElementById('cp_stat_wrap');
+                  const statLock = document.getElementById('cp_stat_lock');
+                
+                  // --- LIFF/state から lineId を安全取得 ---
+                  async function myLineIdAsync(){
+                    if (typeof window.getMyLineId_ === 'function') {
+                      try { const id = await window.getMyLineId_(); if (id) return id; } catch(_){}
+                    }
+                    const tryOnce = () => {
+                      if (window.__ME__?.lineId) return window.__ME__.lineId;
+                      if (window.state?.lineId)  return window.state.lineId;
+                      try { return window.liff?.getDecodedIDToken?.()?.sub || ''; } catch(_){ return ''; }
+                    };
+                    for (let i=0; i<40; i++){
+                      const id = tryOnce(); if (id) { (window.state ||= {}).lineId = id; return id; }
+                      await new Promise(r=>setTimeout(r,100)); // 最大4秒
+                    }
+                    return '';
+                  }
+                
+                  // --- 手動モード時の見た目＆操作不可切替（すでにあるUIを利用） ---
+                  function applyModeUI(){
+                    const manual = (selEvent.value === 'manual' || !selEvent.value);
+                    sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = manual);
+                    statWrap?.classList.toggle('is-disabled', manual);
+                    statWrap?.setAttribute('aria-disabled', manual ? 'true' : 'false');
+                    if (statLock) statLock.hidden = !manual;
+                  }
+                
+                  selEvent.addEventListener('change', applyModeUI);
+                
+                  // --- イベント候補を投入（公開中 × 発表 を優先） ---
+                  async function fillEventChoices(){
+                    // プレースホルダ
+                    selEvent.innerHTML =
+                      `<option value="manual">宛先を手動で選ぶ</option>` +
+                      `<option value="" disabled>読み込み中…</option>`;
+                
+                    const lid = await myLineIdAsync();
+                    const url = new URL(API_ENDPOINT);
+                    url.searchParams.set('attendanceReport','1');
+                    url.searchParams.set('meta','1');
+                    url.searchParams.set('admin','1');
+                    if (lid) url.searchParams.set('lineId', lid);
+                
+                    let r;
+                    try { r = await fetch(url).then(x=>x.json()); } catch { r = {status:'error'}; }
+                    const listRaw = Array.isArray(r?.list) ? r.list :
+                                    Array.isArray(r?.meta) ? r.meta :
+                                    Array.isArray(r?.data) ? r.data : [];
+                
+                    // “公開中”フラグと “発表”種別が取れないケースでも壊れないフィルタ
+                    const isOpen = e =>
+                      (typeof e.open      !== 'undefined') ? !!e.open :
+                      (typeof e.published !== 'undefined') ? !!e.published :
+                      (typeof e.status    !== 'undefined') ? (e.status === '公開中') : true; // 情報なければ通す
+                    const isHappyo = e =>
+                      (typeof e.kind !== 'undefined')
+                        ? (e.kind === '発表' || /発表/.test(String(e.kind)))
+                        : true; // 情報なければ通す
+                
+                    const list = listRaw.filter(e => isOpen(e) && isHappyo(e));
+                
+                    const opts = list.map(e=>{
+                      const id  = String(e.eventId ?? e.id ?? '');
+                      const ymd = e.ymd || e.date || '';
+                      const hm  = e.hm  || e.time || '';
+                      const dt  = [ymd, hm].filter(Boolean).join(' ');
+                      const tt  = e.title || e.name || '';
+                      return `<option value="${id}">${dt} ｜ ${tt}</option>`;
+                    }).join('') || `<option value="" disabled>（該当イベントなし）</option>`;
+                
+                    selEvent.innerHTML = `<option value="manual">宛先を手動で選ぶ</option>` + opts;
+                
+                    // 初期のUI反映
+                    applyModeUI();
+                  }
+                
+                  document.addEventListener('DOMContentLoaded', ()=>{
+                    fillEventChoices();
+                    applyModeUI();
+                  });
+                })();
+                </script>
             </optgroup>
           </select>
         </div>
@@ -4400,6 +4488,27 @@ window.reportReload = function(){ initAdminReportPage(); };
   selEvent.addEventListener('change', applyModeUI);
   applyModeUI(); // 初期反映
 })();
+
+  // ==== SPAナビ（[data-view-target] を押すと該当セクションを表示）====
+  (function(){
+    document.addEventListener('click', (e)=>{
+      const btn = e.target.closest('[data-view-target]');
+      if (!btn) return;
+  
+      const targetId = btn.getAttribute('data-view-target');
+      const dst = document.getElementById(targetId);
+      if (!dst) return;
+  
+      // data-view を持つページを切替
+      document.querySelectorAll('[data-view]').forEach(sec=>{
+        if (sec === dst) sec.removeAttribute('hidden');
+        else sec.setAttribute('hidden','');
+      });
+  
+      // 先頭へスクロール
+      window.scrollTo(0, 0);
+    });
+  })();
 </script> 
   
 <script>
