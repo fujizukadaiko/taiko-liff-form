@@ -1261,6 +1261,25 @@
     
     /* 手動追加とテンプレの間に“1行分”の空白（フォームの行間に合わせて） */
     #view-custom-push .cp-space-1line{ height: 14px; }  /* 12〜16pxでお好み調整可 */
+    /* 対象ステータス：無効時の見た目をはっきり */
+    .statWrap{
+      transition: background .15s ease, border-color .15s ease, opacity .15s ease;
+    }
+    .statWrap.is-disabled{
+      background:#f7f5ff;                           /* 薄い紫の面 */
+      border:1px dashed #e6e0f0;                     /* ダッシュ枠 */
+      border-radius:12px;
+      padding:10px;
+      opacity:.90;
+    }
+    .statWrap.is-disabled label{ color:#7a7a7a; }     /* テキストも薄めに */
+    .statWrap .lockTag{
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:12px; color:#7f6aa5;
+      background:#efe7ff; border:1px solid #e6e0f0;
+      border-radius:999px; padding:2px 8px; margin-left:8px;
+    }
+    .statWrap .lockTag[hidden]{ display:none; }
   </style>
   
   <!-- LIFF SDK -->
@@ -1598,7 +1617,7 @@
         <div class="row-att" style="margin:6px 0 12px;">
           <label for="cp_event" class="repLabel">宛先の選び方</label>
           <select id="cp_event" class="selectBtn schedSel">
-            <option value="manual">手動で宛先を選ぶ</option>
+            <option value="manual">手動のみで宛先を選ぶ</option>
             <optgroup label="イベントから選ぶ">
               <!-- ここは後でJSで差し替え／追加。今はダミーを置いておいてOK -->
               <option value="ev1">イベント１</option>
@@ -1607,13 +1626,19 @@
           </select>
         </div>
     
-        <!-- 対象ステータス（※要望②：チェック群は次の行で左寄せ・横並び） -->
-        <label class="repLabel" style="margin-bottom:6px;">対象ステータス</label>
-        <div class="cp-stat-row">
-          <label><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
-          <label><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
-          <label><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
-          <label><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
+        <!-- 対象ステータス（見出し＋チェック群） -->
+        <div id="cp_stat_wrap" class="statWrap">
+          <div class="repLabel">
+            対象ステータス
+            <span id="cp_stat_lock" class="lockTag" hidden>手動モード（選択不可）</span>
+          </div>
+        
+          <div class="row" style="gap:10px; margin-top:6px;">
+            <label><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
+            <label><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
+            <label><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
+            <label><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
+          </div>
         </div>
     
         <!-- 宛先追加（手動） ラベル左 / セレクト右（※要望③：角丸） -->
@@ -4343,23 +4368,35 @@ window.reportReload = function(){ initAdminReportPage(); };
   }
   
    (function(){
-    const sec      = document.getElementById('view-custom-push');
-    if (!sec) return;
-    const selEvent = document.getElementById('cp_event');
-    const autoBox  = document.getElementById('cp_auto');
+  const sec      = document.getElementById('view-custom-push');
+  if (!sec) return;
+  const selEvent = document.getElementById('cp_event');
+  const autoBox  = document.getElementById('cp_auto');      // 自動選択の表示エリア（あれば）
+  const statWrap = document.getElementById('cp_stat_wrap');
+  const statLock = document.getElementById('cp_stat_lock');
 
-    function applyModeUI(){
-      const isManual = (selEvent.value === 'manual' || !selEvent.value);
-      // 対象ステータスは手動モードでは使わない → 無効化
-      sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = isManual);
-      // 自動選択の表示
+  function applyModeUI(){
+    const isManual = (selEvent.value === 'manual' || !selEvent.value);
+
+    // チェック群を実際に無効化
+    sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = isManual);
+
+    // 見た目の変化（薄紫のダッシュ枠＆ロック札）
+    statWrap?.classList.toggle('is-disabled', isManual);
+    statWrap?.setAttribute('aria-disabled', isManual ? 'true' : 'false');
+    if (statLock) statLock.hidden = !isManual;
+
+    // 自動選択欄のメッセージ（任意）
+    if (autoBox){
       autoBox.textContent = isManual
         ? '（イベント未選択のため自動選択は利用しません）'
         : '（該当なし）';
     }
-    selEvent.addEventListener('change', applyModeUI);
-    applyModeUI(); // 初期反映
-  })();
+  }
+
+  selEvent.addEventListener('change', applyModeUI);
+  applyModeUI(); // 初期反映
+})();
 </script> 
   
 <script>
