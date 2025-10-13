@@ -1232,6 +1232,35 @@
     
     /* 複数選択候補の見切れ対策（既に入っていれば不要） */
     #cp_extra{ font-size:14px; line-height:1.4; }
+    /* チェック群を左寄せ・横並び（折り返しOK） */
+    #view-custom-push .cp-stat-row{
+      display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-start;
+      margin-bottom: 10px;
+    }
+    
+    /* 薄紫の“操作不可”表示ボックス */
+    #view-custom-push .cp-pill{
+      border:1.5px dashed var(--c-primary-2);
+      background:#f7f5ff;
+      border-radius:10px;
+      padding:12px;
+      margin:10px 0;
+    }
+    #view-custom-push .cp-pill-title{ font-weight:700; margin-bottom:4px; color:var(--c-text); }
+    #view-custom-push .cp-pill-body { color:var(--c-muted); }
+    
+    /* 本文の紫枠・白背景・角丸（既存トーンに統一） */
+    #view-custom-push .cp-field{ margin:12px 0; display:flex; flex-direction:column; gap:8px; }
+    #view-custom-push .cp-textarea{
+      width:100%; border:1.5px solid var(--c-primary-2); background:#fff;
+      border-radius:10px; padding:10px 12px; font-size:16px; box-sizing:border-box;
+    }
+    
+    /* 宛先追加（手動）のselectは角丸を強制（multipleでも角丸に） */
+    #cp_extra{ border-radius:10px !important; }
+    
+    /* 手動追加とテンプレの間に“1行分”の空白（フォームの行間に合わせて） */
+    #view-custom-push .cp-space-1line{ height: 14px; }  /* 12〜16pxでお好み調整可 */
   </style>
   
   <!-- LIFF SDK -->
@@ -1562,48 +1591,49 @@
         <button class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
       </div>
     
-      <!-- イベント：ラベル左 / セレクト右（サイト既定の .row-att + .selectBtn を使用） -->
-      <div class="row-att" style="margin:12px 0;">
-        <label for="cp_event" class="repLabel">イベント</label>
-        <select id="cp_event" class="selectBtn schedSel">
-          <option value="">イベントを選ぶ</option>
-        </select>
-      </div>
-    
-      <!-- カード内：以下すべて白背景カードに格納 -->
+      <!-- ここからカード（※要望①：イベントもカード内に） -->
       <div class="card">
     
-        <!-- 対象ステータス -->
-        <div class="row-att">
-          <label class="repLabel">対象ステータス</label>
-          <div class="cp-checks">
-            <label><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
-            <label><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
-            <label><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
-            <label><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
-          </div>
+        <!-- イベント（ラベル左／セレクト右） -->
+        <div class="row-att" style="margin:6px 0 12px;">
+          <label for="cp_event" class="repLabel">イベント</label>
+          <select id="cp_event" class="selectBtn schedSel">
+            <option value="">イベントを選ぶ</option>
+          </select>
         </div>
     
-        <!-- 宛先追加（手動）：ラベル左 / セレクト右 -->
-        <div class="row-att">
+        <!-- 対象ステータス（※要望②：チェック群は次の行で左寄せ・横並び） -->
+        <label class="repLabel" style="margin-bottom:6px;">対象ステータス</label>
+        <div class="cp-stat-row">
+          <label><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
+          <label><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
+          <label><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
+          <label><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
+        </div>
+    
+        <!-- 宛先追加（手動） ラベル左 / セレクト右（※要望③：角丸） -->
+        <div class="row-att" style="margin:12px 0;">
           <label for="cp_extra" class="repLabel">宛先追加（手動）</label>
           <select id="cp_extra" class="selectBtn" multiple>
             <option value="">選択してください</option>
           </select>
         </div>
     
-        <!-- 自動選択 / 手動追加の表示（操作不可風の薄紫） -->
+        <!-- 自動選択 / 手動追加（表示のみ・薄紫） -->
         <div class="cp-pill">
           <div class="cp-pill-title">自動選択（対象ステータス）</div>
           <div class="cp-pill-body" id="cp_auto">（該当なし）</div>
         </div>
-        <div class="cp-pill">
+        <div class="cp-pill" id="cp_manual_wrap">
           <div class="cp-pill-title">手動追加（選択済み）</div>
           <div class="cp-pill-body" id="cp_manual">（未選択）</div>
         </div>
     
-        <!-- テンプレート：ラベル左 / セレクト右 -->
-        <div class="row-att">
+        <!-- ※要望④：手動追加とテンプレの間に1行分の空白 -->
+        <div class="cp-space-1line"></div>
+    
+        <!-- テンプレート -->
+        <div class="row-att" style="margin:6px 0 12px;">
           <label for="cp_tpl" class="repLabel">テンプレート</label>
           <select id="cp_tpl" class="selectBtn">
             <option value="">なし</option>
@@ -1625,9 +1655,8 @@
           <button id="cp_send" class="btn btn-primary">送信する</button>
         </div>
     
-      </div>
+      </div><!-- /card -->
     </section>
-  
   <style>
     /* ===== Custom Push UI style (scoped) ===== */
     #view-custom-push {
