@@ -1189,6 +1189,49 @@
     @media (min-width: 480px){ #view-custom-push { padding: 0 20px; } }
     #view-custom-push .card { margin: 12px 0; }
     #cp_extra { font-size: 14px; line-height: 1.4; } /* 見切れ対策 */
+
+    /* 行右側にチェック群を置く（幅は既存 select 幅と同等感） */
+    #view-custom-push .cp-checks{
+      display:flex; flex-wrap:wrap; gap:12px; justify-content:flex-end;
+    }
+    
+    /* 薄紫の“操作不可”表示ボックス（既存カラーに合わせる） */
+    #view-custom-push .cp-pill{
+      border:1.5px dashed var(--c-primary-2);
+      background:#f7f5ff;            /* 既存ページの無効系背景と同じ系統 */
+      border-radius:10px;
+      padding:12px;
+      margin:10px 0;
+    }
+    #view-custom-push .cp-pill-title{
+      font-weight:700; margin-bottom:4px; color:var(--c-text);
+    }
+    #view-custom-push .cp-pill-body{
+      color: var(--c-muted);
+    }
+    
+    /* 本文：紫枠・白背景・角丸を既存と統一 */
+    #view-custom-push .cp-field{ margin:12px 0; display:flex; flex-direction:column; gap:8px; }
+    #view-custom-push .cp-textarea{
+      width:100%;
+      border:1.5px solid var(--c-primary-2);
+      background:#fff;
+      border-radius:10px;
+      padding:10px 12px;
+      font-size:16px;
+      box-sizing:border-box;
+    }
+    
+    /* 小型ヒント文字（既存 .hint のトーンに寄せる） */
+    #view-custom-push .hint{ color: var(--c-muted); font-size: 12px; }
+    
+    /* 既存ページと同じ左右余白・カード間隔（あなたの追記と同じ値で再掲） */
+    #view-custom-push { padding: 0 16px; }
+    @media (min-width: 480px){ #view-custom-push { padding: 0 20px; } }
+    #view-custom-push .card { margin: 12px 0; }
+    
+    /* 複数選択候補の見切れ対策（既に入っていれば不要） */
+    #cp_extra{ font-size:14px; line-height:1.4; }
   </style>
   
   <!-- LIFF SDK -->
@@ -1511,28 +1554,29 @@
   </main>
   
     <!-- ===== カスタム通知（管理者） ===== -->
-     <section id="view-custom-push" data-view>
-      <!-- タイトル行：左に見出し、右にトップへ -->
-      <div class="cp-header">
-        <h2 class="cp-title">カスタム通知</h2>
+    <section id="view-custom-push" data-view>
+    
+      <!-- 見出し行：左=タイトル / 右=トップに戻る -->
+      <div class="row-space" style="align-items:center;">
+        <div class="sectionTitle">カスタム通知</div>
         <button class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
       </div>
     
-      <!-- イベント（行内右寄せプルダウン） -->
-      <div class="field-row">
-        <label for="cp_event">イベント</label>
-        <select id="cp_event" class="select">
+      <!-- イベント：ラベル左 / セレクト右（サイト既定の .row-att + .selectBtn を使用） -->
+      <div class="row-att" style="margin:12px 0;">
+        <label for="cp_event" class="repLabel">イベント</label>
+        <select id="cp_event" class="selectBtn schedSel">
           <option value="">イベントを選ぶ</option>
         </select>
       </div>
     
-      <!-- ここから白背景カード -->
+      <!-- カード内：以下すべて白背景カードに格納 -->
       <div class="card">
     
-        <!-- 対象ステータス（行内配置） -->
-        <div class="field-row">
-          <label>対象ステータス</label>
-          <div class="checks">
+        <!-- 対象ステータス -->
+        <div class="row-att">
+          <label class="repLabel">対象ステータス</label>
+          <div class="cp-checks">
             <label><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
             <label><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
             <label><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
@@ -1540,29 +1584,28 @@
           </div>
         </div>
     
-        <!-- 宛先追加（手動）：行内右寄せプルダウン -->
-        <div class="field-row">
-          <label for="cp_extra">宛先追加（手動）</label>
-          <select id="cp_extra" class="select" multiple>
-            <!-- 後で実装：複数選択（チェック式UIは後でJSで置換予定） -->
+        <!-- 宛先追加（手動）：ラベル左 / セレクト右 -->
+        <div class="row-att">
+          <label for="cp_extra" class="repLabel">宛先追加（手動）</label>
+          <select id="cp_extra" class="selectBtn" multiple>
             <option value="">選択してください</option>
           </select>
         </div>
     
-        <!-- 自動選択 / 手動追加 の表示エリア（操作不可の薄紫） -->
-        <div class="pillbox">
-          <div class="pillbox-title">自動選択（対象ステータス）</div>
-          <div class="pillbox-body" id="cp_auto">（該当なし）</div>
+        <!-- 自動選択 / 手動追加の表示（操作不可風の薄紫） -->
+        <div class="cp-pill">
+          <div class="cp-pill-title">自動選択（対象ステータス）</div>
+          <div class="cp-pill-body" id="cp_auto">（該当なし）</div>
         </div>
-        <div class="pillbox">
-          <div class="pillbox-title">手動追加（選択済み）</div>
-          <div class="pillbox-body" id="cp_manual">（未選択）</div>
+        <div class="cp-pill">
+          <div class="cp-pill-title">手動追加（選択済み）</div>
+          <div class="cp-pill-body" id="cp_manual">（未選択）</div>
         </div>
     
-        <!-- テンプレート：行内右寄せプルダウン -->
-        <div class="field-row">
-          <label for="cp_tpl">テンプレート</label>
-          <select id="cp_tpl" class="select">
+        <!-- テンプレート：ラベル左 / セレクト右 -->
+        <div class="row-att">
+          <label for="cp_tpl" class="repLabel">テンプレート</label>
+          <select id="cp_tpl" class="selectBtn">
             <option value="">なし</option>
             <option value="雨天中止">雨天中止時</option>
             <option value="時間変更">時間変更時</option>
@@ -1570,18 +1613,19 @@
         </div>
     
         <!-- 本文 -->
-        <div class="field-col">
-          <label for="cp_body">本文（2000文字まで）</label>
-          <textarea id="cp_body" rows="7" maxlength="2000" class="textarea"></textarea>
+        <div class="cp-field">
+          <label for="cp_body" class="repLabel">本文（2000文字まで）</label>
+          <textarea id="cp_body" rows="7" maxlength="2000" class="cp-textarea"></textarea>
+          <div class="hint" id="cp_count">0 / 2000</div>
         </div>
     
-        <!-- ボタン行：左にリセット（白背景・紫枠）、右に送信（紫塗り） -->
-        <div class="actions">
+        <!-- アクション -->
+        <div class="row" style="gap:10px; justify-content:flex-end;">
           <button id="cp_reset" class="btn btn-ghost">リセット</button>
           <button id="cp_send" class="btn btn-primary">送信する</button>
         </div>
     
-      </div><!-- /card -->
+      </div>
     </section>
   
   <style>
