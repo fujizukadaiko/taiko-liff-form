@@ -1613,7 +1613,9 @@
       <!-- 見出し行：左=タイトル / 右=トップに戻る -->
       <div class="row-space" style="align-items:center;">
         <div class="sectionTitle">カスタム通知</div>
-        <button class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
+        <button id="btnCustomBack" type="button" class="btn btn-ghost btn-sm">
+          トップに戻る
+        </button>
       </div>
     
       <!-- ここからカード（※要望①：イベントもカード内に） -->
@@ -4489,59 +4491,25 @@ window.reportReload = function(){ initAdminReportPage(); };
   applyModeUI(); // 初期反映
 })();
 
-  <!-- ==== SPAナビ：data-view-target で画面切替（1回だけ設置） ==== -->
   (function(){
-    if (window.__SpaNavInstalled__) return;
-    window.__SpaNavInstalled__ = true;
-  
-    // [data-view][hidden] を確実に非表示に
-    try{
-      let s = document.getElementById('spa-hidden-style');
-      if (!s){
-        s = document.createElement('style');
-        s.id = 'spa-hidden-style';
-        s.textContent = '[data-view][hidden]{display:none!important}';
-        document.head.appendChild(s);
-      }
-    }catch(_){}
-  
-    function showView(id){
-      const dst = document.getElementById(id);
-      if (!dst){ console.warn('showView: not found', id); return; }
-  
+    // --- フォールバック（あれば既存の $ / show をそのまま使用） ---
+    window.$ = window.$ || (sel => document.querySelector(sel));
+    window.show = window.show || function(sel){
       document.querySelectorAll('[data-view]').forEach(sec=>{
-        if (sec === dst) sec.removeAttribute('hidden');
+        if (sec.matches(sel)) sec.removeAttribute('hidden');
         else sec.setAttribute('hidden','');
       });
+      window.scrollTo({top:0, behavior:'instant'});
+    };
   
-      // セクション側で data-init="initCustomPushPage" のように指定してあれば呼ぶ
-      const initName = dst.dataset.init;
-      if (initName && typeof window[initName] === 'function'){
-        try{ window[initName](); }catch(e){ console.error(e); }
-      }
+    // トップへ戻る（カスタム通知 → ホーム）
+    const btn = document.getElementById('btnCustomBack');
+    if (btn) btn.addEventListener('click', ()=> show('#view-home'));
   
-      window.scrollTo({ top: 0, behavior: 'instant' });
-    }
-    window.showView = showView; // どこからでも呼べるように
-  
-    // クリック委譲
-    document.addEventListener('click', (e)=>{
-      const btn = e.target.closest('[data-view-target]');
-      if (!btn) return;
-      e.preventDefault(); // <a>対策
-      showView(btn.getAttribute('data-view-target'));
-    });
-  
-    // 何も表示されていなければホームを表示
-    document.addEventListener('DOMContentLoaded', ()=>{
-      const anyVisible = Array.from(document.querySelectorAll('[data-view]'))
-        .some(sec => !sec.hasAttribute('hidden'));
-      if (!anyVisible){
-        const home = document.getElementById('view-home');
-        if (home) home.removeAttribute('hidden');
-      }
-    });
+    // （念のため）ホームセクションが data-view を持っているかチェック
+    // <section id="view-home" data-view> ... </section> の形が必須です
   })();
+
 </script> 
   
 <script>
