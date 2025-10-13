@@ -1262,24 +1262,27 @@
     /* 手動追加とテンプレの間に“1行分”の空白（フォームの行間に合わせて） */
     #view-custom-push .cp-space-1line{ height: 14px; }  /* 12〜16pxでお好み調整可 */
     /* 対象ステータス：無効時の見た目をはっきり */
-    .statWrap{
-      transition: background .15s ease, border-color .15s ease, opacity .15s ease;
+    
+    #view-custom-push .statWrap.is-disabled{
+      background:#f5efff !important;         /* 薄い紫の面 */
+      border:1.5px dashed #d8cef1 !important; /* ダッシュ枠 */
+      border-radius:12px !important;
+      padding:10px !important;
+      opacity:.95 !important;
     }
-    .statWrap.is-disabled{
-      background:#f7f5ff;                           /* 薄い紫の面 */
-      border:1px dashed #e6e0f0;                     /* ダッシュ枠 */
-      border-radius:12px;
-      padding:10px;
-      opacity:.90;
+    
+    #view-custom-push .statWrap.is-disabled label{
+      color:#7a6fa6 !important;               /* 文字も少し薄めの紫トーン */
     }
-    .statWrap.is-disabled label{ color:#7a7a7a; }     /* テキストも薄めに */
-    .statWrap .lockTag{
-      display:inline-flex; align-items:center; gap:6px;
+    
+    #view-custom-push .statWrap .lockTag{
+      display:inline-flex !important;
+      align-items:center; gap:6px;
       font-size:12px; color:#7f6aa5;
       background:#efe7ff; border:1px solid #e6e0f0;
       border-radius:999px; padding:2px 8px; margin-left:8px;
     }
-    .statWrap .lockTag[hidden]{ display:none; }
+    #view-custom-push .statWrap .lockTag[hidden]{ display:none !important; }
   </style>
   
   <!-- LIFF SDK -->
@@ -4389,7 +4392,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     // 自動選択欄のメッセージ（任意）
     if (autoBox){
       autoBox.textContent = isManual
-        ? '（イベント未選択のため自動選択は利用しません）'
+        ? '（自動選択未使用）'
         : '（該当なし）';
     }
   }
