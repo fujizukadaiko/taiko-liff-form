@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.1.6";  // stable ver→v4.0.8, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.1.7";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4NDQSQYVski8OcYajrOS2Ya1fJ0rz1LyYB1-q-3jRn8iN8iqS_I8Mr7nHmrurp3yb1w/exec";     // GAS v106.0 （PROD v1.0.1未反映）
 
@@ -4509,6 +4509,224 @@ window.reportReload = function(){ initAdminReportPage(); };
     // （念のため）ホームセクションが data-view を持っているかチェック
     // <section id="view-home" data-view> ... </section> の形が必須です
   })();
+
+    (function(){
+      // ====== 要素参照 ======
+      const sec          = document.getElementById('view-custom-push');
+      if (!sec) return;
+      const selMode      = document.getElementById('cp_event');          // 「宛先の選び方」プルダウン
+      const statWrap     = document.getElementById('cp_stat_wrap');      // 対象ステータス（枠）
+      const statLockTag  = document.getElementById('cp_stat_lock');      // 「手動モード（選択不可）」タグ
+      const statChecks   = Array.from(sec.querySelectorAll('.cp_stat')); // 参加/未定/未回答/欠席
+      const selExtra     = document.getElementById('cp_extra');          // 宛先追加（手動）
+      const boxAuto      = document.getElementById('cp_auto_targets');   // 自動選択の表示枠（読み取り専用）
+      const boxManual    = document.getElementById('cp_manual_targets'); // 手動選択の表示枠（読み取り専用）
+    
+      // 画面内キャッシュ
+      sec.__rows   = [];   // 出欠 rows（event選択時）
+      sec.__roster = [];   // 名簿（通知Yのみ or 全体）
+    
+      // 共通：自分の lineId を安全取得
+      async function myLineId(){
+        try { if (window.getMyLineId_) return await window.getMyLineId_(); } catch(_){}
+        const tryOnce = () => {
+          if (window.__ME__?.lineId) return window.__ME__.lineId;
+          if (window.state?.lineId)  return window.state.lineId;
+          try{
+            const idt = window.liff?.getDecodedIDToken?.();
+            if (idt?.sub){ (window.state ||= {}).lineId = idt.sub; return idt.sub; }
+          }catch(_){}
+          return '';
+        };
+        for (let i=0;i<40;i++){ const id=tryOnce(); if(id) return id; await new Promise(r=>setTimeout(r,100)); }
+        return '';
+      }
+    
+      // ユーティリティ
+      const getCheckedStats = () => statChecks.filter(i=>i.checked).map(i=>i.value);
+      const setDisabled = (els, on)=> els.forEach(el=>{ if(el) el.disabled = !!on; });
+      const setText     = (el, s)=> { if(el) el.textContent = s; };
+      const setHTML     = (el, s)=> { if(el) el.innerHTML   = s; };
+      const showLoadingSelect = (sel, label='読み込み中…')=>{
+        if (!sel) return;
+        sel.innerHTML = `<option value="" disabled>${label}</option>`;
+        sel.disabled = true;
+      };
+    
+      // ① イベント一覧をプルダウンへ（先頭は「手動で選ぶ」）
+      async function fillEventOptions(){
+        if (!selMode) return;
+        showLoadingSelect(selMode, '読み込み中…');
+    
+        const lid = await myLineId();
+        const url = new URL(API_ENDPOINT);
+        url.searchParams.set('attendanceReport','1');
+        url.searchParams.set('meta','1');     // イベント一覧
+        url.searchParams.set('admin','1');
+        if (lid) url.searchParams.set('lineId', lid);
+    
+        let r = {status:'error'};
+        try { r = await fetch(url).then(x=>x.json()); } catch(_){}
+    
+        const list = Array.isArray(r?.list) ? r.list
+                    : Array.isArray(r?.meta) ? r.meta
+                    : Array.isArray(r?.data) ? r.data : [];
+    
+        // 表示するのは「公開中 かつ 種別=発表」優先（無ければ全件）
+        const filt = list.filter(e=>{
+          const open = (e.open===true || e.open===1 || e.status==='open');
+          const kind = (e.kind?.includes('発表') || e.type==='発表');
+          return open && kind;
+        });
+        const useList = filt.length ? filt : list;
+    
+        const opts = [
+          `<option value="manual">宛先を手動で選ぶ</option>`,
+          ...useList.map(e=>{
+            const id = String(e.eventId ?? e.id ?? '');
+            const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
+            const tt = e.title || e.name || '';
+            return `<option value="${id}">${dt}　${tt}</option>`;
+          })
+        ].join('');
+    
+        selMode.innerHTML = opts || `<option value="manual">宛先を手動で選ぶ</option>`;
+        selMode.disabled = false;
+        selMode.value = 'manual';        // 既定＝手動モード
+        applyModeLock();                 // 見た目ロック切替
+        await populateManualList();      // 手動の候補も初回取得
+      }
+    
+      // 見た目ロック：手動モードはチェック不可＆ロックタグ表示
+      function applyModeLock(){
+        const manual = (selMode?.value==='manual');
+        setDisabled(statChecks, manual);
+        if (statWrap){
+          statWrap.classList.toggle('is-locked', manual);  // ← 既にCSS導入済み想定
+        }
+        if (statLockTag){
+          statLockTag.hidden = !manual;
+        }
+        // 自動枠のプレースホルダー
+        if (manual){
+          setText(boxAuto, '（手動モード：自動選択は使いません）');
+        }else{
+          setText(boxAuto, '（読込待ち…）');
+        }
+      }
+    
+      // ② イベント選択時：出欠結果を取得 → 自動枠へ反映
+      async function fetchReportForEvent(evId){
+        if (!evId || evId==='manual') return;
+        setText(boxAuto, '（読込中…）');
+    
+        const lid = await myLineId();
+        const url = new URL(API_ENDPOINT);
+        url.searchParams.set('attendanceReport','1');
+        url.searchParams.set('eventId', evId);
+        url.searchParams.set('admin','1');
+        if (lid) url.searchParams.set('lineId', lid);
+    
+        let r = {status:'error'};
+        try { r = await fetch(url).then(x=>x.json()); } catch(_){}
+        if (r.status!=='ok'){
+          setText(boxAuto, `（取得エラー${r.message ? '：'+r.message : ''}）`);
+          sec.__rows = [];
+          return;
+        }
+        sec.__rows = Array.isArray(r.rows) ? r.rows : [];
+        renderAutoBox(); // 取得後、現在のチェック状態で描画
+      }
+    
+      // ②’ 対象ステータスの現在選択で、自動枠を描画
+      function renderAutoBox(){
+        const checked = new Set(getCheckedStats());
+        const names = sec.__rows
+          .filter(x => checked.has(x.attend || '未回答'))
+          .filter(x => x.lineId)  // 送信可能な人に限定
+          .map(x => x.name)
+          .filter(Boolean);
+        setText(boxAuto, names.length ? names.join('、') : '（該当なし）');
+      }
+    
+      // ③ 手動モード：通知Yの名簿を取得 → selExtra に入れる
+      async function populateManualList(){
+        if (!selExtra) return;
+        showLoadingSelect(selExtra, '読み込み中…');
+    
+        const lid = await myLineId();
+        const url = new URL(API_ENDPOINT);
+        url.searchParams.set('attendanceReport','1');
+        url.searchParams.set('admin','1');
+        url.searchParams.set('meta','1');          // ← イベント指定なしで名簿取得を期待
+        if (lid) url.searchParams.set('lineId', lid);
+    
+        let r = {status:'error'};
+        try { r = await fetch(url).then(x=>x.json()); } catch(_){}
+        // 可能性のあるプロパティを広めに拾う（通知Yだけに限定したい）
+        const rosterY =
+           Array.isArray(r.rosterNotify) ? r.rosterNotify :
+           Array.isArray(r.rosterY)      ? r.rosterY :
+           Array.isArray(r.notify)       ? r.notify :
+           Array.isArray(r.roster)       ? r.roster : [];
+    
+        // r.rows に name/lineId が来るケースもあるので map を作る
+        const rows = Array.isArray(r.rows) ? r.rows : [];
+        const nameToId = new Map(rows.map(x => [x.name, x.lineId || '']));
+    
+        const options = rosterY.map(nm=>{
+          const id = nameToId.get(nm) || '';  // ID分かる人だけ value を付ける
+          return `<option value="${id}" ${id?'':'disabled'}>${nm}</option>`;
+        }).join('');
+    
+        selExtra.innerHTML = options || `<option value="" disabled>オプションなし</option>`;
+        selExtra.disabled = false;
+      }
+    
+      // ④ 手動の選択を表示枠に反映
+      function renderManualBox(){
+        if (!selExtra || !boxManual) return;
+        const names = Array.from(selExtra.selectedOptions)
+          .map(o => o.textContent.trim())
+          .filter(Boolean);
+        setText(boxManual, names.length ? names.join('、') : '（未選択）');
+      }
+    
+      // ===== イベントハンドラ結線 =====
+      selMode?.addEventListener('change', async ()=>{
+        applyModeLock();
+        if (selMode.value === 'manual'){
+          // 手動モード：自動枠は案内文、手動の候補を確実に読み込む
+          setText(boxAuto, '（手動モード：自動選択は使いません）');
+          await populateManualList();
+        }else{
+          // イベントモード：出欠を取得
+          await fetchReportForEvent(selMode.value);
+        }
+      });
+    
+      // 対象ステータス変更 → 自動枠を即時更新（イベントモードのみ有効）
+      statChecks.forEach(cb=>{
+        cb.addEventListener('change', ()=>{
+          if (selMode?.value && selMode.value!=='manual') renderAutoBox();
+        });
+      });
+    
+      // 手動の選択が変わったら枠に反映
+      selExtra?.addEventListener('change', renderManualBox);
+    
+      // 初期化
+      document.addEventListener('DOMContentLoaded', async ()=>{
+        // 既定は「手動モード」＋ ステータスは任意（見た目ロック）
+        if (selMode) selMode.disabled = true;
+        if (boxAuto)  setText(boxAuto,  '（初期化中…）');
+        if (boxManual)setText(boxManual,'（未選択）');
+    
+        await fillEventOptions();     // 先頭に「手動」を入れてイベント候補も構築
+        applyModeLock();              // 見た目ロック
+        renderManualBox();            // 手動枠を初期表示
+      });
+    })();
 
 </script> 
   
