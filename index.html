@@ -4489,26 +4489,61 @@ window.reportReload = function(){ initAdminReportPage(); };
   applyModeUI(); // 初期反映
 })();
 
-  // ==== SPAナビ（[data-view-target] を押すと該当セクションを表示）====
+  <!-- ==== SPAナビ：data-view-target で画面切替（1回だけ設置） ==== -->
+  <script id="spa-nav">
   (function(){
-    document.addEventListener('click', (e)=>{
-      const btn = e.target.closest('[data-view-target]');
-      if (!btn) return;
+    if (window.__SpaNavInstalled__) return;
+    window.__SpaNavInstalled__ = true;
   
-      const targetId = btn.getAttribute('data-view-target');
-      const dst = document.getElementById(targetId);
-      if (!dst) return;
+    // [data-view][hidden] を確実に非表示に
+    try{
+      let s = document.getElementById('spa-hidden-style');
+      if (!s){
+        s = document.createElement('style');
+        s.id = 'spa-hidden-style';
+        s.textContent = '[data-view][hidden]{display:none!important}';
+        document.head.appendChild(s);
+      }
+    }catch(_){}
   
-      // data-view を持つページを切替
+    function showView(id){
+      const dst = document.getElementById(id);
+      if (!dst){ console.warn('showView: not found', id); return; }
+  
       document.querySelectorAll('[data-view]').forEach(sec=>{
         if (sec === dst) sec.removeAttribute('hidden');
         else sec.setAttribute('hidden','');
       });
   
-      // 先頭へスクロール
-      window.scrollTo(0, 0);
+      // セクション側で data-init="initCustomPushPage" のように指定してあれば呼ぶ
+      const initName = dst.dataset.init;
+      if (initName && typeof window[initName] === 'function'){
+        try{ window[initName](); }catch(e){ console.error(e); }
+      }
+  
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    window.showView = showView; // どこからでも呼べるように
+  
+    // クリック委譲
+    document.addEventListener('click', (e)=>{
+      const btn = e.target.closest('[data-view-target]');
+      if (!btn) return;
+      e.preventDefault(); // <a>対策
+      showView(btn.getAttribute('data-view-target'));
+    });
+  
+    // 何も表示されていなければホームを表示
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const anyVisible = Array.from(document.querySelectorAll('[data-view]'))
+        .some(sec => !sec.hasAttribute('hidden'));
+      if (!anyVisible){
+        const home = document.getElementById('view-home');
+        if (home) home.removeAttribute('hidden');
+      }
     });
   })();
+  
 </script> 
   
 <script>
