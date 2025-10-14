@@ -11,7 +11,7 @@
   /* ===== 設定 ===== */
   const FRONT_VERSION = "Front v4.1.7";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbziDrqJcI_8inC6cXuI1OoXWRei4VraBc-XTzLeh-6OIrAs-TakPmgERkkdjY2_eVJ-mg/exec";     // GAS v106.1 （PROD v1.0.1未反映）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwalKyjnaYiG6OYX8O2eh9DB3ZagsnOJa5aFSMugP-D518SCCc0_mOdylzFWUTl8iXvww/exec";     // GAS v106.1 （PROD v1.0.1未反映）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -4668,7 +4668,9 @@ window.reportReload = function(){ initAdminReportPage(); };
         
           sec.__rows   = Array.isArray(r.rows)   ? r.rows   : [];
           sec.__roster = Array.isArray(r.roster) ? r.roster : [];
-        
+          sec.__loadingAuto = false;
+          sec.__autoTargets = []; // [{lineId, name, label, perfs}]
+          
           const anyChecked = getCheckedStats().length > 0;
           if (anyChecked) renderAutoBox();
           else setText(boxAuto, '（対象ステータスを選択してください）');
@@ -4705,19 +4707,18 @@ window.reportReload = function(){ initAdminReportPage(); };
     
           const lid = await myLineId();
           const url = new URL(API_ENDPOINT);
-          url.searchParams.set('attendanceReport','1');
-          url.searchParams.set('meta','1');
-          url.searchParams.set('admin','1');
+          url.searchParams.set('listInputers','1');          // ★ 新API
+          url.searchParams.set('deliverableOnly','1');
+          url.searchParams.set('notifyOnly','1');
           if (lid) url.searchParams.set('lineId', lid);
     
           let r = {status:'error'};
           try { r = await fetch(url).then(x=>x.json()); } catch(_){}
     
           // ★ GAS側パッチで返す配列（[{lineId,name}]）
-          const list = Array.isArray(r.rosterInputers) ? r.rosterInputers : [];
-    
+          const list = Array.isArray(r.list) ? r.list : [];
           selExtra.innerHTML = list.map(x =>
-            `<option value="${x.lineId}">${x.name}</option>`
+            `<option value="${x.lineId}">${x.label || x.name}</option>`
           ).join('') || `<option value="" disabled>オプションなし</option>`;
     
           selExtra.disabled = (list.length === 0);
@@ -4739,18 +4740,17 @@ window.reportReload = function(){ initAdminReportPage(); };
           applyModeLock();
           if (selMode.value === 'manual'){
             sec.__loadingRows = false;                     // ★ 任意：手動にしたら読込状態を解除
-            setText(boxAuto, '（手動モード：自動選択は使いません）');
+            setText(boxAuto, '（手動モード選択中）');
             await populateManualList();
           }else{
-            await fetchReportForEvent(selMode.value);
+            await refreshAutoByPreview();
           }
         });
     
         // 対象ステータス変更 → 自動枠を即時更新（イベント委任で確実に）
         statWrap?.addEventListener('change', (e)=>{
           if (!e.target || !e.target.classList?.contains('cp_stat')) return;
-          if (sec.__loadingRows) return;
-          if (selMode?.value && selMode.value!=='manual') renderAutoBox();
+          if (selMode?.value && selMode.value!=='manual') refreshAutoByPreview();
         });
     
         selExtra?.addEventListener('input',  renderManualBox);   // iOS/Android向け
@@ -4764,7 +4764,36 @@ window.reportReload = function(){ initAdminReportPage(); };
         renderManualBox();
       }
     })();
-
+  
+    async function refreshAutoByPreview(){
+      if (!selMode || selMode.value==='manual') return;
+      const sts = getCheckedStats();
+      if (sts.length === 0){
+        setText(boxAuto, '（対象ステータスを選択してください）');
+        return;
+      }
+    
+      sec.__loadingAuto = true;
+      setText(boxAuto, '（読込中…）');
+    
+      const lid = await myLineId();
+      const url = new URL(API_ENDPOINT);
+      url.searchParams.set('attendanceReport','1');
+      url.searchParams.set('customPushPreview','1');  // GASのプレビューAPI
+      url.searchParams.set('eventId', selMode.value);
+      url.searchParams.set('statuses', JSON.stringify(sts));
+      if (lid) url.searchParams.set('senderLineId', lid);
+    
+      let r = {status:'error'};
+      try { r = await fetch(url).then(x=>x.json()); } catch(_){}
+      sec.__loadingAuto = false;
+    
+      if (r.status!=='ok'){ setText(boxAuto,'（取得エラー）'); sec.__autoTargets=[]; return; }
+    
+      sec.__autoTargets = Array.isArray(r.autoTargets) ? r.autoTargets : [];
+      const labels = sec.__autoTargets.map(x => x.label || x.name); // labelが無ければname
+      setText(boxAuto, labels.length ? labels.join('、') : '（該当なし）');
+    }
 </script> 
   
 <script>
