@@ -1305,6 +1305,11 @@
       font-size: 0.9rem;       /* ← お好みで 0.85rem 〜 0.95rem に調整 */
       line-height: 1.6;        /* ← 行間少し広めで読みやすく */
     }
+    /* 対象ステータス：ラベル文字色は黒(=既定色)に固定 */
+    #view-custom-push #cp_stat_wrap label,
+    #view-custom-push #cp_stat_wrap .repLabel{
+      color: var(--c-text) !important;
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1807,37 +1812,35 @@
 
           <script>
           (function(){
-            const selTpl  = document.getElementById('cp_tpl');
-            const selMode = document.getElementById('cp_event');
-            const bodyEl  = document.getElementById('cp_body');
-            const cntEl   = document.getElementById('cp_count');
+            function boot(){
+              const selTpl  = document.getElementById('cp_tpl');
+              const selMode = document.getElementById('cp_event');
+              const bodyEl  = document.getElementById('cp_body');
+              const cntEl   = document.getElementById('cp_count');
+              if (!selTpl || !selMode || !bodyEl) return;
           
-            if (!selTpl || !selMode || !bodyEl) return;
+              function pickEventCtx(){
+                const eid = selMode.value;
+                const ev = (eid && eid !== 'manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
+                return ev || { title:'{TITLE}', date:'{DATE}', time:'{TIME}',
+                               datetime:'{DATETIME}', place:'{PLACE}',
+                               meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}' };
+              }
           
-            function pickEventCtx(){
-              const eid = selMode.value;
-              const ev = (eid && eid !== 'manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
-              return ev || {
-                title:'{TITLE}', date:'{DATE}', time:'{TIME}',
-                datetime:'{DATETIME}', place:'{PLACE}',
-                meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}'
-              };
-            }
+              function applyTemplate(){
+                const kind = selTpl.value;
+                const ctx  = pickEventCtx();
+                let text = '';
           
-            function applyTemplate(){
-              const kind = selTpl.value;     // ← '雨天中止' / '時間変更' / ''
-              const ctx = pickEventCtx();
-              let text = '';
-          
-              if (kind === '雨天中止'){
-                text =
+                if (kind === '雨天中止'){
+                  text =
           `【雨天中止のお知らせ】
           ${ctx.datetime} 開催予定の「${ctx.title}」は、雨天のため中止となりました。
           楽しみにしてくださっていた皆さまには申し訳ありません。
           
           どうぞよろしくお願いいたします。`;
-              } else if (kind === '時間変更'){   // 集合時間の変更
-                text =
+                } else if (kind === '時間変更'){
+                  text =
           `【集合時間変更のお知らせ】
           ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
           集合場所：${ctx.meetPoint || '{MEET_POINT}'}
@@ -1845,33 +1848,34 @@
           場所：${ctx.place || '{PLACE}'}
           
           ご不便をおかけしますが、どうぞよろしくお願いいたします。`;
-              } else {
-                text = '';
+                }
+          
+                bodyEl.value = text;
+                bodyEl.dispatchEvent(new Event('input'));
+                if (cntEl) cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
               }
           
-              bodyEl.value = text;
-              bodyEl.dispatchEvent(new Event('input'));  // 文字数カウンタ等の更新
+              selTpl.addEventListener('change', applyTemplate);
+              selMode.addEventListener('change', () => { if (selTpl.value) applyTemplate(); });
+          
+              // 文字数カウンタ
               if (cntEl){
-                cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
+                const upd = () => cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
+                bodyEl.addEventListener('input', upd); upd();
               }
+          
+              bodyEl.style.whiteSpace = 'pre-wrap';
+              bodyEl.style.lineHeight = '1.6';
             }
           
-            // 変更時に適用
-            selTpl.addEventListener('change', applyTemplate);
-            // イベントを変更したら“現在のテンプレ”で差し替え
-            selMode.addEventListener('change', () => { if (selTpl.value) applyTemplate(); });
-          
-            // 本文の文字数カウンタ
-            if (cntEl){
-              const upd = () => cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
-              bodyEl.addEventListener('input', upd); upd();
+            // ← ここがポイント：DOM構築完了を待つ
+            if (document.readyState === 'loading'){
+              document.addEventListener('DOMContentLoaded', boot);
+            }else{
+              boot();
             }
-          
-            // 表示を綺麗に
-            bodyEl.style.whiteSpace = 'pre-wrap';
-            bodyEl.style.lineHeight = '1.6';
           })();
-        </script>
+          </script>
         </div>
     
         <!-- 本文 -->
