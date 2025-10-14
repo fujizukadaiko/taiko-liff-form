@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.2.4";  // stable ver→v4.2.3, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.2.5";  // stable ver→v4.2.4, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyt-ZM3Y3v8dX1bPuVwW637PnntDdrBHYsRr92_C0lc6riRBzyRJikYZpQvZ-ylkoYsZg/exec";     // GAS v106.2 （PROD v1.0.1未反映）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwx5L_E7BeSoI7NXrTYA8zeTn6_mHSixzhmF9EWr6NACRVOoNmsddyp8iEeq0Ozbntj5g/exec";     // GAS v106.2 （PROD v1.0.1未反映）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -1122,34 +1122,48 @@
     }
 
     /* 管理レポート：名前⇔コメントの間を固定ギャップで */
+    /* 行＝名前｜コメント */
     #view-admin-report .repPersonRow{
-      display: flex;
-      align-items: baseline;
-      justify-content: flex-start; /* space-between をやめる */
-      gap: 16px;                   /* ← お好みで 12–20px */
+      display:flex;
+      align-items:flex-start;      /* ベースラインでもOK */
+      gap:16px;
     }
     
-    /* 左（名前）は内容幅のまま / 右（コメント）は伸縮＆折り返し */
-    #view-admin-report .repPersonRow .repName { flex: 0 0 auto; }
-    #view-admin-report .repPersonRow .repAt   { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+    /* 左：名前は内容幅のまま */
+    #view-admin-report .repPersonRow .repName{
+      flex:0 0 auto;
+    }
     
-    /* 右が空なら非表示（見た目のズレ防止） */
-    #view-admin-report .repPersonRow .repAt:empty { display:none; }
-    /* コメントの前に薄い「｜」を表示 */
+    /* 右：器は伸縮OK＆縮められるように min-width:0 */
     #view-admin-report .repPersonRow .repAt{
-      display:flex;              /* 既に指定済みなら不要 */
+      flex:1 1 auto;
+      min-width:0;                 /* ← これ重要（flex item の既定 min-width:auto を打消す） */
+      display:flex;                /* パイプ「｜」と本文を横並びにするため */
       align-items:baseline;
+      overflow-wrap:anywhere;      /* 念のため器側にも付けておく */
+      word-break:break-word;
     }
     
+    /* 右：本文本体（ここに折返しルールを直付け） */
     #view-admin-report .repComment{
-      position:relative;
+      display:block;               /* flex item として扱いやすく */
+      flex:1 1 auto;
+      min-width:0;                 /* ← これがないと縮まずに右へ溢れます */
+      white-space:normal !important;
+      overflow-wrap:anywhere;
+      word-break:break-word;
     }
     
+    /* 右が空なら非表示（ズレ防止） */
+    #view-admin-report .repPersonRow .repAt:empty { display:none; }
+    
+    /* コメント前の区切り「｜」 */
     #view-admin-report .repComment::before{
-      content: "｜";             /* 全角バー */
-      color: var(--c-muted);     /* 薄い色で */
-      margin-right: .5em;        /* バーと文字の間隔 */
-      opacity: .7;               /* さらに薄くしたい時は 0.5〜0.7 で調整 */
+      content:"｜";
+      color:var(--c-muted);
+      margin-right:.5em;
+      opacity:.7;
+      flex:0 0 auto;
     }
     /* 1行目：左=日付時刻／右=区分バッジ */
     .fRow1 { display:flex; align-items:baseline; gap:6px; }
@@ -1316,6 +1330,13 @@
       line-height: 1.7;            /* 読みやすさ維持におすすめ */
     }
     
+    .siteFooter{
+      margin:24px 0 12px; padding:8px 0; text-align:center;
+      font-size:12px; color:#9CA3AF;
+    }
+    .siteFooter a{ color:inherit; text-decoration:underline; text-underline-offset:2px; }
+    .siteFooter .ver{ margin-left:8px; opacity:.7; }
+  
   </style>
   
   <!-- LIFF SDK -->
@@ -1636,6 +1657,15 @@
       <div id="repBox" class="muted">公演を選択してください</div>
     </section>
   </main>
+
+  <footer class="siteFooter">
+    <small>
+      <a href="/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
+      <span class="sep">・</span>
+      <a href="/terms.html" target="_blank" rel="noopener">利用規約</a>
+      <span class="ver" id="verFoot"></span>
+    </small>
+  </footer>
   
     <!-- ===== カスタム通知（管理者） ===== -->
     <section id="view-custom-push" data-view>
@@ -2146,6 +2176,18 @@
     }
     .cpModal .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
     .cpModal .muted{ color:#6b6b6b; font-size:12px; }
+    
+    /* 種別バッジの配色（.kind-badge / .scKind の中身テキストに応じて） */
+    .kind-badge, .scKind { border-color: transparent; }
+    .kind-badge.badge--announce, .scKind.badge--announce {
+      background:#FEF3C7; border-color:#F59E0B; color:#92400E; /* 黄 */
+    }
+    .kind-badge.badge--practice, .scKind.badge--practice {
+      background:#ECFDF5; border-color:#10B981; color:#065F46; /* 緑 */
+    }
+    .kind-badge.badge--other, .scKind.badge--other {
+      background:#F5F3FF; border-color:#8B5CF6; color:#5B21B6; /* 紫 */
+    }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -3624,6 +3666,7 @@ async function onRegister(){
 (() => {
   if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 6) return;
   window.__SchedulesBlockV__ = 6;
+  const KIND_CLASS = { '発表':'badge--announce', '練習':'badge--practice', 'その他':'badge--other' };
   // --- フィルタ保存/復元（localStorage） ---
   const FILTER_KEY = 'sched:filters:v1';
   function saveFilters(){
@@ -3671,6 +3714,7 @@ async function onRegister(){
     const segLabel = dispSeg(segNorm);
     const dateText = ymdDow(parseYmdStrictLocal(it.ymd || it.date)) || (it.date || "");
     const kindText = String(it.kind || "").trim();
+    const kindCls  = KIND_CLASS[kindText] || ""; 
     const memoText = String(it.memo || "").trim();
   
     const meetTxt  = [
@@ -3691,7 +3735,7 @@ async function onRegister(){
         <!-- 1行目：左=区分 / 右=種別 -->
         <div class="scTop">
           ${segLabel ? `<span class="seg-badge ${segNorm==='adult'?'seg-adult':segNorm==='child'?'seg-child':'seg-both'}">${segLabel}</span>` : ``}
-          ${kindText ? `<span class="scKind">${kindText}</span>` : ``}
+          ${kindText ? `<span class="scKind ${kindCls}">${kindText}</span>` : ``}
         </div>
   
         <!-- 2行目：日付 + タイトル（1行省略） -->
@@ -4639,9 +4683,10 @@ window.reportReload = function(){ initAdminReportPage(); };
           <div class="repPersonRow">
             <div class="repName">${h(p.name)}</div>
             <div class="repAt">${
-              (p.comment && `<span class="repComment">${h(String(p.comment).trim())}</span>`)
-              || repFormatAt(p.at)
-              || ''
+              (p.comment
+                 ? `<span class="repComment">${h(String(p.comment).trim())}</span>`
+                : (repFormatAt(p.at) ? `<span class="repComment">${h(repFormatAt(p.at))}</span>` : '')
+              )
             }</div>
           </div>
         `).join("")}
