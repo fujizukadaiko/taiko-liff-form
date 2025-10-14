@@ -1310,6 +1310,11 @@
     #view-custom-push #cp_stat_wrap .repLabel{
       color: var(--c-text) !important;
     }
+    /* 本文を少し小さめに */
+    #cp_body.cp-textarea{
+      font-size: 13px !important;  /* 12〜15あたりでお好み調整 */
+      line-height: 1.7;            /* 読みやすさ維持におすすめ */
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1819,127 +1824,61 @@
               const cntEl   = document.getElementById('cp_count');
               if (!selTpl || !selMode || !bodyEl) return;
           
-              const idx = (window.__EVENT_INDEX__ ||= {});
-              const detailPromises = (window.__EVENT_DETAIL_PROMISES__ ||= {});
-          
-              // 詳細を1回だけ取得して meet / meetPoint 等を補完（キャッシュ＆重複リクエスト抑止）
-              async function ensureEventCtx(eid){
-                if (!eid) return null;
-                let ev = idx[eid];
-                if (!ev) return null;
-                if (ev.meet && ev.meetPoint) return ev;
-          
-                if (!detailPromises[eid]){
-                  const lid = (window.state && window.state.lineId) || ''; // 既にあれば使う（待たない）
-                  const url = new URL(API_ENDPOINT);
-                  url.searchParams.set('attendanceReport','1');
-                  url.searchParams.set('eventId', eid);
-                  url.searchParams.set('detail','1');
-                  url.searchParams.set('admin','1');
-                  if (lid) url.searchParams.set('lineId', lid);
-          
-                  detailPromises[eid] = fetch(url).then(x=>x.json()).catch(()=>null);
-                }
-                const r = await detailPromises[eid];
-                const p = (r && (r.detail || r)) || {};
-                ev = Object.assign(ev, {
-                  meet      : ev.meet      || p.meet || p.meetAt || p.meetTime || p['集合'] || '',
-                  meetPoint : ev.meetPoint || p.meetPoint || p['集合場所'] || p.place || p.venue || '',
-                  time      : ev.time      || p.hm || p.time || '',
-                  date      : ev.date      || p.ymd || p.date || '',
-                  datetime  : ev.datetime  || [p.ymd || ev.date || '', p.hm || ev.time || ''].filter(Boolean).join(' ')
-                });
-                idx[eid] = ev;
-                return ev;
+              function pickEventCtx(){
+                const eid = selMode.value;
+                const ev = (eid && eid !== 'manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
+                return ev || { title:'{TITLE}', date:'{DATE}', time:'{TIME}',
+                               datetime:'{DATETIME}', place:'{PLACE}',
+                               meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}' };
               }
           
-              function updateCounter(){
-                if (cntEl) cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
-              }
-          
-              // まずは即時反映 → 裏で詳細が取れたら {MEET_OLD}/{MEET_POINT} を差し替え
-              function applyTemplateFast(){
-                const kind = selTpl.value;              // '雨天中止' | '時間変更' | ''
-                const eid  = selMode.value;
-                let ctx = (eid && eid !== 'manual') ? (idx[eid] || null) : null;
-          
-                // 即時生成
-                const base = ctx || {
-                  title:'{TITLE}', date:'{DATE}', time:'{TIME}',
-                  datetime:'{DATETIME}', place:'{PLACE}',
-                  meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}'
-                };
-          
+              function applyTemplate(){
+                const kind = selTpl.value;
+                const ctx  = pickEventCtx();
                 let text = '';
+          
                 if (kind === '雨天中止'){
                   text =
           `【雨天中止のお知らせ】
-          ${base.datetime} 開催予定の「${base.title}」は、雨天のため中止となりました。
+          ${ctx.datetime} 開催予定の「${ctx.title}」は、雨天のため中止となりました。
           楽しみにしてくださっていた皆さまには申し訳ありません。
           
           どうぞよろしくお願いいたします。`;
                 } else if (kind === '時間変更'){
-                  const oldMeet = base.meet || '{MEET_OLD}';
                   text =
           `【集合時間変更のお知らせ】
-          ${base.date} の「${base.title}」は、集合時間を ${oldMeet} → {MEET_NEW} に変更します。
-          集合場所：${base.meetPoint || '{MEET_POINT}'}
-          開始時間：${base.time || '{TIME}'}
-          場所：${base.place || '{PLACE}'}
+          ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
+          集合場所：${ctx.meetPoint || '{MEET_POINT}'}
+          開始時間：${ctx.time || '{TIME}'}
+          場所：${ctx.place || '{PLACE}'}
           
           ご不便をおかけしますが、どうぞよろしくお願いいたします。`;
                 }
           
-                // まずは即時に本文へ
                 bodyEl.value = text;
                 bodyEl.dispatchEvent(new Event('input'));
-                updateCounter();
-          
-                // 裏更新：meet/meetPoint が未取得なら補完して置換（ユーザーが編集したら触らない）
-                if (kind === '時間変更' && eid && eid !== 'manual' && (!ctx || !ctx.meet || !ctx.meetPoint)){
-                  const tplAtApply = selTpl.value;
-                  const eidAtApply = selMode.value;
-                  const snapshot   = bodyEl.value; // 現在の本文（編集検出用）
-          
-                  ensureEventCtx(eid).then(ev=>{
-                    if (!ev) return;
-                    // テンプレ選択やイベント選択が変わっていたら何もしない
-                    if (selTpl.value !== tplAtApply || selMode.value !== eidAtApply) return;
-                    // ユーザーが本文を編集していたら何もしない
-                    if (bodyEl.value !== snapshot) return;
-          
-                    let v = bodyEl.value;
-                    if (ev.meet && v.includes('{MEET_OLD}'))    v = v.replace('{MEET_OLD}', ev.meet);
-                    if (ev.meetPoint && v.includes('{MEET_POINT}')) v = v.replace('{MEET_POINT}', ev.meetPoint);
-                    if (v !== bodyEl.value){
-                      bodyEl.value = v;
-                      bodyEl.dispatchEvent(new Event('input'));
-                      updateCounter();
-                    }
-                  });
-                }
+                if (cntEl) cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
               }
           
-              // イベント変更時：先回りで詳細プリフェッチ（体感が速くなる）
-              selMode.addEventListener('change', ()=>{
-                const eid = selMode.value;
-                if (eid && eid !== 'manual') ensureEventCtx(eid); // 先に温めるだけ
-                if (selTpl.value) applyTemplateFast();            // 既にテンプレ選択済みなら即再適用
-              });
+              selTpl.addEventListener('change', applyTemplate);
+              selMode.addEventListener('change', () => { if (selTpl.value) applyTemplate(); });
           
-              // テンプレ選択で即反映
-              selTpl.addEventListener('change', applyTemplateFast);
+              // 文字数カウンタ
+              if (cntEl){
+                const upd = () => cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
+                bodyEl.addEventListener('input', upd); upd();
+              }
           
-              // カウンタ
-              if (cntEl){ bodyEl.addEventListener('input', updateCounter); updateCounter(); }
-          
-              // 見た目
               bodyEl.style.whiteSpace = 'pre-wrap';
               bodyEl.style.lineHeight = '1.6';
             }
           
-            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-            else boot();
+            // ← ここがポイント：DOM構築完了を待つ
+            if (document.readyState === 'loading'){
+              document.addEventListener('DOMContentLoaded', boot);
+            }else{
+              boot();
+            }
           })();
           </script>
         </div>
