@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.2.1";  // stable ver→v4.1.9, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.2.2";  // stable ver→v4.1.9, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzD7-37N_tsKH4KiElCqgQrnCn2yyLEF9B-qHz0oNmdvUleyU3ACiSu1Cf9iYyjX6UUxg/exec";     // GAS v106.1 （PROD v1.0.1未反映）
 
@@ -1819,19 +1819,53 @@
               const cntEl   = document.getElementById('cp_count');
               if (!selTpl || !selMode || !bodyEl) return;
           
-              function pickEventCtx(){
-                const eid = selMode.value;
-                const ev = (eid && eid !== 'manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
-                return ev || { title:'{TITLE}', date:'{DATE}', time:'{TIME}',
-                               datetime:'{DATETIME}', place:'{PLACE}',
-                               meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}' };
+              // 必要なら1回だけ詳細を取得して meet / meetPoint を補完
+              async function ensureEventCtx(eid){
+                const idx = (window.__EVENT_INDEX__ ||= {});
+                let ev = idx[eid];
+                if (!ev) return null;                 // まずは meta で見つからないと無理
+          
+                if (ev.meet && ev.meetPoint) return ev;   // 既に持っていればOK
+          
+                try{
+                  const lid = (typeof window.getLineId === 'function') ? (await window.getLineId()) : '';
+                  const url = new URL(API_ENDPOINT);
+                  url.searchParams.set('attendanceReport','1');
+                  url.searchParams.set('eventId', eid);
+                  url.searchParams.set('detail','1');
+                  url.searchParams.set('admin','1');
+                  if (lid) url.searchParams.set('lineId', lid);
+          
+                  const r = await fetch(url).then(x=>x.json());
+                  const p = (r && (r.detail || r)) || {};
+          
+                  // 広めのキー吸収（どれか入っていれば拾う）
+                  ev = Object.assign(ev, {
+                    meet      : p.meet || p.meetAt || p.meetTime || p['集合'] || ev.meet || '',
+                    meetPoint : p.meetPoint || p['集合場所'] || p.place || p.venue || ev.meetPoint || '',
+                    time      : ev.time || p.hm || p.time || '',
+                    date      : ev.date || p.ymd || p.date || '',
+                    datetime  : ev.datetime || [p.ymd || ev.date || '', p.hm || ev.time || ''].filter(Boolean).join(' ')
+                  });
+                  idx[eid] = ev;  // キャッシュ更新
+                }catch(_){}
+                return ev;
               }
           
-              function applyTemplate(){
+              async function applyTemplate(){
                 const kind = selTpl.value;
-                const ctx  = pickEventCtx();
-                let text = '';
+                const eid  = selMode.value;
           
+                // ベース文脈
+                let ctx = (eid && eid !== 'manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
+                if (eid && (!ctx || !ctx.meet)) ctx = await ensureEventCtx(eid); // meet が無ければ詳細取得
+                ctx = ctx || {
+                  title:'{TITLE}', date:'{DATE}', time:'{TIME}',
+                  datetime:'{DATETIME}', place:'{PLACE}',
+                  meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}'
+                };
+          
+                let text = '';
                 if (kind === '雨天中止'){
                   text =
           `【雨天中止のお知らせ】
@@ -1840,9 +1874,10 @@
           
           どうぞよろしくお願いいたします。`;
                 } else if (kind === '時間変更'){
+                  const oldMeet = ctx.meet || '{MEET_OLD}';
                   text =
           `【集合時間変更のお知らせ】
-          ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
+          ${ctx.date} の「${ctx.title}」は、集合時間を ${oldMeet} → {MEET_NEW} に変更します。
           集合場所：${ctx.meetPoint || '{MEET_POINT}'}
           開始時間：${ctx.time || '{TIME}'}
           場所：${ctx.place || '{PLACE}'}
@@ -1855,27 +1890,21 @@
                 if (cntEl) cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
               }
           
-              selTpl.addEventListener('change', applyTemplate);
-              selMode.addEventListener('change', () => { if (selTpl.value) applyTemplate(); });
+              selTpl.addEventListener('change', ()=>applyTemplate());
+              selMode.addEventListener('change', ()=>{ if (selTpl.value) applyTemplate(); });
           
               // 文字数カウンタ
               if (cntEl){
                 const upd = () => cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
                 bodyEl.addEventListener('input', upd); upd();
               }
-          
               bodyEl.style.whiteSpace = 'pre-wrap';
               bodyEl.style.lineHeight = '1.6';
             }
-          
-            // ← ここがポイント：DOM構築完了を待つ
-            if (document.readyState === 'loading'){
-              document.addEventListener('DOMContentLoaded', boot);
-            }else{
-              boot();
-            }
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+            else boot();
           })();
-          </script>
+</script>
         </div>
     
         <!-- 本文 -->
@@ -1902,7 +1931,7 @@
       --violet-100: #F2EEFF;
       --ink: #2b2346;
       --muted: #6b6b86;
-      padding: 16px;
+      padding: 14px;
       background: linear-gradient(180deg, #f7f5ff 0%, #f9f9ff 100%);
     }
     
