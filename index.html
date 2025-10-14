@@ -1992,6 +1992,41 @@
     
     /* --- 5) 仕上げ：内側要素が親幅を超えないよう安全網 --- */
     #view-custom-push * { max-width: 100%; box-sizing: border-box; }
+    
+    /* 1) 背景色のズレを解消：親の背景をそのまま使う */
+    #view-custom-push{
+      background: inherit !important;            /* ← 自前グラデをやめて親と完全一致 */
+      padding-top: 0;                             /* ← 上の余白はゼロ（必要なら下のsafe-areaで復活） */
+    }
+    @supports (padding: env(safe-area-inset-top)) {
+      #view-custom-push{ padding-top: env(safe-area-inset-top); } /* iOSのノッチ分だけ足す（任意） */
+    }
+    
+    /* 2) タイトル行（「カスタム通知」）の上下バランスを他ページに合わせる */
+    #view-custom-push > .row-space:first-child,
+    #view-custom-push .cp-header{
+      margin: 8px 0 12px; /* 出欠結果一覧と同等の“間” */
+    }
+    #view-custom-push .sectionTitle{ margin: 0; } /* 見出し自身の余計な上マージンを潰す */
+    
+    /* 3) 見出しとカードの間に“薄紫の余白”を作る */
+    #view-custom-push .card{ 
+      margin-top: 12px !important;  /* 前回0にしたのを戻す（1枚目に効けばOK） */
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    /* 4) 宛先の表示は改行＋小さめ文字（自動／手動 共通） */
+    #view-custom-push .cp-pill-body,
+    #cp_auto, #cp_auto_targets, #cp_manual, #cp_manual_targets{
+      white-space: pre-line;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    
+    /* 5) 念のための横はみ出し防止（前回の安全網は残してOK） */
+    html, body{ overflow-x: hidden; }
+    #view-custom-push *{ max-width: 100%; box-sizing: border-box; }
   </style>
   </script>
 
@@ -4792,7 +4827,7 @@ window.reportReload = function(){ initAdminReportPage(); };
           const names = Array.from(selExtra.selectedOptions)
             .map(o => o.textContent.trim())
             .filter(Boolean);
-          setText(boxManual, names.length ? names.join('、') : '（未選択）');
+          setText(boxManual, names.length ? names.join('\n') : '（未選択）');
         }
 
         // === CustomPush: globals bootstrap ===
