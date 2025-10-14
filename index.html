@@ -1290,6 +1290,13 @@
       color: var(--c-muted);
       margin-left: 6px;
     }
+    
+    #cp_extra_row { grid-template-columns: 1fr var(--attSel-width); }
+    #cp_extra_row .row-att-note{
+      grid-column: 1 / -1;     /* 下段で2列ぶち抜き */
+      margin-top: 4px;
+    }
+    .loadingHint{ font-size:12px; color: var(--c-muted); }
   </style>
   
   <!-- LIFF SDK -->
@@ -1739,14 +1746,15 @@
         </div>
     
         <!-- 宛先追加（手動） ラベル左 / セレクト右（※要望③：角丸） -->
-        <div class="row-att" style="margin:12px 0;">
-          <label for="cp_extra" class="repLabel">
-            宛先追加（手動）
-            <span id="cp_extra_hint" class="loadingHint" hidden>（読み込み中…）</span>
-          </label>
+        <div class="row-att" id="cp_extra_row" style="margin:12px 0;">
+          <label for="cp_extra" class="repLabel">宛先追加（手動）</label>
           <select id="cp_extra" class="selectBtn" multiple>
-            <option value="" disabled hidden>選択してください</option>
+            <option value="">選択してください</option>
           </select>
+          <!-- 下段フル幅で表示 -->
+          <div class="row-att-note">
+            <span id="cp_extra_hint" class="loadingHint" hidden>（読み込み中…）</span>
+          </div>
         </div>
     
         <!-- 自動選択 / 手動追加（表示のみ・薄紫） -->
@@ -4535,7 +4543,7 @@ window.reportReload = function(){ initAdminReportPage(); };
         const hintExtra    = document.getElementById('cp_extra_hint');     // （読み込み中…）ラベル
     
         const boxAuto      = document.getElementById('cp_auto_targets');   // 宛先（自動選択）
-        const boxManual    = document.getElementById('cp_manual_targets'); // 宛先（手動選択）
+        const boxManual = sec.querySelector('#cp_manual_targets, #cp_manual'); // 宛先（手動選択）
     
         // 画面内キャッシュ
         sec.__rows   = [];   // 出欠 rows（event選択時）
@@ -4643,7 +4651,8 @@ window.reportReload = function(){ initAdminReportPage(); };
           try { r = await fetch(url).then(x=>x.json()); } catch(_){}
           if (r.status!=='ok'){ setText(boxAuto, '（取得エラー）'); sec.__rows = []; return; }
     
-          sec.__rows = Array.isArray(r.rows) ? r.rows : [];
+          sec.__rows   = Array.isArray(r.rows)   ? r.rows   : [];
+          sec.__roster = Array.isArray(r.roster) ? r.roster : []; // ★ 追加
           const anyChecked = getCheckedStats().length > 0;
           if (anyChecked) renderAutoBox();
           else setText(boxAuto, '（対象ステータスを選択してください）');
@@ -4651,12 +4660,24 @@ window.reportReload = function(){ initAdminReportPage(); };
     
         // ===== 対象ステータス選択に応じて自動枠を描画 =====
         function renderAutoBox(){
-          const checked = new Set(getCheckedStats());
-          const names = (sec.__rows || [])
-            .filter(x => checked.has(x.attend || '未回答'))
-            // lineId フィルタは“表示”には不要。送信時にフィルタします
-            .map(x => x.displayName || x.name)
-            .filter(Boolean);
+          const sel = new Set(getCheckedStats());
+          const names = [];
+        
+          // 未回答 = roster － 回答者
+          if (sel.has('未回答')){
+            const answered = new Set((sec.__rows||[]).map(x => x.name).filter(Boolean));
+            const noans = (sec.__roster||[]).filter(nm => !answered.has(nm));
+            names.push(...noans);
+          }
+          // 参加/未定/欠席
+          ['参加','未定','欠席'].forEach(st=>{
+            if (sel.has(st)){
+              names.push(...(sec.__rows||[])
+                .filter(x => x.attend === st)
+                .map(x => x.displayName || x.name));
+            }
+          });
+        
           setText(boxAuto, names.length ? names.join('、') : '（該当なし）');
         }
     
@@ -4684,6 +4705,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     
           selExtra.disabled = (list.length === 0);
           loadingOnExtra(false);
+          renderManualBox();
         }
     
         // ===== 手動の選択を表示枠に反映 =====
@@ -4712,7 +4734,8 @@ window.reportReload = function(){ initAdminReportPage(); };
           });
         });
     
-        selExtra?.addEventListener('change', renderManualBox);
+        selExtra?.addEventListener('input',  renderManualBox);   // iOS/Android向け
+        selExtra?.addEventListener('change', renderManualBox);   // PC向け
     
         // ===== 初期化 =====
         if (boxAuto)   setText(boxAuto,  '（初期化中…）');
