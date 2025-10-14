@@ -11,7 +11,7 @@
   /* ===== 設定 ===== */
   const FRONT_VERSION = "Front v4.2.3";  // stable ver→v4.2.2, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzD7-37N_tsKH4KiElCqgQrnCn2yyLEF9B-qHz0oNmdvUleyU3ACiSu1Cf9iYyjX6UUxg/exec";     // GAS v106.1 （PROD v1.0.1未反映）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwTuXWpdBzZBoQ3QCulDbMQ5yGZ-_4eoViwocHLre5bNhRk6Au2dDYFXg3fWp7FFkx_Dg/exec";     // GAS v106.2 （PROD v1.0.1未反映）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -5198,26 +5198,24 @@ window.reportReload = function(){ initAdminReportPage(); };
       // --- 実送信 ---
       async function sendNow({ body, targets, eventId }){
         const sender = (typeof window.getLineId === 'function') ? (await window.getLineId()) : '';
-        const url = new URL(API_ENDPOINT);
-        url.searchParams.set('customPushSend','1'); // ★サーバ側でこのフラグを受ける想定
-    
-        const payload = {
-          senderLineId: sender || undefined,
-          eventId: (eventId && eventId !== 'manual') ? eventId : '',
-          body,
-          targets: targets.map(t => t.lineId) // 文字列配列
-        };
-    
-        // POST(JSON) で送る（GETは長文で落ちるため使わない）
+      
+        // フラグはボディ側に入れる（クエリに付けてもOK）
+        const form = new URLSearchParams();
+        form.set('customPushSend', '1');
+        if (sender) form.set('senderLineId', sender);
+        if (eventId && eventId !== 'manual') form.set('eventId', eventId);
+        form.set('body', body);
+        form.set('targets', JSON.stringify(targets.map(t => t.lineId)));
+      
         let r;
         try{
-          r = await fetch(url.toString(), {
-            method:'POST',
-            headers:{ 'Content-Type':'application/json' },
-            body: JSON.stringify(payload)
-          }).then(x=>x.json());
+          r = await fetch(API_ENDPOINT, {
+            method: 'POST',
+            // ← Content-Type は指定しない（ブラウザが x-www-form-urlencoded を付ける）
+            body: form
+          }).then(x => x.json());
         }catch(e){
-          r = { status:'error', message: String(e) };
+          r = { status:'error', message:String(e) };
         }
         return r;
       }
