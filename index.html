@@ -11,7 +11,7 @@
   /* ===== 設定 ===== */
   const FRONT_VERSION = "Front v4.2.3";  // stable ver→v4.2.2, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwTuXWpdBzZBoQ3QCulDbMQ5yGZ-_4eoViwocHLre5bNhRk6Au2dDYFXg3fWp7FFkx_Dg/exec";     // GAS v106.2 （PROD v1.0.1未反映）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwPpewg3frNiJPyavQX1J8AXTKEV8X7ZcTciZvutJuI-_KBPKD9que1TnpOwoa6yS9nmA/exec";     // GAS v106.2 （PROD v1.0.1未反映）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -5199,7 +5199,6 @@ window.reportReload = function(){ initAdminReportPage(); };
       async function sendNow({ body, targets, eventId }){
         const sender = (typeof window.getLineId === 'function') ? (await window.getLineId()) : '';
       
-        // フラグはボディ側に入れる（クエリに付けてもOK）
         const form = new URLSearchParams();
         form.set('customPushSend', '1');
         if (sender) form.set('senderLineId', sender);
@@ -5207,17 +5206,24 @@ window.reportReload = function(){ initAdminReportPage(); };
         form.set('body', body);
         form.set('targets', JSON.stringify(targets.map(t => t.lineId)));
       
-        let r;
+        // まず通常の CORS で試す
         try{
-          r = await fetch(API_ENDPOINT, {
-            method: 'POST',
-            // ← Content-Type は指定しない（ブラウザが x-www-form-urlencoded を付ける）
-            body: form
-          }).then(x => x.json());
+          const res = await fetch(API_ENDPOINT, { method:'POST', body: form });
+          // 読めるなら JSON を読む
+          let data = null;
+          try { data = await res.json(); } catch(_) {}
+          if (res.ok) return data || { status:'ok' };
+          throw new Error('HTTP '+res.status);
         }catch(e){
-          r = { status:'error', message:String(e) };
+          console.warn('CORS failed, fallback to no-cors:', e);
+          // フォールバック：投げっぱなし（成功可否は読めない）
+          try{
+            await fetch(API_ENDPOINT, { method:'POST', body: form, mode:'no-cors' });
+            return { status:'ok', note:'no-cors fallback' };
+          }catch(err){
+            return { status:'error', message:String(err) };
+          }
         }
-        return r;
       }
     
       // --- バリデーション（未入力やプレースホルダを検知） ---
