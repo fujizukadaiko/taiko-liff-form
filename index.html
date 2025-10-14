@@ -1641,7 +1641,8 @@
               <script>
                 (function(){
                   const sec = document.getElementById('view-custom-push');
-                  const selEvent = document.getElementById('cp_event');
+                  const selMode = document.getElementById('cp_event');
+                  window.selMode = selMode;  
                   const statWrap = document.getElementById('cp_stat_wrap');
                   const statLock = document.getElementById('cp_stat_lock');
                 
@@ -1664,19 +1665,19 @@
                 
                   // --- 手動モード時の見た目＆操作不可切替（すでにあるUIを利用） ---
                   function applyModeUI(){
-                    const manual = (selEvent.value === 'manual' || !selEvent.value);
+                    const manual = (selMode.value === 'manual' || !selMode.value);
                     sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = manual);
                     statWrap?.classList.toggle('is-disabled', manual);
                     statWrap?.setAttribute('aria-disabled', manual ? 'true' : 'false');
                     if (statLock) statLock.hidden = !manual;
                   }
                 
-                  selEvent.addEventListener('change', applyModeUI);
+                  selMode.addEventListener('change', applyModeUI);
                 
                   // --- イベント候補を投入（公開中 × 発表 を優先） ---
                   async function fillEventChoices(){
                     // プレースホルダ
-                    selEvent.innerHTML =
+                    selMode.innerHTML =
                       `<option value="manual">宛先を手動で選ぶ</option>` +
                       `<option value="" disabled>読み込み中…</option>`;
                 
@@ -1714,7 +1715,7 @@
                       return `<option value="${id}">${dt} ｜ ${tt}</option>`;
                     }).join('') || `<option value="" disabled>（該当イベントなし）</option>`;
                 
-                    selEvent.innerHTML = `<option value="manual">宛先を手動で選ぶ</option>` + opts;
+                    selMode.innerHTML = `<option value="manual">宛先を手動で選ぶ</option>` + opts;
                 
                     // 初期のUI反映
                     applyModeUI();
@@ -4137,8 +4138,8 @@ window.reportReload = function(){ initAdminReportPage(); };
   
   // --- ヘルパー：state.report からセレクトを全面再描画 ---
   function drawEventSelectFromReport(){
-    if (!selEvent) return;
-    selEvent.innerHTML = `<option value="">（選択してください）</option>`;
+    if (!selMode) return;
+    selMode.innerHTML = `<option value="">（選択してください）</option>`;
 
     const items = (state.report || []).slice().sort((a,b)=>
       String(a.ymd||"").localeCompare(String(b.ymd||"")) ||
@@ -4151,9 +4152,9 @@ window.reportReload = function(){ initAdminReportPage(); };
       // ★ id / eventId のどちらでもOKに
       opt.value = String(e.id ?? e.eventId ?? "");
       opt.textContent = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
-      selEvent.appendChild(opt);
+      selMode.appendChild(opt);
     }
-    selEvent.disabled = false;
+    selMode.disabled = false;
   }
 
     /* ===== 出欠結果一覧（管理者） 1枚カード版 ===== */
