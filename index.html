@@ -2190,7 +2190,7 @@
       position: fixed;
       left: 0; right: 0; bottom: 0;
       text-align: center;
-      font-size: 12px;
+      font-size: 10px;
       color: var(--c-muted);
       padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); /* iOSノッチ対応 */
       background: transparent; /* 背景は透過のまま(邪魔なら#fffなどに) */
@@ -2209,6 +2209,16 @@
     }
     @supports (padding: max(0px)){
       main{ padding-bottom: max(42px, env(safe-area-inset-bottom)); }
+    }
+    /* ===== カスタム通知：タイトル周りの余白を他ページと揃える ===== */
+    #view-custom-push > .row-space{
+      margin: 8px 0 8px !important;   /* 上下とも控えめに（出欠結果一覧と同程度） */
+    }
+    #view-custom-push .sectionTitle{
+      margin: 0 !important;           /* 見出し自体の余白をリセット */
+    }
+    #view-custom-push .card:first-of-type{
+      margin-top: 8px !important;     /* 1枚目カードの上マージンだけ薄く */
     }
   </style>
 
