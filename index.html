@@ -1645,144 +1645,115 @@
           <label for="cp_event" class="repLabel">宛先の選び方</label>
           <select id="cp_event" class="selectBtn schedSel">
             <option value="manual">手動のみで宛先を選ぶ</option>
-            <optgroup label="イベントから選ぶ">
-              <script>
-                window.getLineId = window.getLineId || (async function(){
-                  // 1) 既存の getMyLineId_ があれば最優先
-                  try {
-                    if (typeof window.getMyLineId_ === 'function') {
-                      const id = await window.getMyLineId_();
-                      if (id) { (window.state ||= {}).lineId = id; return id; }
-                    }
-                  } catch(_) {}
-                
-                  // 2) 既に保持済みならそれ
-                  const tryOnce = () => {
-                    if (window.__ME__?.lineId) return window.__ME__.lineId;
-                    if (window.state?.lineId)  return window.state.lineId;
-                    try { return window.liff?.getDecodedIDToken?.()?.sub || ''; } catch(_){ return ''; }
-                  };
-                
-                  // 3) 最大4秒だけポーリング
-                  for (let i=0; i<40; i++){
-                    const id = tryOnce();
-                    if (id) { (window.state ||= {}).lineId = id; return id; }
-                    await new Promise(r=>setTimeout(r,100));
-                  }
-                  return '';
-                });
-
-                (function(){
-                  const sec = document.getElementById('view-custom-push');
-                  const selMode = document.getElementById('cp_event');
-                  window.selMode = selMode;  
-                  const statWrap = document.getElementById('cp_stat_wrap');
-                  const statLock = document.getElementById('cp_stat_lock');
-                
-                  // --- LIFF/state から lineId を安全取得 ---
-                  async function myLineIdAsync(){
-                    if (typeof window.getMyLineId_ === 'function') {
-                      try { const id = await window.getMyLineId_(); if (id) return id; } catch(_){}
-                    }
-                    const tryOnce = () => {
-                      if (window.__ME__?.lineId) return window.__ME__.lineId;
-                      if (window.state?.lineId)  return window.state.lineId;
-                      try { return window.liff?.getDecodedIDToken?.()?.sub || ''; } catch(_){ return ''; }
-                    };
-                    for (let i=0; i<40; i++){
-                      const id = tryOnce(); if (id) { (window.state ||= {}).lineId = id; return id; }
-                      await new Promise(r=>setTimeout(r,100)); // 最大4秒
-                    }
-                    return '';
-                  }
-                
-                  // --- 手動モード時の見た目＆操作不可切替（すでにあるUIを利用） ---
-                  function applyModeUI(){
-                    const manual = (selMode.value === 'manual' || !selMode.value);
-                    sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = manual);
-                    statWrap?.classList.toggle('is-disabled', manual);
-                    statWrap?.setAttribute('aria-disabled', manual ? 'true' : 'false');
-                    if (statLock) statLock.hidden = !manual;
-                  }
-                
-                  selMode.addEventListener('change', applyModeUI);
-                
-                  // --- イベント候補を投入（公開中 × 発表 を優先） ---
-                  async function fillEventChoices(){
-                    // プレースホルダ
-                    selMode.innerHTML =
-                      `<option value="manual">手動のみで選ぶ</option>` +
-                      `<option value="" disabled>読み込み中…</option>`;
-                  
-                    const lid = await getLineId();
-                    const url = new URL(API_ENDPOINT);
-                    url.searchParams.set('attendanceReport','1');
-                    url.searchParams.set('meta','1');
-                    url.searchParams.set('admin','1');
-                    if (lid) url.searchParams.set('lineId', lid);
-                  
-                    let r;
-                    try { r = await fetch(url).then(x=>x.json()); } catch { r = {status:'error'}; }
-                    const listRaw = Array.isArray(r?.list) ? r.list :
-                                    Array.isArray(r?.meta) ? r.meta :
-                                    Array.isArray(r?.data) ? r.data : [];
-                  
-                    // “公開中”フラグと “発表”種別が取れないケースでも壊れないフィルタ
-                    const isOpen = e =>
-                      (typeof e.open      !== 'undefined') ? !!e.open :
-                      (typeof e.published !== 'undefined') ? !!e.published :
-                      (typeof e.status    !== 'undefined') ? (e.status === '公開中') : true;
-                    const isHappyo = e =>
-                      (typeof e.kind !== 'undefined')
-                        ? (e.kind === '発表' || /発表/.test(String(e.kind)))
-                        : true;
-                  
-                    const list = listRaw.filter(e => isOpen(e) && isHappyo(e));
-                  
-                    // ★ここでインデックスを構築（関数の中）
-                    const idx = {};
-                    list.forEach(e => {
-                      const id  = String(e.eventId ?? e.id ?? '');
-                      const ymd = e.ymd || e.date || '';
-                      const hm  = e.hm  || e.time || '';
-                      // 集合時間・集合場所があれば拾う（なければ空文字）
-                      const meet      = e.meet || e.meetTime || e['集合'] || '';
-                      const meetPoint = e.meetPoint || e['集合場所'] || e.place || e.venue || '';
-                      idx[id] = {
-                        id,
-                        title   : e.title || e.name || '',
-                        date    : ymd,
-                        time    : hm,
-                        datetime: [ymd, hm].filter(Boolean).join(' '),
-                        place   : e.place || e.venue || '',
-                        meet,
-                        meetPoint
-                      };
-                    });
-                    window.__EVENT_INDEX__ = idx; // ← グローバルに保存
-                  
-                    const opts = list.map(e=>{
-                      const id  = String(e.eventId ?? e.id ?? '');
-                      const ymd = e.ymd || e.date || '';
-                      const hm  = e.hm  || e.time || '';
-                      const dt  = [ymd, hm].filter(Boolean).join(' ');
-                      const tt  = e.title || e.name || '';
-                      return `<option value="${id}">${dt} ｜ ${tt}</option>`;
-                    }).join('') || `<option value="" disabled>（該当イベントなし）</option>`;
-                  
-                    selMode.innerHTML = `<option value="manual">手動のみで選ぶ</option>` + opts;
-                  
-                    // 初期のUI反映
-                    applyModeUI();
-                  }
-                  
-                  document.addEventListener('DOMContentLoaded', ()=>{
-                    fillEventChoices();
-                    applyModeUI();
-                  });
-                </script>
-            </optgroup>
+            <optgroup id="opt-events" label="イベントから選ぶ"></optgroup>
           </select>
+          
+          <script>
+          (function(){
+            // 1) getLineId は必ずグローバルに一度だけ
+            window.getLineId = window.getLineId || (async function(){
+              try{
+                if (typeof window.getMyLineId_ === 'function'){
+                  const id = await window.getMyLineId_();
+                  if (id){ (window.state ||= {}).lineId = id; return id; }
+                }
+              }catch(_){}
+              const tryOnce = () => {
+                if (window.__ME__?.lineId) return window.__ME__.lineId;
+                if (window.state?.lineId)  return window.state.lineId;
+                try{ return window.liff?.getDecodedIDToken?.()?.sub || ''; }catch(_){ return ''; }
+              };
+              for (let i=0;i<40;i++){
+                const id = tryOnce();
+                if (id){ (window.state ||= {}).lineId = id; return id; }
+                await new Promise(r=>setTimeout(r,100));
+              }
+              return '';
+            });
+          
+            const sec      = document.getElementById('view-custom-push');
+            const selMode  = document.getElementById('cp_event');
+            const optGroup = document.getElementById('opt-events');
+          
+            function applyModeUI(){
+              const statWrap = document.getElementById('cp_stat_wrap');
+              const statLock = document.getElementById('cp_stat_lock');
+              const manual   = (selMode.value === 'manual' || !selMode.value);
+              sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = manual);
+              statWrap?.classList.toggle('is-disabled', manual);
+              statWrap?.setAttribute('aria-disabled', manual ? 'true' : 'false');
+              if (statLock) statLock.hidden = !manual;
+            }
+          
+            async function fillEventChoices(){
+              // プレースホルダ（optgroup だけ差し替え）
+              if (optGroup) optGroup.innerHTML = `<option value="" disabled>読み込み中…</option>`;
+          
+              const lid = await getLineId();
+              const url = new URL(API_ENDPOINT);
+              url.searchParams.set('attendanceReport','1');
+              url.searchParams.set('meta','1');
+              url.searchParams.set('admin','1');
+              if (lid) url.searchParams.set('lineId', lid);
+          
+              let r;
+              try{ r = await fetch(url).then(x=>x.json()); }
+              catch(e){ r = {status:'error', message:String(e)}; }
+          
+              const listRaw = Array.isArray(r?.list) ? r.list :
+                              Array.isArray(r?.meta) ? r.meta :
+                              Array.isArray(r?.data) ? r.data : [];
+          
+              const isOpen   = e => (typeof e.open      !== 'undefined') ? !!e.open
+                                   : (typeof e.published !== 'undefined') ? !!e.published
+                                   : (typeof e.status    !== 'undefined') ? (e.status === '公開中') : true;
+              const isHappyo = e => (typeof e.kind !== 'undefined')
+                                    ? (e.kind === '発表' || /発表/.test(String(e.kind)))
+                                    : true;
+          
+              const list = listRaw.filter(e => isOpen(e) && isHappyo(e));
+          
+              // イベントIndex（集合時間/場所も拾う）
+              const idx = {};
+              list.forEach(e=>{
+                const id  = String(e.eventId ?? e.id ?? '');
+                const ymd = e.ymd || e.date || '';
+                const hm  = e.hm  || e.time || '';
+                const meet      = e.meet || e.meetTime || e['集合'] || '';
+                const meetPoint = e.meetPoint || e['集合場所'] || e.place || e.venue || '';
+                idx[id] = {
+                  id,
+                  title   : e.title || e.name || '',
+                  date    : ymd,
+                  time    : hm,
+                  datetime: [ymd, hm].filter(Boolean).join(' '),
+                  place   : e.place || e.venue || '',
+                  meet,
+                  meetPoint
+                };
+              });
+              window.__EVENT_INDEX__ = idx;
+          
+              const opts = list.map(e=>{
+                const id  = String(e.eventId ?? e.id ?? '');
+                const ymd = e.ymd || e.date || '';
+                const hm  = e.hm  || e.time || '';
+                const dt  = [ymd, hm].filter(Boolean).join(' ');
+                const tt  = e.title || e.name || '';
+                return `<option value="${id}">${dt} ｜ ${tt}</option>`;
+              }).join('') || `<option value="" disabled>（該当イベントなし）</option>`;
+          
+              // optgroup を中身だけ差し替え
+              if (optGroup) optGroup.innerHTML = opts;
+              applyModeUI();
+            }
+          
+            document.addEventListener('DOMContentLoaded', ()=>{
+              fillEventChoices();
+              applyModeUI();
+            });
+          })();  /* ← IIFE をきちんと閉じる */
+          </script>
         </div>
     
         <!-- 対象ステータス（見出し＋チェック群） -->
@@ -4415,7 +4386,7 @@ window.reportReload = function(){ initAdminReportPage(); };
   }
   // 出欠結果の描画（#repEvent の value を eventId とみなして取得）
   async function renderReport(){
-    const lid = encodeURIComponent(state.lineId || "");
+    const lid = encodeURIComponent(((window.state && window.state.lineId) || ""));
     const sel = document.getElementById('repEvent');
     const box = document.getElementById('repBox');
     const id  = sel?.value || '';
@@ -4568,13 +4539,15 @@ window.reportReload = function(){ initAdminReportPage(); };
     if (!sel) return;
   
     // 古いメタを一旦クリア（失敗時の取り違え防止）
-    state.reportMeta = [];
+    window.state = window.state || {};
+    window.state.reportMeta = [];
   
     sel.disabled = true;
     sel.innerHTML = `<option value="">（読み込み中…）</option>`;
     try{
       // 認可の都合で lineId/admin を付けて取得
-      const r = await api(`?attendanceReport=1&meta=1&lineId=${encodeURIComponent(state.lineId)}&admin=1`);
+      const lid = encodeURIComponent(((window.state && window.state.lineId) || ""));
+      const r = await api(`?attendanceReport=1&meta=1&lineId=${lid}&admin=1`);
       if (r?.status === 'ok' && Array.isArray(r.list)){
         // ★ ここで保存
         state.reportMeta = r.list;
