@@ -1681,7 +1681,7 @@
                       `<option value="manual">宛先を手動で選ぶ</option>` +
                       `<option value="" disabled>読み込み中…</option>`;
                 
-                    const lid = await myLineIdAsync();
+                    const lid = await myLineId();
                     const url = new URL(API_ENDPOINT);
                     url.searchParams.set('attendanceReport','1');
                     url.searchParams.set('meta','1');
@@ -4516,7 +4516,7 @@ window.reportReload = function(){ initAdminReportPage(); };
         `<option value="manual">宛先を手動で選ぶ</option>` +
         `<option value="" disabled>読み込み中…</option>`;
   
-      const lid = await myLineIdAsync();
+      const lid = await myLineId(); 
       const url = new URL(API_ENDPOINT);
       url.searchParams.set('attendanceReport','1');
       url.searchParams.set('meta','1');
@@ -4871,7 +4871,7 @@ window.reportReload = function(){ initAdminReportPage(); };
         sec.__loadingAuto = true;
         setText(boxAuto, '（読込中…）');
       
-        const lid = await myLineIdAsync();           // ★ Admin 判定用
+        const lid = await myLineId();          // ★ Admin 判定用
         const url = new URL(API_ENDPOINT);
         url.searchParams.set('attendanceReport','1');
         url.searchParams.set('customPushPreview','1');
