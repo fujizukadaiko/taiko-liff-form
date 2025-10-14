@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.1.7";  // stable ver→v4.0.8, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.1.8";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwalKyjnaYiG6OYX8O2eh9DB3ZagsnOJa5aFSMugP-D518SCCc0_mOdylzFWUTl8iXvww/exec";     // GAS v106.1 （PROD v1.0.1未反映）
 
@@ -4479,33 +4479,85 @@ window.reportReload = function(){ initAdminReportPage(); };
    (function(){
   const sec      = document.getElementById('view-custom-push');
   if (!sec) return;
-  const selEvent = document.getElementById('cp_event');
-  const autoBox  = document.getElementById('cp_auto');      // 自動選択の表示エリア（あれば）
+  const selMode  = document.getElementById('cp_event');
   const statWrap = document.getElementById('cp_stat_wrap');
   const statLock = document.getElementById('cp_stat_lock');
-
-  function applyModeUI(){
-    const isManual = (selEvent.value === 'manual' || !selEvent.value);
-
-    // チェック群を実際に無効化
-    sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = isManual);
-
-    // 見た目の変化（薄紫のダッシュ枠＆ロック札）
-    statWrap?.classList.toggle('is-disabled', isManual);
-    statWrap?.setAttribute('aria-disabled', isManual ? 'true' : 'false');
-    if (statLock) statLock.hidden = !isManual;
-
-    // 自動選択欄のメッセージ（任意）
-    if (autoBox){
-      autoBox.textContent = isManual
-        ? '（自動選択未使用）'
-        : '（該当なし）';
+  async function myLineIdAsync(){
+      if (typeof window.getMyLineId_ === 'function') {
+        try { const id = await window.getMyLineId_(); if (id) return id; } catch(_){}
+      }
+      const tryOnce = () => {
+        if (window.__ME__?.lineId) return window.__ME__.lineId;
+        if (window.state?.lineId)  return window.state.lineId;
+        try { return window.liff?.getDecodedIDToken?.()?.sub || ''; } catch(_){ return ''; }
+      };
+      for (let i=0; i<40; i++){
+        const id = tryOnce(); if (id) { (window.state ||= {}).lineId = id; return id; }
+        await new Promise(r=>setTimeout(r,100));
+      }
+      return '';
     }
-  }
-
-  selEvent.addEventListener('change', applyModeUI);
-  applyModeUI(); // 初期反映
-})();
+      // --- 手動モード時の見た目＆操作不可切替 ---
+    function applyModeUI(){
+      const manual = (selMode.value === 'manual' || !selMode.value);
+      sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = manual);
+      statWrap?.classList.toggle('is-locked', manual);              // ← 以前使っていたクラス名に合わせる
+      statWrap?.setAttribute('aria-disabled', manual ? 'true' : 'false');
+      if (statLock) statLock.hidden = !manual;
+    }
+  
+    selMode.addEventListener('change', applyModeUI);
+  
+    // --- イベント候補を投入（公開中 × 発表 を優先） ---
+    async function fillEventChoices(){
+      // プレースホルダ
+      selMode.innerHTML =
+        `<option value="manual">宛先を手動で選ぶ</option>` +
+        `<option value="" disabled>読み込み中…</option>`;
+  
+      const lid = await myLineIdAsync();
+      const url = new URL(API_ENDPOINT);
+      url.searchParams.set('attendanceReport','1');
+      url.searchParams.set('meta','1');
+      url.searchParams.set('admin','1');
+      if (lid) url.searchParams.set('lineId', lid);
+  
+      let r;
+      try { r = await fetch(url).then(x=>x.json()); } catch { r = {status:'error'}; }
+      const listRaw = Array.isArray(r?.list) ? r.list :
+                      Array.isArray(r?.meta) ? r.meta :
+                      Array.isArray(r?.data) ? r.data : [];
+  
+      const isOpen = e =>
+        (typeof e.open      !== 'undefined') ? !!e.open :
+        (typeof e.published !== 'undefined') ? !!e.published :
+        (typeof e.status    !== 'undefined') ? (e.status === '公開中') : true;
+      const isHappyo = e =>
+        (typeof e.kind !== 'undefined')
+          ? (e.kind === '発表' || /発表/.test(String(e.kind)))
+          : true;
+  
+      const list = listRaw.filter(e => isOpen(e) && isHappyo(e));
+  
+      const opts = list.map(e=>{
+        const id  = String(e.eventId ?? e.id ?? '');
+        const ymd = e.ymd || e.date || '';
+        const hm  = e.hm  || e.time || '';
+        const dt  = [ymd, hm].filter(Boolean).join(' ');
+        const tt  = e.title || e.name || '';
+        return `<option value="${id}">${dt} ｜ ${tt}</option>`;
+      }).join('') || `<option value="" disabled>（該当イベントなし）</option>`;
+  
+      selMode.innerHTML = `<option value="manual">宛先を手動で選ぶ</option>` + opts;
+  
+      applyModeUI(); // 初期のUI反映
+    }
+  
+    document.addEventListener('DOMContentLoaded', ()=>{
+      fillEventChoices();
+      applyModeUI();
+    });
+  })();
 
   (function(){
     // --- フォールバック（あれば既存の $ / show をそのまま使用） ---
