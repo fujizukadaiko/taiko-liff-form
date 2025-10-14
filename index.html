@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.2.5";  // stable ver→v4.2.4, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.2.6";  // stable ver→v4.2.4, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwx5L_E7BeSoI7NXrTYA8zeTn6_mHSixzhmF9EWr6NACRVOoNmsddyp8iEeq0Ozbntj5g/exec";     // GAS v106.2 （PROD v1.0.1未反映）
 
@@ -1658,14 +1658,11 @@
     </section>
   </main>
 
-  <footer class="siteFooter">
-    <small>
-      <a href="/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
-      <span class="sep">・</span>
-      <a href="/terms.html" target="_blank" rel="noopener">利用規約</a>
-      <span class="ver" id="verFoot"></span>
-    </small>
-  </footer>
+  <footer id="legalFooter" class="legal-footer" aria-label="legal links">
+  <a href="https://fujizukadaiko.github.io/your-repo/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
+  ・
+  <a href="https://fujizukadaiko.github.io/your-repo/terms.html" target="_blank" rel="noopener">利用規約</a>
+</footer>
   
     <!-- ===== カスタム通知（管理者） ===== -->
     <section id="view-custom-push" data-view>
@@ -2188,6 +2185,31 @@
     .kind-badge.badge--other, .scKind.badge--other {
       background:#F5F3FF; border-color:#8B5CF6; color:#5B21B6; /* 紫 */
     }
+    /* === 共通フッター（常に画面下に固定） === */
+    .legal-footer{
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      text-align: center;
+      font-size: 12px;
+      color: var(--c-muted);
+      padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); /* iOSノッチ対応 */
+      background: transparent; /* 背景は透過のまま(邪魔なら#fffなどに) */
+      z-index: 40;
+    }
+    .legal-footer a{
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      opacity: .9;
+    }
+    
+    /* フッターに隠れないよう、全ページの下余白を少し増やす */
+    main{
+      padding-bottom: 42px; /* フッター高さぶんの余白 */
+    }
+    @supports (padding: max(0px)){
+      main{ padding-bottom: max(42px, env(safe-area-inset-bottom)); }
+    }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -2619,7 +2641,8 @@ const $ = s => document.querySelector(s);
 const INCLUDE_BOTH_FOR_ALL = true;
 // ↑②の仕様に合わせて false（＝常に『両方』は表示対象から除外）
 // 運用で方針変更する場合は true にすると、常に『両方』を表示に含められます。
-function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classList.remove("show")); $(id).classList.add("show"); }
+function show(id){ document.querySelectorAll("[data-view]").forEach(v=>v.classList.remove("show")); $(id).classList.add("show"); const lf = document.getElementById('legalFooter');
+  if (lf) lf.style.display = (id === '#view-home') ? '' : 'none';}
 function logHome(t){ $("#homeLog").textContent = t||""; }
 function logForm(t){ $("#formLog").textContent = t||""; }
 function logReg(t){ $("#regLog").textContent = t||""; }
