@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.2.2";  // stable ver→v4.1.9, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.2.3";  // stable ver→v4.2.2, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzD7-37N_tsKH4KiElCqgQrnCn2yyLEF9B-qHz0oNmdvUleyU3ACiSu1Cf9iYyjX6UUxg/exec";     // GAS v106.1 （PROD v1.0.1未反映）
 
@@ -1315,6 +1315,7 @@
       font-size: 13px !important;  /* 12〜15あたりでお好み調整 */
       line-height: 1.7;            /* 読みやすさ維持におすすめ */
     }
+    
   </style>
   
   <!-- LIFF SDK -->
@@ -2124,6 +2125,27 @@
       box-shadow: none !important;
       padding: 0 !important;
     }
+    /* ---- プレビュー用モーダル ---- */
+    .cpModalOverlay{
+      position:fixed; inset:0; background:rgba(0,0,0,.45);
+      display:flex; align-items:center; justify-content:center;
+      z-index:1000;
+    }
+    .cpModal{
+      background:#fff; border:1px solid var(--c-border);
+      border-radius:14px; padding:16px; width:min(680px, calc(100% - 28px));
+      box-shadow:0 12px 32px rgba(0,0,0,.12);
+    }
+    .cpModal h3{ margin:0 0 8px; font-size:16px; font-weight:700; }
+    .cpModal .meta{ font-size:13px; color:#444; margin-bottom:8px; }
+    .cpModal pre{
+      white-space:pre-wrap; word-break:break-word;
+      background:#f7f7fb; border:1px solid var(--c-border);
+      border-radius:10px; padding:10px; max-height:40vh; overflow:auto;
+      font-size:14px; line-height:1.6;
+    }
+    .cpModal .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+    .cpModal .muted{ color:#6b6b6b; font-size:12px; }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -5048,6 +5070,215 @@ window.reportReload = function(){ initAdminReportPage(); };
       return Array.from(sec?.querySelectorAll('.cp_stat')||[])
         .filter(cb=>cb.checked).map(cb=>cb.value);
     }
+
+    (function(){
+      const root    = document.getElementById('view-custom-push');
+      if (!root) return;
+    
+      const selMode = document.getElementById('cp_event');
+      const selTpl  = document.getElementById('cp_tpl');
+      const bodyEl  = document.getElementById('cp_body');
+      const cntEl   = document.getElementById('cp_count');
+      const boxAuto = document.getElementById('cp_auto');   // 表示用（自動）
+      const boxMan  = document.getElementById('cp_manual'); // 表示用（手動）
+      const selExtra= document.getElementById('cp_extra');
+    
+      // 状態キャッシュ（既存があれば流用）
+      root.__autoTargets = Array.isArray(root.__autoTargets) ? root.__autoTargets : [];
+    
+      function getCheckedStats(){
+        return Array.from(document.querySelectorAll('#cp_stat_wrap .cp_stat:checked')).map(el=>el.value);
+      }
+    
+      // いま選べている自動宛先が未取得なら、preview APIで埋める
+      async function ensureAutoTargets(){
+        if (!selMode || !selMode.value || selMode.value === 'manual') return [];
+        if (root.__autoTargets && root.__autoTargets.length) return root.__autoTargets;
+    
+        const sts = getCheckedStats();
+        if (sts.length === 0) return [];
+    
+        // API: /?attendanceReport=1&customPushPreview=1&eventId=..&statuses=[..]&lineId=..&senderLineId=..
+        let lid = '';
+        try{ if (typeof window.getLineId === 'function') lid = await window.getLineId(); }catch(_){}
+        const url = new URL(API_ENDPOINT);
+        url.searchParams.set('attendanceReport','1');
+        url.searchParams.set('customPushPreview','1');
+        url.searchParams.set('eventId', selMode.value);
+        url.searchParams.set('statuses', JSON.stringify(sts));
+        if (lid){
+          url.searchParams.set('lineId', lid);
+          url.searchParams.set('senderLineId', lid);
+        }
+    
+        try{
+          const r = await fetch(url).then(x=>x.json());
+          if (r?.status === 'ok'){
+            root.__autoTargets = Array.isArray(r.autoTargets) ? r.autoTargets : [];
+            // 表示も更新（空なら“該当なし”）
+            if (boxAuto){
+              const labels = root.__autoTargets.map(x => x.label || x.name).filter(Boolean);
+              boxAuto.textContent = labels.length ? labels.join('\n') : '（該当なし）';
+            }
+          }
+        }catch(_){}
+        return root.__autoTargets || [];
+      }
+    
+      function collectManualTargets(){
+        if (!selExtra) return [];
+        return Array.from(selExtra.selectedOptions || [])
+          .map(o => ({ lineId: o.value, label: o.textContent.trim() }))
+          .filter(x => x.lineId);
+      }
+    
+      async function collectAllTargets(){
+        const auto = await ensureAutoTargets(); // [{lineId,label}]
+        const man  = collectManualTargets();
+        const uniq = new Map();
+        [...auto, ...man].forEach(x => { if (x && x.lineId) uniq.set(x.lineId, { lineId:x.lineId, label:x.label || x.name || x.lineId }); });
+        return Array.from(uniq.values());
+      }
+    
+      // --- リセット ---
+      function doReset(){
+        // イベント＝手動
+        if (selMode){
+          selMode.value = 'manual';
+          selMode.dispatchEvent(new Event('change'));
+        }
+        // ステータス未選択
+        document.querySelectorAll('#cp_stat_wrap .cp_stat').forEach(cb => cb.checked = false);
+        // 自動宛先表示とキャッシュをクリア
+        root.__autoTargets = [];
+        if (boxAuto) boxAuto.textContent = '（手動モード：自動選択は使いません）';
+        // 手動宛先の選択を解除
+        if (selExtra){
+          Array.from(selExtra.options).forEach(o => o.selected = false);
+        }
+        if (boxMan) boxMan.textContent = '（未選択）';
+        // テンプレ＆本文クリア
+        if (selTpl){ selTpl.value = ''; }
+        if (bodyEl){
+          bodyEl.value = '';
+          bodyEl.dispatchEvent(new Event('input'));
+        }
+        if (cntEl) cntEl.textContent = `0 / ${bodyEl?.maxLength || 2000}`;
+      }
+    
+      // --- プレビューUI ---
+      function openPreview({body, count, sampleList, onConfirm}){
+        const ov = document.createElement('div');
+        ov.className = 'cpModalOverlay';
+        ov.innerHTML = `
+          <div class="cpModal" role="dialog" aria-modal="true">
+            <h3>送信プレビュー</h3>
+            <div class="meta">宛先 <b>${count}</b> 人に送信します。</div>
+            <pre>${body.replace(/[<>&]/g, m => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]))}</pre>
+            <div class="muted" style="margin-top:6px;">
+              宛先例：${sampleList.slice(0,3).map(s=>`<span class="pill sm" style="margin-right:6px;">${s}</span>`).join('')}
+              ${sampleList.length>3 ? `ほか ${sampleList.length-3} 名` : ''}
+            </div>
+            <div class="actions">
+              <button type="button" class="btn btn-ghost btn-sm">キャンセル</button>
+              <button type="button" class="btn btn-primary btn-sm" id="cp_do_send">OK（送信）</button>
+            </div>
+          </div>`;
+        document.body.appendChild(ov);
+    
+        const btns = ov.querySelectorAll('.btn');
+        const close = () => { ov.remove(); };
+        btns[0].addEventListener('click', close);
+        btns[1].addEventListener('click', async ()=>{
+          btns[0].disabled = true; btns[1].disabled = true;
+          try{ await onConfirm(); } finally { close(); }
+        });
+      }
+    
+      // --- 実送信 ---
+      async function sendNow({ body, targets, eventId }){
+        const sender = (typeof window.getLineId === 'function') ? (await window.getLineId()) : '';
+        const url = new URL(API_ENDPOINT);
+        url.searchParams.set('customPushSend','1'); // ★サーバ側でこのフラグを受ける想定
+    
+        const payload = {
+          senderLineId: sender || undefined,
+          eventId: (eventId && eventId !== 'manual') ? eventId : '',
+          body,
+          targets: targets.map(t => t.lineId) // 文字列配列
+        };
+    
+        // POST(JSON) で送る（GETは長文で落ちるため使わない）
+        let r;
+        try{
+          r = await fetch(url.toString(), {
+            method:'POST',
+            headers:{ 'Content-Type':'application/json' },
+            body: JSON.stringify(payload)
+          }).then(x=>x.json());
+        }catch(e){
+          r = { status:'error', message: String(e) };
+        }
+        return r;
+      }
+    
+      // --- バリデーション（未入力やプレースホルダを検知） ---
+      function validateBody(text){
+        if (!text || !text.trim()) return '本文が空です。';
+        const remains = [];
+        ['{MEET_NEW}','{MEET_POINT}','{TIME}','{PLACE}','{MEET_OLD}','{TITLE}','{DATE}','{DATETIME}'].forEach(ph=>{
+          if (text.includes(ph)) remains.push(ph);
+        });
+        if (remains.length) return `本文に未置換の項目があります：${remains.join('、')}`;
+        return '';
+      }
+    
+      // === イベント結線 ===
+      const btnReset = document.getElementById('cp_reset');
+      const btnSend  = document.getElementById('cp_send');
+    
+      btnReset?.addEventListener('click', (e)=>{ e.preventDefault(); doReset(); });
+    
+      btnSend?.addEventListener('click', async (e)=>{
+        e.preventDefault();
+    
+        const body = bodyEl?.value || '';
+        const err  = validateBody(body);
+        if (err){ alert(err); return; }
+    
+        // 宛先収集（必要なら preview API を叩いて最新化）
+        const targets = await collectAllTargets();
+        if (!targets.length){
+          alert('宛先がありません。イベントと対象ステータス、または手動宛先を選択してください。');
+          return;
+        }
+    
+        // プレビュー → OKで送信
+        openPreview({
+          body,
+          count: targets.length,
+          sampleList: targets.map(t => t.label || t.lineId),
+          onConfirm: async ()=>{
+            // ボタンを無効化（連打防止）
+            btnSend.disabled = true;
+    
+            // 送信
+            const res = await sendNow({ body, targets, eventId: selMode?.value });
+            if (res?.status === 'ok'){
+              alert('送信しました。');
+              // 任意でリセット
+              // doReset();
+            }else{
+              alert(`送信に失敗しました：${res?.message || 'unknown error'}`);
+            }
+    
+            btnSend.disabled = false;
+          }
+        });
+      });
+    
+    })();
+
 </script> 
   
 <script>
