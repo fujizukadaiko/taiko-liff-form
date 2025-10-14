@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.1.8";  // stable ver→v4.0.8, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.1.9";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzD7-37N_tsKH4KiElCqgQrnCn2yyLEF9B-qHz0oNmdvUleyU3ACiSu1Cf9iYyjX6UUxg/exec";     // GAS v106.1 （PROD v1.0.1未反映）
 
@@ -1297,6 +1297,14 @@
       margin-top: 4px;
     }
     .loadingHint{ font-size:12px; color: var(--c-muted); }
+    
+    /* 自動・手動の宛先一覧エリアに適用（両方まとめて） */
+    #cp_auto_targets, #cp_auto,
+    #cp_manual_targets, #cp_manual {
+      white-space: pre-line;   /* ← \n を改行として描画 */
+      font-size: 0.9rem;       /* ← お好みで 0.85rem 〜 0.95rem に調整 */
+      line-height: 1.6;        /* ← 行間少し広めで読みやすく */
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1821,7 +1829,6 @@
     
       </div><!-- /card -->
     </section>
-      
   <style>
     /* ===== Custom Push UI style (scoped) ===== */
     #view-custom-push {
@@ -1927,6 +1934,64 @@
       #view-custom-push .select, 
       #view-custom-push .checks{ width: 60%; }
     }
+    /* --- 0) 横はみ出しの安全網（右端の白帯対策） --- */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden; /* ← まずは強制で横スク封じ */
+      box-sizing: border-box;
+    }
+    
+    /* --- 1) カスタム通知セクション自身は常に親幅内に収める --- */
+    #view-custom-push {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+      /* 上の余白が気になる場合は 0 にする。セーフエリアを使うなら下の@supportsへ */
+      padding-top: 0;
+    }
+    
+    /* iOS セーフエリアを上だけに部分適用したい場合（任意） */
+    @supports (padding: env(safe-area-inset-top)) {
+      #view-custom-push { padding-top: env(safe-area-inset-top); }
+    }
+    
+    /* --- 2) タイトル行の“上マージン”を潰す --- */
+    #view-custom-push > .row-space:first-child { margin-top: 0; }
+    #view-custom-push .sectionTitle { margin: 0; }
+    
+    /* 白カード周りで意図せぬ“上だけ余白”が出る保険 */
+    #view-custom-push .card { margin-top: 0; width: 100%; box-sizing: border-box; }
+    
+    /* --- 3) フレックス行で横溢れしないように（クラス不一致も吸収） --- */
+    /* HTMLは .row-att / .repLabel / .selectBtn を使っている */
+    #view-custom-push .row-att {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #view-custom-push .row-att .repLabel { flex: 0 0 auto; }
+    #view-custom-push .row-att .selectBtn {
+      flex: 1 1 0%;
+      min-width: 0;
+      max-width: 100%;
+    }
+    /* チェック群も折り返せるように */
+    #cp_stat_wrap .row { flex-wrap: wrap; }
+    
+    /* --- 4) 宛先の表示を“改行＋小さめ文字”に --- */
+    /* 実HTMLは .cp-pill-body / #cp_auto / #cp_manual なので両対応 */
+    #view-custom-push .cp-pill-body,
+    #cp_auto, #cp_auto_targets, #cp_manual, #cp_manual_targets {
+      white-space: pre-line;     /* \n を改行として描画 */
+      font-size: 0.9rem;         /* お好みで 0.85〜0.95rem */
+      line-height: 1.6;
+    }
+    
+    /* --- 5) 仕上げ：内側要素が親幅を超えないよう安全網 --- */
+    #view-custom-push * { max-width: 100%; box-sizing: border-box; }
   </style>
   </script>
 
@@ -4842,7 +4907,7 @@ window.reportReload = function(){ initAdminReportPage(); };
           .map(x => x.label || x.name)
           .filter(Boolean);
       
-        setText(boxAuto, labels.length ? labels.join('、') : '（該当なし）');
+        setText(boxAuto, labels.length ? labels.join('\n') : '（該当なし）');
       }
     function setText(el, s){ if(el) el.textContent = s; }
     function getCheckedStats(){
