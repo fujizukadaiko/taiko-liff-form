@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.1.9";  // stable ver→v4.0.8, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.2.0";  // stable ver→v4.1.9, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzD7-37N_tsKH4KiElCqgQrnCn2yyLEF9B-qHz0oNmdvUleyU3ACiSu1Cf9iYyjX6UUxg/exec";     // GAS v106.1 （PROD v1.0.1未反映）
 
@@ -1711,34 +1711,56 @@
                   async function fillEventChoices(){
                     // プレースホルダ
                     selMode.innerHTML =
-                      `<option value="manual">宛先を手動で選ぶ</option>` +
+                      `<option value="manual">手動のみで選ぶ</option>` +
                       `<option value="" disabled>読み込み中…</option>`;
-                
+                  
                     const lid = await getLineId();
                     const url = new URL(API_ENDPOINT);
                     url.searchParams.set('attendanceReport','1');
                     url.searchParams.set('meta','1');
                     url.searchParams.set('admin','1');
                     if (lid) url.searchParams.set('lineId', lid);
-                
+                  
                     let r;
                     try { r = await fetch(url).then(x=>x.json()); } catch { r = {status:'error'}; }
                     const listRaw = Array.isArray(r?.list) ? r.list :
                                     Array.isArray(r?.meta) ? r.meta :
                                     Array.isArray(r?.data) ? r.data : [];
-                
+                  
                     // “公開中”フラグと “発表”種別が取れないケースでも壊れないフィルタ
                     const isOpen = e =>
                       (typeof e.open      !== 'undefined') ? !!e.open :
                       (typeof e.published !== 'undefined') ? !!e.published :
-                      (typeof e.status    !== 'undefined') ? (e.status === '公開中') : true; // 情報なければ通す
+                      (typeof e.status    !== 'undefined') ? (e.status === '公開中') : true;
                     const isHappyo = e =>
                       (typeof e.kind !== 'undefined')
                         ? (e.kind === '発表' || /発表/.test(String(e.kind)))
-                        : true; // 情報なければ通す
-                
+                        : true;
+                  
                     const list = listRaw.filter(e => isOpen(e) && isHappyo(e));
-                
+                  
+                    // ★ここでインデックスを構築（関数の中）
+                    const idx = {};
+                    list.forEach(e => {
+                      const id  = String(e.eventId ?? e.id ?? '');
+                      const ymd = e.ymd || e.date || '';
+                      const hm  = e.hm  || e.time || '';
+                      // 集合時間・集合場所があれば拾う（なければ空文字）
+                      const meet      = e.meet || e.meetTime || e['集合'] || '';
+                      const meetPoint = e.meetPoint || e['集合場所'] || e.place || e.venue || '';
+                      idx[id] = {
+                        id,
+                        title   : e.title || e.name || '',
+                        date    : ymd,
+                        time    : hm,
+                        datetime: [ymd, hm].filter(Boolean).join(' '),
+                        place   : e.place || e.venue || '',
+                        meet,
+                        meetPoint
+                      };
+                    });
+                    window.__EVENT_INDEX__ = idx; // ← グローバルに保存
+                  
                     const opts = list.map(e=>{
                       const id  = String(e.eventId ?? e.id ?? '');
                       const ymd = e.ymd || e.date || '';
@@ -1747,18 +1769,17 @@
                       const tt  = e.title || e.name || '';
                       return `<option value="${id}">${dt} ｜ ${tt}</option>`;
                     }).join('') || `<option value="" disabled>（該当イベントなし）</option>`;
-                
-                    selMode.innerHTML = `<option value="manual">宛先を手動で選ぶ</option>` + opts;
-                
+                  
+                    selMode.innerHTML = `<option value="manual">手動のみで選ぶ</option>` + opts;
+                  
                     // 初期のUI反映
                     applyModeUI();
                   }
-                
+                  
                   document.addEventListener('DOMContentLoaded', ()=>{
                     fillEventChoices();
                     applyModeUI();
                   });
-                })();
                 </script>
             </optgroup>
           </select>
@@ -2027,6 +2048,11 @@
     /* 5) 念のための横はみ出し防止（前回の安全網は残してOK） */
     html, body{ overflow-x: hidden; }
     #view-custom-push *{ max-width: 100%; box-sizing: border-box; }
+
+    #cp_body {
+      white-space: pre-wrap;  /* 改行と折返しを両立 */
+      line-height: 1.6;
+    }
   </style>
   </script>
 
@@ -4680,7 +4706,7 @@ window.reportReload = function(){ initAdminReportPage(); };
           setDisabled(statChecks, manual);
           statWrap?.classList.toggle('is-locked', manual);
           if (statLockTag) statLockTag.hidden = !manual;
-          setText(boxAuto, manual ? '（手動モード：自動選択は使いません）' : '（読込待ち…）');
+          setText(boxAuto, manual ? '（手動モード：自動選択は使いません）' : '（読込中…）');
         }
     
         // ===== イベント一覧をプルダウンへ（先頭は「手動で選ぶ」） =====
@@ -4714,7 +4740,7 @@ window.reportReload = function(){ initAdminReportPage(); };
           const useList = filt.length ? filt : list;
     
           const opts = [
-            `<option value="manual">宛先を手動で選ぶ</option>`,
+            `<option value="manual">手動のみで選ぶ</option>`,
             ...useList.map(e=>{
               const id = String(e.eventId ?? e.id ?? '');
               const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
@@ -4723,7 +4749,7 @@ window.reportReload = function(){ initAdminReportPage(); };
             })
           ].join('');
     
-          selMode.innerHTML = opts || `<option value="manual">宛先を手動で選ぶ</option>`;
+          selMode.innerHTML = opts || `<option value="manual">手動のみで選ぶ</option>`;
           selMode.disabled = false;
           selMode.value = 'manual';       // 既定＝手動
           applyModeLock();
@@ -4950,6 +4976,52 @@ window.reportReload = function(){ initAdminReportPage(); };
       return Array.from(sec?.querySelectorAll('.cp_stat')||[])
         .filter(cb=>cb.checked).map(cb=>cb.value);
     }
+  
+    (function(){
+      const selTpl  = document.getElementById('cp_tpl');
+      const selMode = document.getElementById('cp_event');
+      const bodyEl  = document.getElementById('cp_body');
+    
+      function pickEvent(){
+        const eid = selMode?.value;
+        return (eid && eid !== 'manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
+      }
+    
+      function applyTemplate(kind){
+        const ev  = pickEvent();
+        const ctx = ev || {
+          title:'{TITLE}', date:'{DATE}', time:'{TIME}',
+          datetime:'{DATETIME}', place:'{PLACE}',
+          meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}'
+        };
+    
+        let text = '';
+        if (kind === '雨天中止時'){
+          text =
+    `【雨天中止のお知らせ】
+    ${ctx.datetime} 開催予定の「${ctx.title}」は、雨天のため中止となりました。
+    楽しみにしてくださっていた皆さまには申し訳ありません。
+    
+    どうぞよろしくお願いいたします。`;
+        } else if (kind === '時間変更時'){ // ← 集合時間変更に読み替え
+          text =
+    `【集合時間変更のお知らせ】
+    ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
+    集合場所：${ctx.meetPoint || '{MEET_POINT}'}
+    開始時間：${ctx.time || '{TIME}'}
+    場所：${ctx.place || '{PLACE}'}
+    
+    ご不便をおかけしますが、どうぞよろしくお願いいたします。`;
+        } else {
+          text = '';
+        }
+    
+        bodyEl.value = text;
+        bodyEl.dispatchEvent(new Event('input')); // 文字数カウンタなど更新
+      }
+    
+      selTpl?.addEventListener('change', () => applyTemplate(selTpl.value));
+    })();
 </script> 
   
 <script>
