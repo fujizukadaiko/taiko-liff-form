@@ -11,7 +11,7 @@
   /* ===== 設定 ===== */
   const FRONT_VERSION = "Front v4.1.7";  // stable ver→v4.0.8, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz4NDQSQYVski8OcYajrOS2Ya1fJ0rz1LyYB1-q-3jRn8iN8iqS_I8Mr7nHmrurp3yb1w/exec";     // GAS v106.0 （PROD v1.0.1未反映）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyDZxGV3kf_kLhJYlkAczbgNKWzWNXm90dyRBz3DRc3mCo8ZnqrjkFdgz6DedATTCuH1A/exec";     // GAS v106.1 （PROD v1.0.1未反映）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -1285,7 +1285,11 @@
     #view-custom-push .statWrap .lockTag[hidden]{ display:none !important; }
 
     #view-custom-push #cp_event{ font-size:13px; }
-    
+    .loadingHint{
+      font-size: 12px;
+      color: var(--c-muted);
+      margin-left: 6px;
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1736,9 +1740,12 @@
     
         <!-- 宛先追加（手動） ラベル左 / セレクト右（※要望③：角丸） -->
         <div class="row-att" style="margin:12px 0;">
-          <label for="cp_extra" class="repLabel">宛先追加（手動）</label>
+          <label for="cp_extra" class="repLabel">
+            宛先追加（手動）
+            <span id="cp_extra_hint" class="loadingHint" hidden>（読み込み中…）</span>
+          </label>
           <select id="cp_extra" class="selectBtn" multiple>
-            <option value="">選択してください</option>
+            <option value="" disabled hidden>選択してください</option>
           </select>
         </div>
     
@@ -1780,6 +1787,7 @@
     
       </div><!-- /card -->
     </section>
+      
   <style>
     /* ===== Custom Push UI style (scoped) ===== */
     #view-custom-push {
@@ -4616,35 +4624,35 @@ window.reportReload = function(){ initAdminReportPage(); };
       }
     
       // ② イベント選択時：出欠結果を取得 → 自動枠へ反映
-      async function fetchReportForEvent(evId){
-        if (!evId || evId==='manual') return;
-        setText(boxAuto, '（読込中…）');
+     async function fetchReportForEvent(evId){
+      if (!evId || evId==='manual') return;
+      setText(boxAuto, '（読込中…）');
     
-        const lid = await myLineId();
-        const url = new URL(API_ENDPOINT);
-        url.searchParams.set('attendanceReport','1');
-        url.searchParams.set('eventId', evId);
-        url.searchParams.set('admin','1');
-        if (lid) url.searchParams.set('lineId', lid);
+      const lid = await myLineId();
+      const url = new URL(API_ENDPOINT);
+      url.searchParams.set('attendanceReport','1');
+      url.searchParams.set('eventId', evId);
+      url.searchParams.set('admin','1');
+      if (lid) url.searchParams.set('lineId', lid);
     
-        let r = {status:'error'};
-        try { r = await fetch(url).then(x=>x.json()); } catch(_){}
-        if (r.status!=='ok'){
-          setText(boxAuto, `（取得エラー${r.message ? '：'+r.message : ''}）`);
-          sec.__rows = [];
-          return;
-        }
-        sec.__rows = Array.isArray(r.rows) ? r.rows : [];
-        renderAutoBox(); // 取得後、現在のチェック状態で描画
-      }
+      let r = {status:'error'};
+      try { r = await fetch(url).then(x=>x.json()); } catch(_){}
+      if (r.status!=='ok'){ setText(boxAuto, '（取得エラー）'); sec.__rows = []; return; }
+    
+      sec.__rows = Array.isArray(r.rows) ? r.rows : [];
+      // ステータス未選択なら案内だけ残す
+      const anyChecked = getCheckedStats().length > 0;
+      if (anyChecked) renderAutoBox();
+      else setText(boxAuto, '（対象ステータスを選択してください）');
+    }
     
       // ②’ 対象ステータスの現在選択で、自動枠を描画
       function renderAutoBox(){
         const checked = new Set(getCheckedStats());
-        const names = sec.__rows
+        const names = (sec.__rows || [])
           .filter(x => checked.has(x.attend || '未回答'))
-          .filter(x => x.lineId)  // 送信可能な人に限定
-          .map(x => x.name)
+          // .filter(x => x.lineId)   ← ← これが原因で全消しになっていた
+          .map(x => x.displayName || x.name)
           .filter(Boolean);
         setText(boxAuto, names.length ? names.join('、') : '（該当なし）');
       }
@@ -4652,35 +4660,26 @@ window.reportReload = function(){ initAdminReportPage(); };
       // ③ 手動モード：通知Yの名簿を取得 → selExtra に入れる
       async function populateManualList(){
         if (!selExtra) return;
-        showLoadingSelect(selExtra, '読み込み中…');
-    
+        // iOS対策：独立ラベルも点灯
+        loadingOnExtra(true);
+      
         const lid = await myLineId();
         const url = new URL(API_ENDPOINT);
         url.searchParams.set('attendanceReport','1');
+        url.searchParams.set('meta','1');
         url.searchParams.set('admin','1');
-        url.searchParams.set('meta','1');          // ← イベント指定なしで名簿取得を期待
         if (lid) url.searchParams.set('lineId', lid);
-    
+      
         let r = {status:'error'};
         try { r = await fetch(url).then(x=>x.json()); } catch(_){}
-        // 可能性のあるプロパティを広めに拾う（通知Yだけに限定したい）
-        const rosterY =
-           Array.isArray(r.rosterNotify) ? r.rosterNotify :
-           Array.isArray(r.rosterY)      ? r.rosterY :
-           Array.isArray(r.notify)       ? r.notify :
-           Array.isArray(r.roster)       ? r.roster : [];
-    
-        // r.rows に name/lineId が来るケースもあるので map を作る
-        const rows = Array.isArray(r.rows) ? r.rows : [];
-        const nameToId = new Map(rows.map(x => [x.name, x.lineId || '']));
-    
-        const options = rosterY.map(nm=>{
-          const id = nameToId.get(nm) || '';  // ID分かる人だけ value を付ける
-          return `<option value="${id}" ${id?'':'disabled'}>${nm}</option>`;
-        }).join('');
-    
-        selExtra.innerHTML = options || `<option value="" disabled>オプションなし</option>`;
-        selExtra.disabled = false;
+      
+        const list = Array.isArray(r.rosterInputers) ? r.rosterInputers : [];
+        selExtra.innerHTML = list.map(x =>
+          `<option value="${x.lineId}">${x.name}</option>`
+        ).join('') || `<option value="" disabled>オプションなし</option>`;
+      
+        selExtra.disabled = (list.length === 0);
+        loadingOnExtra(false);
       }
     
       // ④ 手動の選択を表示枠に反映
@@ -4727,7 +4726,17 @@ window.reportReload = function(){ initAdminReportPage(); };
         renderManualBox();            // 手動枠を初期表示
       });
     })();
-
+  
+    function loadingOnExtra(on){
+      const h = document.getElementById('cp_extra_hint');
+      if (h) h.hidden = !on;
+      if (selExtra) {
+        if (on){
+          selExtra.innerHTML = '';
+          selExtra.disabled = true;
+        }
+      }
+    }
 </script> 
   
 <script>
