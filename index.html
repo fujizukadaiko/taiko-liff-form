@@ -4640,21 +4640,35 @@ window.reportReload = function(){ initAdminReportPage(); };
         // ===== イベント選択時：出欠結果を取得 → 自動枠へ反映 =====
         async function fetchReportForEvent(evId){
           if (!evId || evId==='manual') return;
+
+          sec.__loadingRows = true;                    // ★ 追加：開始
           setText(boxAuto, '（読込中…）');
-    
+        
           const lid = await myLineId();
           const url = new URL(API_ENDPOINT);
           url.searchParams.set('attendanceReport','1');
           url.searchParams.set('eventId', evId);
           url.searchParams.set('admin','1');
           if (lid) url.searchParams.set('lineId', lid);
-    
+        
           let r = {status:'error'};
-          try { r = await fetch(url).then(x=>x.json()); } catch(_){}
-          if (r.status!=='ok'){ setText(boxAuto, '（取得エラー）'); sec.__rows = []; return; }
-    
+          try {
+            r = await fetch(url).then(x=>x.json());
+          } catch(_){
+            // no-op
+          } finally {
+            sec.__loadingRows = false;                 // ★ 追加：終了（成功/失敗どちらでも）
+          }
+        
+          if (r.status!=='ok'){
+            setText(boxAuto, '（取得エラー）');
+            sec.__rows = [];
+            return;
+          }
+        
           sec.__rows   = Array.isArray(r.rows)   ? r.rows   : [];
-          sec.__roster = Array.isArray(r.roster) ? r.roster : []; // ★ 追加
+          sec.__roster = Array.isArray(r.roster) ? r.roster : [];
+        
           const anyChecked = getCheckedStats().length > 0;
           if (anyChecked) renderAutoBox();
           else setText(boxAuto, '（対象ステータスを選択してください）');
@@ -4662,24 +4676,27 @@ window.reportReload = function(){ initAdminReportPage(); };
     
         // ===== 対象ステータス選択に応じて自動枠を描画 =====
         function renderAutoBox(){
-          const sel = new Set(getCheckedStats());
-           const out = [];
-           // 未回答 = roster – 回答者
-           if (sel.has('未回答')){
-             const answered = new Set((sec.__rows||[]).map(x => x.name).filter(Boolean));
-             const noans = (sec.__roster||[]).filter(nm => !answered.has(nm));
-             out.push(...noans);
-           }
-           // 参加/未定/欠席
-           ['参加','未定','欠席'].forEach(st=>{
-             if (sel.has(st)){
-               out.push(...(sec.__rows||[])
-                 .filter(x => x.attend === st)
-                 .map(x => x.displayName || x.name));
-             }
-           });
-           setText(boxAuto, out.length ? out.join('、') : '（該当なし）');
+          if (sec.__loadingRows){
+            setText(boxAuto, '（読込中…）');
+            return;
           }
+        
+          const sel = new Set(getCheckedStats());
+          const out = [];
+          if (sel.has('未回答')){
+            const answered = new Set((sec.__rows||[]).map(x => x.name).filter(Boolean));
+            const noans = (sec.__roster||[]).filter(nm => !answered.has(nm));
+            out.push(...noans);
+          }
+          ['参加','未定','欠席'].forEach(st=>{
+            if (sel.has(st)){
+              out.push(...(sec.__rows||[])
+                .filter(x => x.attend === st)
+                .map(x => x.displayName || x.name));
+            }
+          });
+          setText(boxAuto, out.length ? out.join('、') : '（該当なし）');
+        }
     
         // ===== 手動モード：通知Yの名簿を取得 → selExtra に入れる =====
         async function populateManualList(){
@@ -4721,6 +4738,7 @@ window.reportReload = function(){ initAdminReportPage(); };
         selMode?.addEventListener('change', async ()=>{
           applyModeLock();
           if (selMode.value === 'manual'){
+            sec.__loadingRows = false;                     // ★ 任意：手動にしたら読込状態を解除
             setText(boxAuto, '（手動モード：自動選択は使いません）');
             await populateManualList();
           }else{
@@ -4731,6 +4749,7 @@ window.reportReload = function(){ initAdminReportPage(); };
         // 対象ステータス変更 → 自動枠を即時更新（イベント委任で確実に）
         statWrap?.addEventListener('change', (e)=>{
           if (!e.target || !e.target.classList?.contains('cp_stat')) return;
+          if (sec.__loadingRows) return;
           if (selMode?.value && selMode.value!=='manual') renderAutoBox();
         });
     
