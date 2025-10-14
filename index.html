@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.2.0";  // stable ver→v4.1.9, PROD v1.0.1未反映
+  const FRONT_VERSION = "Front v4.2.1";  // stable ver→v4.1.9, PROD v1.0.1未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzD7-37N_tsKH4KiElCqgQrnCn2yyLEF9B-qHz0oNmdvUleyU3ACiSu1Cf9iYyjX6UUxg/exec";     // GAS v106.1 （PROD v1.0.1未反映）
 
@@ -2024,6 +2024,20 @@
       white-space: pre-wrap;  /* 改行と折返しを両立 */
       line-height: 1.6;
     }
+    /* 対象ステータスの枠・背景をなくす */
+    #cp_stat_wrap,
+    #cp_stat_wrap.is-disabled {
+      border: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+    }
+    
+    /* 内側行の余白だけ軽く */
+    #cp_stat_wrap .row { margin-top: 6px; }
+    
+    /* ラベルとチェックはそのまま */
+    #cp_stat_wrap .repLabel { margin: 0; }
   </style>
   </script>
 
@@ -4955,20 +4969,22 @@ window.reportReload = function(){ initAdminReportPage(); };
       const selMode = document.getElementById('cp_event');
       const bodyEl  = document.getElementById('cp_body');
     
-      function pickEvent(){
-        const eid = selMode?.value;
-        return (eid && eid !== 'manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
-      }
+      if (!selTpl || !selMode || !bodyEl) return;
     
-      function applyTemplate(kind){
-        const ev  = pickEvent();
-        const ctx = ev || {
+      function pickEventCtx(){
+        const eid = selMode.value;
+        const ev  = (eid && eid!=='manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
+        return ev || {
           title:'{TITLE}', date:'{DATE}', time:'{TIME}',
           datetime:'{DATETIME}', place:'{PLACE}',
           meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}'
         };
+      }
     
+      function applyTemplate(kind){
+        const ctx = pickEventCtx();
         let text = '';
+    
         if (kind === '雨天中止時'){
           text =
     `【雨天中止のお知らせ】
@@ -4976,7 +4992,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     楽しみにしてくださっていた皆さまには申し訳ありません。
     
     どうぞよろしくお願いいたします。`;
-        } else if (kind === '時間変更時'){ // ← 集合時間変更に読み替え
+        } else if (kind === '時間変更時'){ // ← 集合時間変更テンプレ
           text =
     `【集合時間変更のお知らせ】
     ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
@@ -4985,15 +5001,25 @@ window.reportReload = function(){ initAdminReportPage(); };
     場所：${ctx.place || '{PLACE}'}
     
     ご不便をおかけしますが、どうぞよろしくお願いいたします。`;
-        } else {
+        } else { // なし
           text = '';
         }
     
         bodyEl.value = text;
-        bodyEl.dispatchEvent(new Event('input')); // 文字数カウンタなど更新
+        bodyEl.dispatchEvent(new Event('input')); // 文字数カウンタ等の更新用
       }
     
-      selTpl?.addEventListener('change', () => applyTemplate(selTpl.value));
+      // 変更時に適用
+      selTpl.addEventListener('change', ()=> applyTemplate(selTpl.value));
+    
+      // イベント変更時も「現在選択中のテンプレ」を再適用
+      selMode.addEventListener('change', ()=>{
+        if (selTpl.value) applyTemplate(selTpl.value);
+      });
+    
+      // 読みやすく
+      bodyEl.style.whiteSpace = 'pre-wrap';
+      bodyEl.style.lineHeight = '1.6';
     })();
 </script> 
   
