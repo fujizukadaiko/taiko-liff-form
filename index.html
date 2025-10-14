@@ -1336,7 +1336,23 @@
     }
     .siteFooter a{ color:inherit; text-decoration:underline; text-underline-offset:2px; }
     .siteFooter .ver{ margin-left:8px; opacity:.7; }
-  
+  /* レイアウト：フッターを最下部に固定（中身が少ないページでも） */
+    html, body { height: 100%; }
+    body { min-height: 100svh; display: flex; flex-direction: column; }
+    main { flex: 1 0 auto; }
+    
+    /* フッターの見た目 */
+    .siteFooter{
+      text-align:center; font-size:12px; color:#777;
+      padding: 10px 16px; border-top:1px solid var(--c-border);
+    }
+    .siteFooter a{ color: var(--c-primary-2); text-decoration:none; }
+    .siteFooter .dot{ color:#bbb; margin:0 6px; }
+    
+    /* カスタム通知：タイトル周りの余白を他ページと合わせる */
+    #view-custom-push { padding: 0 !important; } /* section自身の内側パディングをゼロ */
+    #view-custom-push > .row-space{ margin: 8px 0 8px !important; }
+    #view-custom-push .card:first-of-type{ margin-top: 8px !important; }
   </style>
   
   <!-- LIFF SDK -->
@@ -1656,14 +1672,6 @@
     
       <div id="repBox" class="muted">公演を選択してください</div>
     </section>
-  </main>
-
-  <footer id="legalFooter" class="legal-footer" aria-label="legal links">
-  <a href="https://fujizukadaiko.github.io/your-repo/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
-  ・
-  <a href="https://fujizukadaiko.github.io/your-repo/terms.html" target="_blank" rel="noopener">利用規約</a>
-</footer>
-  
     <!-- ===== カスタム通知（管理者） ===== -->
     <section id="view-custom-push" data-view>
     
@@ -1926,6 +1934,13 @@
     
       </div><!-- /card -->
     </section>
+  </main>
+
+  <footer id="legalFooter" class="legal-footer" aria-label="legal links">
+  <a href="https://fujizukadaiko.github.io/your-repo/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
+  ・
+  <a href="https://fujizukadaiko.github.io/your-repo/terms.html" target="_blank" rel="noopener">利用規約</a>
+</footer>
   <style>
     /* ===== Custom Push UI style (scoped) ===== */
     #view-custom-push {
