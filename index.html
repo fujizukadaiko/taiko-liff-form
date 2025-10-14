@@ -4738,7 +4738,7 @@ window.reportReload = function(){ initAdminReportPage(); };
           // 共有ハンドル（全ブロックから参照する前提）
           window.cpSec   = window.cpSec   || root;
           window.selMode = window.selMode || document.getElementById('cp_event');          // イベント/手動
-          window.boxAuto = window.boxAuto || document.getElementById('cp_auto_targets');   // 自動表示枠
+          window.boxAuto = window.boxAuto || document.querySelector('#cp_auto_targets, #cp_auto');  // 自動表示枠
         
           // 状態用の安全初期化
           if (typeof cpSec.__loadingAuto === 'undefined') cpSec.__loadingAuto = false;
@@ -4757,7 +4757,7 @@ window.reportReload = function(){ initAdminReportPage(); };
         (function(){
           const sec      = window.cpSec;
           const selMode  = window.selMode || document.getElementById('cp_event');
-          const boxAuto  = window.boxAuto || document.getElementById('cp_auto_targets');
+          const boxAuto  = window.boxAuto || document.querySelector('#cp_auto_targets, #cp_auto');
           const statWrap = document.getElementById('cp_stat_wrap');
           const selExtra = document.getElementById('cp_extra');
         
@@ -4800,7 +4800,7 @@ window.reportReload = function(){ initAdminReportPage(); };
       async function refreshAutoByPreview(){
         const sec     = window.cpSec   || document.getElementById('view-custom-push');
         const selMode = window.selMode || document.getElementById('cp_event');
-        const boxAuto = window.boxAuto || document.getElementById('cp_auto_targets');
+        const boxAuto = window.boxAuto || document.querySelector('#cp_auto_targets, #cp_auto');
       
         if (!selMode || selMode.value==='manual') return;
       
