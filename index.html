@@ -4788,47 +4788,64 @@ window.reportReload = function(){ initAdminReportPage(); };
           setText(boxManual, names.length ? names.join('、') : '（未選択）');
         }
 
-        // === CustomPush 共通ユーティリティ（refreshAutoByPreviewより前に置く） ===
+        // === CustomPush: globals bootstrap ===
         (function(){
-          const sec = document.getElementById('view-custom-push');
-          if (!sec) return;
+          const root = document.getElementById('view-custom-push');
+          if (!root) return;
         
-          // 他ブロックから参照される可能性のある要素をグローバル化
-          window.selMode = window.selMode || document.getElementById('cp_event');
-          window.boxAuto = window.boxAuto || document.getElementById('cp_auto_targets');
+          // 共有ハンドル（全ブロックから参照する前提）
+          window.cpSec   = window.cpSec   || root;
+          window.selMode = window.selMode || document.getElementById('cp_event');          // イベント/手動
+          window.boxAuto = window.boxAuto || document.getElementById('cp_auto_targets');   // 自動表示枠
         
-          // 対象ステータスのチェック値を配列で返す（例: ["参加","未定"]）
+          // 状態用の安全初期化
+          if (typeof cpSec.__loadingAuto === 'undefined') cpSec.__loadingAuto = false;
+          if (!Array.isArray(cpSec.__autoTargets))        cpSec.__autoTargets = [];
+        
+          // ユーティリティ（未定義なら用意）
           window.getCheckedStats = window.getCheckedStats || function(){
-            return Array.from(sec.querySelectorAll('.cp_stat:checked')).map(el=>el.value);
+            return Array.from(cpSec.querySelectorAll('.cp_stat:checked')).map(el => el.value);
           };
-        
-          // textContent セットの簡易ヘルパ
           window.setText = window.setText || function(el, s){
             if (el) el.textContent = s;
           };
         })();
 
-        // ===== 結線 =====
-        selMode?.addEventListener('change', async ()=>{
-          applyModeLock();
-          if (selMode.value === 'manual'){
-            sec.__loadingRows = false;                     // ★ 任意：手動にしたら読込状態を解除
-            setText(boxAuto, '（手動モード選択中）');
-            await populateManualList();
-          }else{
-            await refreshAutoByPreview();
-          }
-        });
-    
-        // 対象ステータス変更 → 自動枠を即時更新（イベント委任で確実に）
-        statWrap?.addEventListener('change', (e)=>{
-          if (!e.target || !e.target.classList?.contains('cp_stat')) return;
-          if (selMode?.value && selMode.value!=='manual') refreshAutoByPreview();
-        });
-    
-        selExtra?.addEventListener('input',  renderManualBox);   // iOS/Android向け
-        selExtra?.addEventListener('change', renderManualBox);   // PC向け
-    
+        // ===== 結線（置換）=====
+        (function(){
+          const sec      = window.cpSec;
+          const selMode  = window.selMode || document.getElementById('cp_event');
+          const boxAuto  = window.boxAuto || document.getElementById('cp_auto_targets');
+          const statWrap = document.getElementById('cp_stat_wrap');
+          const selExtra = document.getElementById('cp_extra');
+        
+          if (!sec || !selMode) return;
+        
+          // 「宛先の選び方」変更
+          selMode.addEventListener('change', async ()=>{
+            if (typeof applyModeLock === 'function') applyModeLock();
+            if (selMode.value === 'manual'){
+              sec.__loadingAuto = false; // 読込フラグ解除（任意）
+              setText(boxAuto, '（手動モード：自動選択は使いません）');
+              if (typeof populateManualList === 'function') await populateManualList();
+            } else {
+              if (typeof refreshAutoByPreview === 'function') await refreshAutoByPreview();
+            }
+          });
+        
+          // 対象ステータス変更 → イベントモード時のみプレビュー更新
+          statWrap?.addEventListener('change', (e)=>{
+            if (!e.target?.classList?.contains('cp_stat')) return;
+            if (selMode.value !== 'manual' && typeof refreshAutoByPreview === 'function'){
+              refreshAutoByPreview();
+            }
+          });
+        
+          // 手動追加の選択内容を表示枠に反映
+          selExtra?.addEventListener('input',  ()=> typeof renderManualBox==='function' && renderManualBox());
+          selExtra?.addEventListener('change', ()=> typeof renderManualBox==='function' && renderManualBox());
+        })();
+
         // ===== 初期化 =====
         if (boxAuto)   setText(boxAuto,  '（初期化中…）');
         if (boxManual) setText(boxManual,'（未選択）');
@@ -4839,32 +4856,45 @@ window.reportReload = function(){ initAdminReportPage(); };
     })();
   
     async function refreshAutoByPreview(){
-      if (!selMode || selMode.value==='manual') return;
-      const sts = getCheckedStats();
+      const sec     = window.cpSec;
+      const selMode = window.selMode || document.getElementById('cp_event');
+      const boxAuto = window.boxAuto || document.getElementById('cp_auto_targets');
+      if (!sec || !selMode || !boxAuto) return;
+    
+      // 手動モードなら何もしない
+      if (selMode.value === 'manual') return;
+    
+      const sts = (window.getCheckedStats ? getCheckedStats() : []);
       if (sts.length === 0){
         setText(boxAuto, '（対象ステータスを選択してください）');
         return;
       }
     
+      // 読み込み中の表示を優先
       sec.__loadingAuto = true;
       setText(boxAuto, '（読込中…）');
     
-      const lid = await myLineId();
+      // 自分の lineId 取得（既存のユーティリティを流用してください）
+      const lid = (await (window.getMyLineId_?.() ?? '')) || window.state?.lineId || '';
       const url = new URL(API_ENDPOINT);
       url.searchParams.set('attendanceReport','1');
-      url.searchParams.set('customPushPreview','1');  // GASのプレビューAPI
+      url.searchParams.set('customPushPreview','1');
       url.searchParams.set('eventId', selMode.value);
       url.searchParams.set('statuses', JSON.stringify(sts));
       if (lid) url.searchParams.set('senderLineId', lid);
     
-      let r = {status:'error'};
+      let r = { status:'error' };
       try { r = await fetch(url).then(x=>x.json()); } catch(_){}
       sec.__loadingAuto = false;
     
-      if (r.status!=='ok'){ setText(boxAuto,'（取得エラー）'); sec.__autoTargets=[]; return; }
+      if (r.status !== 'ok'){
+        setText(boxAuto, '（取得エラー）');
+        sec.__autoTargets = [];
+        return;
+      }
     
       sec.__autoTargets = Array.isArray(r.autoTargets) ? r.autoTargets : [];
-      const labels = sec.__autoTargets.map(x => x.label || x.name); // labelが無ければname
+      const labels = sec.__autoTargets.map(x => x.label || x.name).filter(Boolean);
       setText(boxAuto, labels.length ? labels.join('、') : '（該当なし）');
     }
 </script> 
