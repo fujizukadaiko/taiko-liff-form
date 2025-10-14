@@ -4787,7 +4787,27 @@ window.reportReload = function(){ initAdminReportPage(); };
             .filter(Boolean);
           setText(boxManual, names.length ? names.join('、') : '（未選択）');
         }
-    
+
+        // === CustomPush 共通ユーティリティ（refreshAutoByPreviewより前に置く） ===
+        (function(){
+          const sec = document.getElementById('view-custom-push');
+          if (!sec) return;
+        
+          // 他ブロックから参照される可能性のある要素をグローバル化
+          window.selMode = window.selMode || document.getElementById('cp_event');
+          window.boxAuto = window.boxAuto || document.getElementById('cp_auto_targets');
+        
+          // 対象ステータスのチェック値を配列で返す（例: ["参加","未定"]）
+          window.getCheckedStats = window.getCheckedStats || function(){
+            return Array.from(sec.querySelectorAll('.cp_stat:checked')).map(el=>el.value);
+          };
+        
+          // textContent セットの簡易ヘルパ
+          window.setText = window.setText || function(el, s){
+            if (el) el.textContent = s;
+          };
+        })();
+
         // ===== 結線 =====
         selMode?.addEventListener('change', async ()=>{
           applyModeLock();
