@@ -4855,47 +4855,58 @@ window.reportReload = function(){ initAdminReportPage(); };
       }
     })();
   
-    async function refreshAutoByPreview(){
-      const sec     = window.cpSec;
-      const selMode = window.selMode || document.getElementById('cp_event');
-      const boxAuto = window.boxAuto || document.getElementById('cp_auto_targets');
-      if (!sec || !selMode || !boxAuto) return;
-    
-      // 手動モードなら何もしない
-      if (selMode.value === 'manual') return;
-    
-      const sts = (window.getCheckedStats ? getCheckedStats() : []);
-      if (sts.length === 0){
-        setText(boxAuto, '（対象ステータスを選択してください）');
-        return;
+      async function refreshAutoByPreview(){
+        const sec     = window.cpSec   || document.getElementById('view-custom-push');
+        const selMode = window.selMode || document.getElementById('cp_event');
+        const boxAuto = window.boxAuto || document.getElementById('cp_auto_targets');
+      
+        if (!selMode || selMode.value==='manual') return;
+      
+        const sts = getCheckedStats();
+        if (sts.length === 0){
+          setText(boxAuto, '（対象ステータスを選択してください）');
+          return;
+        }
+      
+        sec.__loadingAuto = true;
+        setText(boxAuto, '（読込中…）');
+      
+        const lid = await myLineIdAsync();           // ★ Admin 判定用
+        const url = new URL(API_ENDPOINT);
+        url.searchParams.set('attendanceReport','1');
+        url.searchParams.set('customPushPreview','1');
+        url.searchParams.set('eventId', selMode.value);
+        url.searchParams.set('statuses', JSON.stringify(sts));
+        if (lid){
+          url.searchParams.set('lineId', lid);       // ★ これが必須（Admin 判定）
+          url.searchParams.set('senderLineId', lid); // （任意）ログ/テンプレ側で利用可
+        }
+      
+        let r;
+        try{ r = await fetch(url).then(x=>x.json()); }
+        catch(e){ r = { status:'error', message:String(e) }; }
+        console.log('customPushPreview resp:', r);   // ★ デバッグログ（開発者ツールで確認）
+      
+        sec.__loadingAuto = false;
+      
+        if (r.status!=='ok'){
+          setText(boxAuto, '（取得エラー）');
+          sec.__autoTargets = [];
+          return;
+        }
+      
+        sec.__autoTargets = Array.isArray(r.autoTargets) ? r.autoTargets : [];
+        const labels = sec.__autoTargets
+          .map(x => x.label || x.name)
+          .filter(Boolean);
+      
+        setText(boxAuto, labels.length ? labels.join('、') : '（該当なし）');
       }
-    
-      // 読み込み中の表示を優先
-      sec.__loadingAuto = true;
-      setText(boxAuto, '（読込中…）');
-    
-      // 自分の lineId 取得（既存のユーティリティを流用してください）
-      const lid = (await (window.getMyLineId_?.() ?? '')) || window.state?.lineId || '';
-      const url = new URL(API_ENDPOINT);
-      url.searchParams.set('attendanceReport','1');
-      url.searchParams.set('customPushPreview','1');
-      url.searchParams.set('eventId', selMode.value);
-      url.searchParams.set('statuses', JSON.stringify(sts));
-      if (lid) url.searchParams.set('senderLineId', lid);
-    
-      let r = { status:'error' };
-      try { r = await fetch(url).then(x=>x.json()); } catch(_){}
-      sec.__loadingAuto = false;
-    
-      if (r.status !== 'ok'){
-        setText(boxAuto, '（取得エラー）');
-        sec.__autoTargets = [];
-        return;
-      }
-    
-      sec.__autoTargets = Array.isArray(r.autoTargets) ? r.autoTargets : [];
-      const labels = sec.__autoTargets.map(x => x.label || x.name).filter(Boolean);
-      setText(boxAuto, labels.length ? labels.join('、') : '（該当なし）');
+    function setText(el, s){ if(el) el.textContent = s; }
+    function getCheckedStats(){
+      const sec = window.cpSec || document.getElementById('view-custom-push');
+      return Array.from(sec?.querySelectorAll('.cp_stat')||[])
+        .filter(cb=>cb.checked).map(cb=>cb.value);
     }
 </script> 
   
