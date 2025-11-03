@@ -2724,6 +2724,12 @@ function updateSubmitButton(){
 }
 
 /* ===== ユーティリティ ===== */
+  // HTMLエスケープ（XSS/崩れ防止）
+function h(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+  ));
+}
 const $ = s => document.querySelector(s);
 /* ===== 区分(セグメント) 正規化 & 判定ヘルパー ===== */
 const INCLUDE_BOTH_FOR_ALL = true;
@@ -4654,12 +4660,6 @@ window.reportReload = function(){ initAdminReportPage(); };
     ];
     for (const c of cands) if (Array.isArray(c)) return c;
     return [];
-  }
-  // HTMLエスケープ（XSS/崩れ防止）
-  function h(s){
-    return String(s==null?'':s).replace(/[&<>"']/g, c => (
-      {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
-    ));
   }
   // 行の正規化
   function mapRow(x){
