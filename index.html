@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.2.6";  // stable ver→v4.2.4, PROD v1.0.2 反映済み
+  const FRONT_VERSION = "Front v4.2.7";  // stable ver→v4.2.6, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwx5L_E7BeSoI7NXrTYA8zeTn6_mHSixzhmF9EWr6NACRVOoNmsddyp8iEeq0Ozbntj5g/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbymxq0YjGxik2YR-NcZAHFIOSfWDRnyWjxo651D0F1ESVrAyS3q6jCq4kaOk7GiBJjGvA/exec";     // GAS v106.3 （PROD v1.0.2 未反映）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -938,10 +938,25 @@
       all:unset; display:flex; align-items:baseline; gap:8px; width:100%; cursor:pointer;
     }
     .scTitleBtn .scDate{ flex:0 0 auto; font-weight:700; white-space:nowrap; }
+    /* タイトル：閉じている時は1行省略 */
     .scTitleBtn .scTitle{
-      flex:1 1 auto; min-width:0;            /* ← これがないと省略記号が効かない */
+      flex:1 1 auto; min-width:0;
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      display:block;
     }
+    /* タイトル：開いたら最大2行で折り返し（フル表示） */
+    .scTitleBtn[aria-expanded="true"] .scTitle{
+      white-space:normal;
+      display:-webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;     /* 2行まで */
+      overflow:hidden;
+    }
+    /* 折りたたみ内のメタ行（集合／演奏開始／@場所） */
+    .scMeta{ font-size:13px; color:var(--c-text); margin-top:6px; }
+    .scMeta .scMetaLine{ margin-top:4px; }
+    .scMeta .label{ color:var(--c-muted); margin-right:.25em; }
+    
     .scTitleBtn .scCaret{ flex:0 0 auto; margin-left:8px; transition:transform .12s ease; }    
     /* 折りたたみパネル（フルタイトル／メモ／場所＋集合情報をここに） */
     .scPanel{ margin-top:8px; }
@@ -3764,36 +3779,41 @@ async function onRegister(){
     const kindText = String(it.kind || "").trim();
     const kindCls  = KIND_CLASS[kindText] || ""; 
     const memoText = String(it.memo || "").trim();
+    
+    // ← NEW: 演奏開始の候補キーを広めに吸収
+    const performAt = it.performAt || it.playAt || it.startAt || it.performanceAt || "";
+    
+    // 行ごとに整形（存在するものだけ並べる）
+    const meetLine  = (it.meetAt || it.meetPlace)
+      ? `<div class="scMetaLine"><span class="label">集合</span> ${[it.meetAt||"", it.meetPlace||""].filter(Boolean).join(" ")}</div>` : "";
+    const perfLine  = performAt
+      ? `<div class="scMetaLine"><span class="label">演奏開始</span> ${performAt}</div>` : "";
+    const placeLine = it.place
+      ? `<div class="scMetaLine">@${it.place}</div>` : "";
   
-    const meetTxt  = [
-      (it.meetAt ? `集合 ${it.meetAt}` : ""),
-      (it.meetPlace || "")
-    ].filter(Boolean).join(" ");
-    const placeTxt = it.place ? `@${it.place}` : "";
-  
-    // 折りたたみ内の中身（フルタイトル → メモ → 場所/集合）
+    // 折りたたみ内：★タイトルは出さず（ご要望どおり）、メモ→各行メタ
     const panelInner = `
-      <div class="scFullTitle">${it.title || ""}</div>
       ${memoText ? `<div class="scMemo">${memoText}</div>` : ``}
-      ${(placeTxt || meetTxt) ? `<div class="scMeta">${[placeTxt, meetTxt].filter(Boolean).join("　")}</div>` : ``}
+      ${(meetLine || perfLine || placeLine)
+        ? `<div class="scMeta">${meetLine}${perfLine}${placeLine}</div>` : ``}
     `;
-  
+    
     return `
       <div class="card scheduleCard" data-seg="${segNorm || 'both'}">
         <!-- 1行目：左=区分 / 右=種別 -->
         <div class="scTop">
           ${segLabel ? `<span class="seg-badge ${segNorm==='adult'?'seg-adult':segNorm==='child'?'seg-child':'seg-both'}">${segLabel}</span>` : ``}
-          ${kindText ? `<span class="scKind ${kindCls}">${kindText}</span>` : ``}
+          ${kindText ? `<span class="scKind">${kindText}</span>` : ``}
         </div>
   
-        <!-- 2行目：日付 + タイトル（1行省略） -->
+        <!-- 2行目：日付 + タイトル（閉=1行省略／開=最大2行） -->
         <button type="button" class="scTitleBtn" aria-expanded="false">
           <span class="scDate">${dateText}</span>
           <span class="scTitle">${it.title || ""}</span>
           <span class="scCaret" aria-hidden="true">∨</span>
         </button>
   
-        <!-- 3行目以降：折りたたみ（フルタイトル/メモ/@場所・集合） -->
+        <!-- 折りたたみ -->
         <div class="scPanel" hidden>${panelInner}</div>
       </div>`;
   }
