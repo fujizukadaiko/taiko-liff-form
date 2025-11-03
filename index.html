@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.2.9";  // stable ver→v4.2.6, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.3.0";  // stable ver→v4.2.9, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz8SqnMkvicq4hfamo3oe3AWDMKt_KNduzmaaTXiNG4vHOWQYoBWDnAqVTUJjPq_BJrqQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -1374,7 +1374,7 @@
 
 <body>
   <header class="is-sticky">
-    <div class="siteTitle">【テスト用】藤塚太鼓 出欠・予定</div>
+    <div class="siteTitle">藤塚太鼓 出欠・予定</div>
     <div class="ver" id="ver"></div>
   </header>
 
@@ -4160,11 +4160,6 @@ async function adminSubmit(){
 
     if (!title || !type || !ymdIn){ throw new Error("タイトル/種別/公演日は必須です"); }
 
-    // ④-2 大人の部ならタイトル先頭に【大人の部】を必ず付与（種別問わず）
-    if (seg === "大人" && !title.startsWith("【大人の部】")){
-      title = `【大人の部】${title}`;
-    }
-
     if (type === "発表"){
       const flag = $("#ad_flag").value.trim();
       const allowed = (adminMode==="create") ? ["Y","N"] : ["Y","S","D","N"];
@@ -4756,7 +4751,7 @@ window.reportReload = function(){ initAdminReportPage(); };
           </div>
          ${arr.map(p => `
           <div class="repPersonRow">
-            <div class="repName">${h(p.name)}</div>
+            <div class="repName">${h(nameWithSegPrefix(p))}</div>
             <div class="repAt">${
               (p.comment
                  ? `<span class="repComment">${h(String(p.comment).trim())}</span>`
@@ -4772,7 +4767,12 @@ window.reportReload = function(){ initAdminReportPage(); };
     
     repBox.innerHTML = `<div class="repCard">${head}${body}</div>`;
   }
-
+  
+  function nameWithSegPrefix(p){
+    const s = String(p?.seg || "");
+    return s.includes("大人") ? `【大人の部】${p.name}` : p.name;
+  }
+  
   // 公演メタ（セレクトの選択肢）を取得して #repEvent を埋める
   async function loadReportMeta(){
     const sel = document.getElementById('repEvent');
