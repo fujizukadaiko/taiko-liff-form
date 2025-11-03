@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.3.4";  // stable ver→v4.3.1, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.3.5";  // stable ver→v4.3.1, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyZ7o-ax1M48FhD10l0xIKhl6bIAYS1mlyCXFcLLcdr6hnntBLW4gpAwhOhE8y78uBUVA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxjUq7bNLTxDi6hOa5vv4-Sn_gFyueTSAByi6z-INN4yvy-WLvY9RsS5T0pEM8FemUpcQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -526,6 +526,17 @@
     #summaryFreeQuotaBox .kvRow { display:flex; justify-content:space-between; padding:6px 8px; border:1px solid #ddd; border-radius:8px; }
     #summaryFreeQuotaBox .kvKey { color:#666; font-size:13px; }
     #summaryFreeQuotaBox .kvVal { font-weight:600; }
+
+    .summaryCard .kpi { display:inline-block; min-width:120px; padding:8px 10px; margin:4px; border:1px solid #eee; border-radius:8px; }
+    .summaryCard .kpiLabel { font-size:12px; color:#666; }
+    .summaryCard .kpiValue { font-size:20px; font-weight:700; }
+    .summaryCard .num { text-align:right; font-variant-numeric: tabular-nums; }
+    .summaryCard .ok { color:#0a7; }
+    .summaryCard .ng { color:#c33; }
+    .summaryCard .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; }
+    .summaryCard .summaryHeader { font-weight:700; margin:6px 0 8px; }
+    .summaryCard .summarySubHeader { font-weight:700; margin:10px 0 6px; }
+    .table.compact th, .table.compact td { padding:4px 6px; }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -1961,10 +1972,16 @@
         <!-- タブ風ボタン -->
         <div class="row" style="gap:8px;margin-bottom:8px;">
           <button id="btnSummaryFreeQuota" class="btn btn-primary btn-sm btn-compact">無料枠確認</button>
+          <button id="btnSummaryPushStats" class="btn btn-outline btn-sm btn-compact">配信履歴</button>
         </div>
     
-        <!-- 表示ボックス -->
+        <!-- 無料枠 -->
         <div id="summaryFreeQuotaBox" class="summaryCard">
+          <div class="small muted">読み込み待機中…</div>
+        </div>
+    
+        <!-- 配信履歴 -->
+        <div id="summaryPushStatsBox" class="summaryCard" style="display:none;">
           <div class="small muted">読み込み待機中…</div>
         </div>
     
@@ -1973,7 +1990,8 @@
         </div>
     
         <div class="small muted" style="margin-top:6px;">
-          ※ LINE公式アカウントの今月利用状況を表示します
+          ※ 「無料枠確認」はLINE公式アカウントの今月利用状況を表示します。<br>
+          ※ 「配信履歴」はPushlog/PushDetailから当月の集計を表示します。
         </div>
       </div>
     </section>
@@ -5522,6 +5540,159 @@ window.reportReload = function(){ initAdminReportPage(); };
         box.innerHTML = `<div class="err">エラー：${e.message || e}</div>`;
       }
     };
+      // ===== サマリ：タブ切替共通 =====
+      (function(){
+        const btnFree = document.getElementById('btnSummaryFreeQuota');
+        const btnPush = document.getElementById('btnSummaryPushStats');
+        const boxFree = document.getElementById('summaryFreeQuotaBox');
+        const boxPush = document.getElementById('summaryPushStatsBox');
+      
+        function setActive(tab){ // 'free' | 'push'
+          if (!btnFree || !btnPush || !boxFree || !boxPush) return;
+          const on  = (el)=>{ el.classList.remove('btn-outline'); el.classList.add('btn-primary'); };
+          const off = (el)=>{ el.classList.remove('btn-primary'); el.classList.add('btn-outline'); };
+          if (tab === 'free'){
+            on(btnFree);  off(btnPush);
+            boxFree.style.display = '';
+            boxPush.style.display = 'none';
+          } else {
+            on(btnPush);  off(btnFree);
+            boxFree.style.display = 'none';
+            boxPush.style.display = '';
+          }
+        }
+      
+        window.showSummaryFreeTab = function(){ setActive('free'); };
+        window.showSummaryPushTab = function(){ setActive('push'); };
+      
+        // 画面遷移時（サマリボタン）
+        document.getElementById('btnSummary')?.addEventListener('click', ()=>{
+          if (!state.isAdmin){ alert('管理者のみアクセス可能です'); return; }
+          show('#view-summary');
+          showSummaryFreeTab();           // デフォルトは無料枠タブ
+          window.loadSummaryFreeQuota?.();
+        });
+      
+        // タブクリック
+        btnFree?.addEventListener('click', ()=>{
+          showSummaryFreeTab();
+          window.loadSummaryFreeQuota?.();
+        });
+        btnPush?.addEventListener('click', ()=>{
+          showSummaryPushTab();
+          window.loadSummaryPushStats?.();
+        });
+      
+        // 再取得（アクティブタブに合わせて）
+        document.getElementById('btnSummaryReload')?.addEventListener('click', ()=>{
+          if (boxPush?.style.display !== 'none') {
+            window.loadSummaryPushStats?.();
+          } else {
+            window.loadSummaryFreeQuota?.();
+          }
+        });
+      })();
+      
+      // ===== サマリ：配信履歴（当月） =====
+      window.loadSummaryPushStats = async function(){
+        const box = document.getElementById('summaryPushStatsBox');
+        if (!box) return;
+        box.innerHTML = `取得中… <span class="spinner"></span>`;
+      
+        try{
+          const r = await api(`?summary=1&pushStats=1`);
+          if (r?.status !== 'ok'){
+            box.innerHTML = `<div class="err">エラー: ${h(r?.message||'取得に失敗しました')}</div>`;
+            return;
+          }
+          if (r.empty){
+            box.innerHTML = `<div class="small muted">データがありません</div>`;
+            return;
+          }
+      
+          const fmtNum = n => (typeof n==='number' ? n.toLocaleString() : String(n||'0'));
+          const month  = h(r.month || '');
+      
+          const logs = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0,byType:{}};
+          const byType = logs.byType || {};
+          const typeRows = Object.keys(byType).sort().map(t=>{
+            const v = byType[t] || {};
+            return `<tr><td>${h(t)}</td><td class="num">${fmtNum(v.count)}</td><td class="num">${fmtNum(v.targets)}</td><td class="num">${fmtNum(v.success)}</td><td class="num">${fmtNum(v.fail)}</td></tr>`;
+          }).join('') || `<tr><td colspan="5" class="muted">種別内訳なし</td></tr>`;
+      
+          const byEvent = r.byEvent || {};
+          const evRows = Object.keys(byEvent).sort().map(id=>{
+            const v = byEvent[id] || {};
+            return `<tr><td>${h(id)}</td><td class="num">${fmtNum(v.count)}</td><td class="num">${fmtNum(v.targets)}</td><td class="num">${fmtNum(v.success)}</td><td class="num">${fmtNum(v.fail)}</td></tr>`;
+          }).join('') || `<tr><td colspan="5" class="muted">公演別内訳なし</td></tr>`;
+      
+          const recent = r.recent || [];
+          const recentRows = recent.map(x=>{
+            return `<tr>
+              <td>${h(x.at||'')}</td>
+              <td>${h(x.type||'')}</td>
+              <td>${h(x.eventId||'')}</td>
+              <td class="num">${fmtNum(x.targets)}</td>
+              <td class="num ok">${fmtNum(x.success)}</td>
+              <td class="num ng">${fmtNum(x.fail)}</td>
+              <td class="mono">${h(x.requestId||'')}</td>
+            </tr>`;
+          }).join('') || `<tr><td colspan="7" class="muted">直近20件なし</td></tr>`;
+      
+          box.innerHTML = `
+            <div class="summaryBlock">
+              <div class="summaryHeader">当月配信サマリ（${month}）</div>
+              <div class="summaryKpis">
+                <div class="kpi"><div class="kpiLabel">ログ件数</div><div class="kpiValue">${fmtNum(logs.count)}</div></div>
+                <div class="kpi"><div class="kpiLabel">対象件数</div><div class="kpiValue">${fmtNum(logs.totalTargets)}</div></div>
+                <div class="kpi"><div class="kpiLabel">成功数</div><div class="kpiValue">${fmtNum(logs.totalSuccess)}</div></div>
+                <div class="kpi"><div class="kpiLabel">失敗数</div><div class="kpiValue">${fmtNum(logs.totalFail)}</div></div>
+              </div>
+            </div>
+      
+            <div class="summaryBlock">
+              <div class="summarySubHeader">種別内訳</div>
+              <table class="table compact">
+                <thead><tr><th>種別</th><th>ログ</th><th>対象</th><th>成功</th><th>失敗</th></tr></thead>
+                <tbody>${typeRows}</tbody>
+              </table>
+            </div>
+      
+            <div class="summaryBlock">
+              <div class="summarySubHeader">公演別内訳</div>
+              <table class="table compact">
+                <thead><tr><th>公演ID</th><th>ログ</th><th>対象</th><th>成功</th><th>失敗</th></tr></thead>
+                <tbody>${evRows}</tbody>
+              </table>
+            </div>
+      
+            <div class="summaryBlock">
+              <div class="summarySubHeader">直近20件</div>
+              <table class="table compact">
+                <thead><tr><th>日時</th><th>種別</th><th>公演ID</th><th>対象</th><th>成功</th><th>失敗</th><th>リクエストID</th></tr></thead>
+                <tbody>${recentRows}</tbody>
+              </table>
+            </div>
+      
+            ${
+              r.httpStatus && Object.keys(r.httpStatus).length
+                ? `<div class="summaryBlock">
+                     <div class="summarySubHeader">HTTPステータス分布（当月）</div>
+                     <table class="table compact">
+                       <thead><tr><th>Status</th><th>件数</th></tr></thead>
+                       <tbody>${
+                         Object.keys(r.httpStatus).sort().map(k=>`<tr><td>${h(k)}</td><td class="num">${fmtNum(r.httpStatus[k])}</td></tr>`).join('')
+                       }</tbody>
+                     </table>
+                   </div>`
+                : ``
+            }
+          `;
+        }catch(err){
+          console.error(err);
+          box.innerHTML = `<div class="err">通信エラー: ${h(err?.message||err)}</div>`;
+        }
+      };
     })();
 
 </script> 
