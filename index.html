@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.3.1";  // stable ver→v4.2.9, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.3.2";  // stable ver→v4.3.1, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz8SqnMkvicq4hfamo3oe3AWDMKt_KNduzmaaTXiNG4vHOWQYoBWDnAqVTUJjPq_BJrqQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyZ7o-ax1M48FhD10l0xIKhl6bIAYS1mlyCXFcLLcdr6hnntBLW4gpAwhOhE8y78uBUVA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -521,6 +521,11 @@
       box-shadow: 0 4px 16px rgba(0,0,0,.06);
     }
     #view-custom-push .sectionTitle{ margin-bottom: 8px; }
+    
+    #summaryFreeQuotaBox .kv { display: grid; gap: 6px; }
+    #summaryFreeQuotaBox .kvRow { display:flex; justify-content:space-between; padding:6px 8px; border:1px solid #ddd; border-radius:8px; }
+    #summaryFreeQuotaBox .kvKey { color:#666; font-size:13px; }
+    #summaryFreeQuotaBox .kvVal { font-weight:600; }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -1395,7 +1400,7 @@
         <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin">予定登録/編集</button>
         <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin-report">出欠結果一覧</button>
         <button id="btnAdminCustomPush" class="btn btn-outline btn-sm btn-compact" data-view-target="view-custom-push">カスタム通知</button>
-        <a href="https://your-domain.github.io/your-repo/summary.html" target="_blank" class="btn btn-outline btn-sm btn-compact">サマリ</a>
+        <button id="btnSummary" class="btn btn-outline btn-sm btn-compact" data-view-target="view-summary">サマリ</button>
       </div>
       <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
     </div>
@@ -1947,6 +1952,33 @@
     
       </div><!-- /card -->
     </section>
+
+    <!-- ===== サマリ（管理者） ===== -->
+    <section id="view-summary" class="view" hidden>
+      <div class="card">
+        <div class="sectionTitle">サマリ</div>
+    
+        <!-- タブ風ボタン -->
+        <div class="row" style="gap:8px;margin-bottom:8px;">
+          <button id="btnSummaryFreeQuota" class="btn btn-primary btn-sm btn-compact">無料枠確認</button>
+        </div>
+    
+        <!-- 表示ボックス -->
+        <div id="summaryFreeQuotaBox" class="summaryCard">
+          <div class="small muted">読み込み待機中…</div>
+        </div>
+    
+        <div class="row" style="gap:8px;margin-top:10px;">
+          <button id="btnSummaryReload" class="btn btn-outline btn-sm btn-compact">再取得</button>
+        </div>
+    
+        <div class="small muted" style="margin-top:6px;">
+          ※ LINE公式アカウントの今月利用状況を表示します
+        </div>
+      </div>
+    </section>
+    <!-- ===== サマリ END ===== -->
+    
   </main>
 
   <footer id="legalFooter" class="legal-footer" aria-label="legal links">
@@ -2960,6 +2992,12 @@ function bindHandlers(){
     if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
     show("#view-custom-push");                 // 画面表示
     window.initCustomPushPage?.();             // 初期化（イベント候補読込・参加のみONなど）
+  };
+  // 管理メニュー：サマリ
+  $("#btnSummary").onclick = () => {
+    if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
+    show("#view-summary");       // サマリ画面を表示
+    loadSummaryFreeQuota();      // 無料枠の初期表示
   };
   // 管理画面
   $("#btnAdminBack").onclick = ()=> show("#view-home");
@@ -5429,7 +5467,38 @@ window.reportReload = function(){ initAdminReportPage(); };
           }
         });
       });
+    // ===== サマリ：無料枠描画 =====
+    function renderFreeQuotaCard(data){
+      const box = $("#summaryFreeQuotaBox");
+      if (!box) return;
+      const q = data || {};
+      const sent = Number(q.used ?? q.monthSent ?? 0);
+      const limit = Number(q.limit ?? q.monthLimit ?? 0);
+      const remain = Math.max(0, limit - sent);
+      const followers = Number(q.followers ?? 0);
+      const rounds = followers > 0 ? Math.floor(remain / followers) : 0;
     
+      box.innerHTML = `
+        <div class="kv">
+          <div class="kvRow"><div class="kvKey">当月送信</div><div class="kvVal">${sent}</div></div>
+          <div class="kvRow"><div class="kvKey">上限</div><div class="kvVal">${limit}（残り：${remain}）</div></div>
+          <div class="kvRow"><div class="kvKey">フォロワー</div><div class="kvVal">${followers}</div></div>
+          <div class="kvRow"><div class="kvKey">全体配信あと</div><div class="kvVal">${rounds}</div></div>
+        </div>`;
+    }
+    
+    // ===== サマリ：無料枠読み込み =====
+    async function loadSummaryFreeQuota(){
+      const box = $("#summaryFreeQuotaBox");
+      if (box) box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+      try {
+        const r = await api("?summary=1&freeQuota=1");
+        if (r?.status === "ok") renderFreeQuotaCard(r);
+        else box.innerHTML = `<span class="err">${r?.message || "取得に失敗しました"}</span>`;
+      } catch (e) {
+        box.innerHTML = `<span class="err">通信エラー: ${e.message || e}</span>`;
+      }
+    }
     })();
 
 </script> 
