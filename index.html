@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.3.6";  // stable ver→v4.3.1, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.3.7";  // stable ver→v4.3.1, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwSRC85xTSnI7Bbl_C2Zrz7roFiGMRr97nTLGVnFgtkbIDQWv5nUFnblKYHKX4e9a3mmg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -537,6 +537,41 @@
     .summaryCard .summaryHeader { font-weight:700; margin:6px 0 8px; }
     .summaryCard .summarySubHeader { font-weight:700; margin:10px 0 6px; }
     .table.compact th, .table.compact td { padding:4px 6px; }
+    /* サマリカードのグリッド */
+    .metricsGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    @media (min-width: 480px){
+      .metricsGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (min-width: 720px){
+      .metricsGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    .metricCard {
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      padding: 14px 12px;
+      background: #fff;
+    }
+    .metricTitle { font-size: 12px; color:#666; margin-bottom: 6px; }
+    .metricValue { font-size: 22px; font-weight: 700; }
+    .tableSm { width:100%; border-collapse: collapse; }
+    .tableSm th, .tableSm td { padding: 8px 6px; border-bottom: 1px solid #eee; }
+    .sectionSub { font-weight:700; font-size:16px; margin:14px 0 6px; }
+    .badgeMuted { font-size:12px; padding:2px 8px; border-radius:9999px; background:#f0f0f7; color:#555; }
+    .ok { color:#14a44d; } .ng { color:#d62d20; }
+    .summaryKpis{
+      display:grid;
+      grid-template-columns: repeat(2,minmax(0,1fr));
+      gap:8px;
+    }
+    @media (min-width:480px){ .summaryKpis{ grid-template-columns:repeat(3,1fr); } }
+    @media (min-width:720px){ .summaryKpis{ grid-template-columns:repeat(4,1fr); } }
+    .kpi{ border:1px solid #e6e6e6; border-radius:12px; padding:12px; background:#fff; }
+    .kpiLabel{ font-size:12px; color:#666; margin-bottom:6px; }
+    .kpiValue{ font-size:22px; font-weight:700; }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -2298,6 +2333,7 @@
     #view-custom-push .card:first-of-type{
       margin-top: 8px !important;     /* 1枚目カードの上マージンだけ薄く */
     }
+    
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -5613,31 +5649,54 @@ window.reportReload = function(){ initAdminReportPage(); };
           const fmtNum = n => (typeof n==='number' ? n.toLocaleString() : String(n||'0'));
           const month  = h(r.month || '');
       
-          const logs = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0,byType:{}};
+          const logs   = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0,byType:{}};
           const byType = logs.byType || {};
+          const typeLabel = (t)=>{
+            if (t==='initial') return '初回';
+            if (t==='reminder') return 'リマインド';
+            return 'other';
+          };
           const typeRows = Object.keys(byType).sort().map(t=>{
             const v = byType[t] || {};
-            return `<tr><td>${h(t)}</td><td class="num">${fmtNum(v.count)}</td><td class="num">${fmtNum(v.targets)}</td><td class="num">${fmtNum(v.success)}</td><td class="num">${fmtNum(v.fail)}</td></tr>`;
+            return `<tr>
+              <td>${h(typeLabel(t))}</td>
+              <td class="num">${fmtNum(v.count)}</td>
+              <td class="num">${fmtNum(v.targets)}</td>
+              <td class="num ok">${fmtNum(v.success)}</td>
+              <td class="num ng">${fmtNum(v.fail)}</td>
+            </tr>`;
           }).join('') || `<tr><td colspan="5" class="muted">種別内訳なし</td></tr>`;
       
-          const byEvent = r.byEvent || {};
-          const evRows = Object.keys(byEvent).sort().map(id=>{
-            const v = byEvent[id] || {};
-            return `<tr><td>${h(id)}</td><td class="num">${fmtNum(v.count)}</td><td class="num">${fmtNum(v.targets)}</td><td class="num">${fmtNum(v.success)}</td><td class="num">${fmtNum(v.fail)}</td></tr>`;
-          }).join('') || `<tr><td colspan="5" class="muted">公演別内訳なし</td></tr>`;
-      
+          // 直近20件（requestIdは出さない）
           const recent = r.recent || [];
-          const recentRows = recent.map(x=>{
-            return `<tr>
+          const recentRows = recent.map(x=>`
+            <tr>
               <td>${h(x.at||'')}</td>
-              <td>${h(x.type||'')}</td>
+              <td>${h(typeLabel(x.type||''))}</td>
               <td>${h(x.eventId||'')}</td>
               <td class="num">${fmtNum(x.targets)}</td>
               <td class="num ok">${fmtNum(x.success)}</td>
               <td class="num ng">${fmtNum(x.fail)}</td>
-              <td class="mono">${h(x.requestId||'')}</td>
-            </tr>`;
-          }).join('') || `<tr><td colspan="7" class="muted">直近20件なし</td></tr>`;
+            </tr>
+          `).join('') || `<tr><td colspan="6" class="muted">履歴なし</td></tr>`;
+      
+          // HTTPステータス：200以外がある時だけ表示
+          const http = r.httpStatus || {};
+          const abnormalKeys = Object.keys(http).filter(k=>k && k!=='200' && http[k]>0);
+          const httpBlock = (abnormalKeys.length>0)
+            ? `<div class="summaryBlock">
+                 <div class="summarySubHeader">HTTPステータス分布（当月）</div>
+                 <table class="table compact">
+                   <thead><tr><th>Status</th><th>件数</th></tr></thead>
+                   <tbody>${
+                     Object.keys(http).sort().map(k=>`<tr><td>${h(k||'-')}</td><td class="num">${fmtNum(http[k])}</td></tr>`).join('')
+                   }</tbody>
+                 </table>
+                 <div class="small muted" style="margin-top:6px;">
+                   ※ 429=レート制限 / 401・403=トークン・権限 / 5xx=LINE側エラーの目安
+                 </div>
+               </div>`
+            : ``;
       
           box.innerHTML = `
             <div class="summaryBlock">
@@ -5645,48 +5704,30 @@ window.reportReload = function(){ initAdminReportPage(); };
               <div class="summaryKpis">
                 <div class="kpi"><div class="kpiLabel">ログ件数</div><div class="kpiValue">${fmtNum(logs.count)}</div></div>
                 <div class="kpi"><div class="kpiLabel">対象件数</div><div class="kpiValue">${fmtNum(logs.totalTargets)}</div></div>
-                <div class="kpi"><div class="kpiLabel">成功数</div><div class="kpiValue">${fmtNum(logs.totalSuccess)}</div></div>
-                <div class="kpi"><div class="kpiLabel">失敗数</div><div class="kpiValue">${fmtNum(logs.totalFail)}</div></div>
+                <div class="kpi"><div class="kpiLabel">成功数</div><div class="kpiValue ok">${fmtNum(logs.totalSuccess)}</div></div>
+                <div class="kpi"><div class="kpiLabel">失敗数</div><div class="kpiValue ng">${fmtNum(logs.totalFail)}</div></div>
               </div>
             </div>
       
             <div class="summaryBlock">
-              <div class="summarySubHeader">種別内訳</div>
+              <div class="summarySubHeader">配信種別内訳 <span class="badgeMuted">当月</span></div>
               <table class="table compact">
                 <thead><tr><th>種別</th><th>ログ</th><th>対象</th><th>成功</th><th>失敗</th></tr></thead>
                 <tbody>${typeRows}</tbody>
               </table>
             </div>
       
-            <div class="summaryBlock">
-              <div class="summarySubHeader">公演別内訳</div>
-              <table class="table compact">
-                <thead><tr><th>公演ID</th><th>ログ</th><th>対象</th><th>成功</th><th>失敗</th></tr></thead>
-                <tbody>${evRows}</tbody>
-              </table>
-            </div>
+            <!-- 公演別内訳は一旦非表示（必要になったら復活させる） -->
       
             <div class="summaryBlock">
-              <div class="summarySubHeader">直近20件</div>
+              <div class="summarySubHeader">履歴（直近20件）</div>
               <table class="table compact">
-                <thead><tr><th>日時</th><th>種別</th><th>公演ID</th><th>対象</th><th>成功</th><th>失敗</th><th>リクエストID</th></tr></thead>
+                <thead><tr><th>日時</th><th>種別</th><th>公演ID</th><th>対象</th><th>成功</th><th>失敗</th></tr></thead>
                 <tbody>${recentRows}</tbody>
               </table>
             </div>
       
-            ${
-              r.httpStatus && Object.keys(r.httpStatus).length
-                ? `<div class="summaryBlock">
-                     <div class="summarySubHeader">HTTPステータス分布（当月）</div>
-                     <table class="table compact">
-                       <thead><tr><th>Status</th><th>件数</th></tr></thead>
-                       <tbody>${
-                         Object.keys(r.httpStatus).sort().map(k=>`<tr><td>${h(k)}</td><td class="num">${fmtNum(r.httpStatus[k])}</td></tr>`).join('')
-                       }</tbody>
-                     </table>
-                   </div>`
-                : ``
-            }
+            ${httpBlock}
           `;
         }catch(err){
           console.error(err);
