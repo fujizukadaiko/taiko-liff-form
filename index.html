@@ -581,8 +581,17 @@
     @media (min-width:720px){
       .summaryKpis{ grid-template-columns:repeat(4, minmax(0,1fr)); }
     }
+    /* 既存の .summaryCard .kpi を上書きしてグリッド向けに */
     .summaryKpis .kpi{
-      padding:10px 8px; min-height:64px;
+      display:block;         /* ← inline-block を無効化 */
+      width:100%;
+      min-width:0;           /* 文字で横に伸びないよう保険 */
+      margin:0;              /* ← 余白はグリッドの gap に任せる */
+      padding:10px 8px;
+      min-height:64px;
+      border:1px solid #e6e6e6;
+      border-radius:12px;
+      background:#fff;
     }
     .summaryKpis .kpi .kpiLabel{ font-size:0.9rem; line-height:1.2; }
     .summaryKpis .kpi .kpiValue{ font-size:1.6rem; line-height:1.1; }
