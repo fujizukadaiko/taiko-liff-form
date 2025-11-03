@@ -2025,6 +2025,7 @@
 
     <!-- ===== サマリ（管理者） ===== -->
     <section id="view-summary" class="view" hidden>
+      <div class="row header" style="margin-bottom:8px;">
       <div id="summaryPageHead" class="row between align-center" style="margin:6px 4px 8px;">
         <div class="pageTitle">サマリ</div>
         <button id="btnSummaryToTop" class="btn btn-outline btn-sm btn-compact">トップに戻る</button>
@@ -5701,23 +5702,6 @@ window.reportReload = function(){ initAdminReportPage(); };
               <td class="num ng">${fmtNum(x.fail)}</td>
             </tr>
           `).join('') || `<tr><td colspan="6" class="muted">履歴なし</td></tr>`;
-      
-          // ⑧ HTTP 200 以外が1つでもある時だけ表示
-          const http = r.httpStatus || {};
-          const non200Count = Object.entries(http)
-            .filter(([k,v]) => String(k)!=='200' && (Number(v)||0) > 0)
-            .reduce((a,[_k,v])=>a+(Number(v)||0),0);
-          const httpBlock = (non200Count>0)
-            ? `<div class="summaryBlock">
-                 <div class="summarySubHeader">HTTPステータス分布（当月 / 200以外のみ）</div>
-                 <table class="table compact">
-                   <thead><tr><th>Status</th><th>件数</th></tr></thead>
-                   <tbody>${
-                     Object.keys(http)
-                       .filter(k => k!=='200')
-                       .sort()
-                       .map(k=>`<tr><td>${h(k)}</td><td class="num">${fmtNum(http[k])}</td></tr>`)
-                       .join('')
                    }</tbody>
                  </table>
                </div>`
