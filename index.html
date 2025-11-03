@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.3.0";  // stable ver→v4.2.9, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.3.1";  // stable ver→v4.2.9, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz8SqnMkvicq4hfamo3oe3AWDMKt_KNduzmaaTXiNG4vHOWQYoBWDnAqVTUJjPq_BJrqQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -4658,32 +4658,59 @@ window.reportReload = function(){ initAdminReportPage(); };
   
     // ★ 家族フィルタは一切しない（= 全員表示）
     const rows = list.map(mapRow);
+ 
+    // --- 比較用：名前の正規化（全角空白→半角、前後/重複空白除去、接頭辞除去） ---
+     const canonName = (s) => {
+       const t = String(s||'')
+         .replace(/\u3000/g,' ')            // 全角空白→半角
+         .replace(/^\s+|\s+$/g,'')          // 前後空白
+        .replace(/\s+/g,' ');              // 連続空白
+       // 先頭の【大人の部】/【子どもの部】などの角括弧ラベルを除去
+       return t.replace(/^【[^】]+】\s*/,'');
+     };
   
-    // ===== ここから：未回答の合成（roster が文字列配列でもOK） =====
-    const normName = s => String(s||'').replace(/\u3000/g,' ').replace(/\s+/g,' ').trim();
-  
-    // 回答済みの名前集合（正規化）
-    const answered = new Set(rows.map(r => normName(r.name)).filter(Boolean));
+     // members から「名前→区分」索引（未回答表示で接頭辞付与に使う）
+     const segIndex = {};
+     if (Array.isArray(payload?.members)) {
+       payload.members.forEach(m=>{
+         const nm = canonName(m?.displayName ?? m?.name ?? m?.member ?? m?.performerName ?? '');
+         if (nm) segIndex[nm] = String(m?.seg || m?.segment || m?.attendSegment || '');
+       });
+     }
+    
+    // 回答済みの名前集合（正規化キーで保持）
+    const answeredCanon = new Set(rows.map(r => canonName(r.name)).filter(Boolean));
   
     // 候補名（roster優先。無ければ members / candidates から名前欄を拾う）
     let candidates = [];
     if (Array.isArray(payload?.roster)) {
       // GAS 側は roster を ["氏名", ...] で返す想定
-      candidates = payload.roster.map(normName).filter(Boolean);
+      candidates = payload.roster
+        .map(n => ({ name: String(n||'').trim(), seg: segIndex[canonName(n)] || '' }))
+        .filter(x => x.name);
     } else if (Array.isArray(payload?.members)) {
-      candidates = payload.members
-        .map(m => normName(m?.name ?? m?.member ?? m?.performerName ?? ''))
-        .filter(Boolean);
+      candidates = payload.members.map(m=>{
+        const raw = m?.displayName ?? m?.name ?? m?.member ?? m?.performerName ?? '';
+        return { name: String(raw||'').trim(), seg: String(m?.seg || m?.segment || m?.attendSegment || '') };
+      }).filter(x => x.name);
     } else if (Array.isArray(payload?.candidates)) {
-      candidates = payload.candidates
-        .map(m => normName(m?.name ?? m?.member ?? m?.performerName ?? ''))
-        .filter(Boolean);
+      candidates = payload.candidates.map(m=>{
+        const raw = m?.displayName ?? m?.name ?? m?.member ?? m?.performerName ?? '';
+        return { name: String(raw||'').trim(), seg: String(m?.seg || m?.segment || m?.attendSegment || '') };
+      }).filter(x => x.name);
     }
   
-    // 未回答 = 候補 − 回答済み
+    // 未回答 = 候補 − 回答済み（正規化キーで差集合）
     const naRows = candidates
-      .filter(nm => !answered.has(nm))
-      .map(nm => ({ name: nm, attend: '未回答', at: '', seg: '' }));
+      .filter(c => !answeredCanon.has(canonName(c.name)))
+      .map(c => {
+        // 表示名はここで「大人の部」接頭辞を統一付与
+        const seg = c.seg || segIndex[canonName(c.name)] || '';
+        const display = seg.includes('大人') && !/^【[^】]+】/.test(c.name)
+          ? `【大人の部】${c.name}`
+          : c.name;
+        return { name: display, attend: '未回答', at: '', seg };
+      });
   
     // rows を未回答で拡張
     const rowsAll = rows.concat(naRows);
