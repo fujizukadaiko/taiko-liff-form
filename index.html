@@ -11,7 +11,7 @@
   /* ===== 設定 ===== */
   const FRONT_VERSION = "Front v4.3.8";  // stable ver→v4.3.1, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzMxc3JqwkMeTQTr0gmDI6kKxMG5Qn0Big7X05-7gFT0OM43wSsRGs8oqCyw6UEAq0HNQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxcde0Uq20DKCvQAsIv6txm9zQhjIJh4ahgQOa_p2_Aj-5qK0AmdbFbQGB9lSgUwbHBGw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -565,13 +565,16 @@
     .summaryKpis{
       display:flex; flex-wrap:wrap; gap:8px;
     }
-    .summaryKpis .kpi{
-      flex: 0 0 calc(50% - 8px);  /* 横2つ */
-      min-width: 140px;           /* つぶれ防止の目安 */
+    .summaryKpis{
+      display:grid; grid-template-columns:repeat(4, minmax(0,1fr));
+      gap:12px; margin-top:8px;
     }
     .table.compact.smalltext { font-size: 13px; }
     .table.compact.smalltext th, 
     .table.compact.smalltext td { padding: 6px 8px; }
+    .table.compact.history td, .table.compact.history th{
+      font-size: 0.9rem; line-height:1.2;
+    }
 
     /* ヘッダーのタイトル */
     .pageTitle{ font-weight:700; font-size:18px; }
@@ -2012,10 +2015,11 @@
     <section id="view-summary" class="view" hidden>
       <div id="summaryPageHead" class="row between align-center" style="margin:6px 4px 8px;">
         <div class="pageTitle">サマリ</div>
-        <button id="btnSummaryToTop" class="btn btn-outline btn-sm btn-compact">トップへ</button>
+        <button id="btnSummaryToTop" class="btn btn-outline btn-sm btn-compact">トップへ戻る</button>
       </div>
     
         <!-- タブ風ボタン -->
+      <div class="card">
         <div class="row" style="gap:8px;margin-bottom:8px;">
           <button id="btnSummaryFreeQuota" class="btn btn-primary btn-sm btn-compact">無料枠確認</button>
           <button id="btnSummaryPushStats" class="btn btn-outline btn-sm btn-compact">配信履歴</button>
@@ -5643,6 +5647,7 @@ window.reportReload = function(){ initAdminReportPage(); };
       })();
       
       // ===== サマリ：配信履歴（当月） =====
+      // ===== サマリ：配信履歴（当月） =====
       window.loadSummaryPushStats = async function(){
         const box = document.getElementById('summaryPushStatsBox');
         if (!box) return;
@@ -5662,15 +5667,22 @@ window.reportReload = function(){ initAdminReportPage(); };
           const fmtNum = n => (typeof n==='number' ? n.toLocaleString() : String(n||'0'));
           const month  = h(r.month || '');
       
-          // KPI
-          const logs = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0};
+          const logs   = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0};
       
-          // 履歴（見出しと行）— リクエストIDは非表示
-          const recent = r.recent || [];
+          // ⑦ 履歴フォント小さめ、④ リクエストID列は出さない
+          const mapType = t => {
+            const s = String(t||'').toLowerCase();
+            if (s==='initial')  return '初回';
+            if (s==='reminder') return 'リマインド';
+            if (s==='custom')   return 'カスタム';
+            return (s||'other');
+          };
+      
+          const recent = Array.isArray(r.recent) ? r.recent : [];
           const recentRows = recent.map(x=>`
             <tr>
               <td>${h(x.at||'')}</td>
-              <td>${h(x.type||'')}</td>
+              <td>${h(mapType(x.type))}</td>
               <td>${h(x.eventId||'')}</td>
               <td class="num">${fmtNum(x.targets)}</td>
               <td class="num ok">${fmtNum(x.success)}</td>
@@ -5678,25 +5690,26 @@ window.reportReload = function(){ initAdminReportPage(); };
             </tr>
           `).join('') || `<tr><td colspan="6" class="muted">履歴なし</td></tr>`;
       
-          // HTTPステータス分布：200以外がある時だけ表示
-          let statusBlock = '';
-          if (r.httpStatus){
-            const keys = Object.keys(r.httpStatus).filter(k => String(k) !== '200');
-            if (keys.length){
-              const rows = keys.sort().map(k=>`
-                <tr><td>${h(k)}</td><td class="num">${fmtNum(r.httpStatus[k])}</td></tr>
-              `).join('');
-              statusBlock = `
-                <div class="summaryBlock">
-                  <div class="summarySubHeader">HTTPステータス（200以外）</div>
-                  <table class="table compact smalltext">
-                    <thead><tr><th>Status</th><th>件数</th></tr></thead>
-                    <tbody>${rows}</tbody>
-                  </table>
-                  <div class="small muted">※ 429=レート制限 / 401・403=トークン・権限 / 5xx=LINE側エラーの目安</div>
-                </div>`;
-            }
-          }
+          // ⑧ HTTP 200 以外が1つでもある時だけ表示
+          const http = r.httpStatus || {};
+          const non200Count = Object.entries(http)
+            .filter(([k,v]) => String(k)!=='200' && (Number(v)||0) > 0)
+            .reduce((a,[_k,v])=>a+(Number(v)||0),0);
+          const httpBlock = (non200Count>0)
+            ? `<div class="summaryBlock">
+                 <div class="summarySubHeader">HTTPステータス分布（当月 / 200以外のみ）</div>
+                 <table class="table compact">
+                   <thead><tr><th>Status</th><th>件数</th></tr></thead>
+                   <tbody>${
+                     Object.keys(http)
+                       .filter(k => k!=='200')
+                       .sort()
+                       .map(k=>`<tr><td>${h(k)}</td><td class="num">${fmtNum(http[k])}</td></tr>`)
+                       .join('')
+                   }</tbody>
+                 </table>
+               </div>`
+            : ``;
       
           box.innerHTML = `
             <div class="summaryBlock">
@@ -5709,24 +5722,17 @@ window.reportReload = function(){ initAdminReportPage(); };
               </div>
             </div>
       
-            <!-- 種別内訳は非表示（要望により削除） -->
-      
-            <!-- 公演別内訳も不要であれば削除可（今は非表示） -->
-      
             <div class="summaryBlock">
               <div class="summarySubHeader">履歴（直近20件）</div>
-              <table class="table compact smalltext">
+              <table class="table compact history">
                 <thead>
-                  <tr>
-                    <th>日時</th><th>種別</th><th>公演ID</th>
-                    <th class="num">対象</th><th class="num">成功</th><th class="num">失敗</th>
-                  </tr>
+                  <tr><th>日時</th><th>種別</th><th>公演ID</th><th>対象</th><th>成功</th><th>失敗</th></tr>
                 </thead>
                 <tbody>${recentRows}</tbody>
               </table>
             </div>
       
-            ${statusBlock}
+            ${httpBlock}
           `;
         }catch(err){
           console.error(err);
