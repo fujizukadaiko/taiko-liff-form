@@ -3795,7 +3795,7 @@ async function onRegister(){
   
     // 折りたたみ内の中身（タイトルは出さない：演奏開始 / 集合 / @場所）
     const panelInner = `
-      ${[perfTxt, meetTxt, placeTxt].filter(Boolean).length ? `
+      ${[_hm, meetTxt, placeTxt].filter(Boolean).length ? `
        <div class="scMeta">
          ${_hm     ? `<div class="scLine">${timeForPanel}</div>` : ``}
          ${meetTxt  ? `<div class="scLine">${meetTxt}</div>` : ``}
