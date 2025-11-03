@@ -2994,11 +2994,16 @@ function bindHandlers(){
     window.initCustomPushPage?.();             // 初期化（イベント候補読込・参加のみONなど）
   };
   // 管理メニュー：サマリ
-  $("#btnSummary").onclick = () => {
-    if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
-    show("#view-summary");       // サマリ画面を表示
-    window.loadSummaryFreeQuota?.();      // 無料枠の初期表示
-  };
+  document.getElementById('btnSummary')?.addEventListener('click', () => {
+    if (!state.isAdmin) { alert('管理者のみアクセス可能です'); return; }
+    show('#view-summary');                  // サマリ画面を表示（内部で hidden=false）
+    const v = document.getElementById('view-summary');
+    if (v) v.hidden = false;                // 念のための保険
+  
+    window.loadSummaryFreeQuota?.();        // 無料枠の初期表示
+  });
+  
+  // サマリ内ボタン
   document.getElementById('btnSummaryFreeQuota')
     ?.addEventListener('click', () => window.loadSummaryFreeQuota?.());
   document.getElementById('btnSummaryReload')
@@ -5472,39 +5477,49 @@ window.reportReload = function(){ initAdminReportPage(); };
           }
         });
       });
-    // ===== サマリ：無料枠描画 =====
-    window.renderFreeQuotaCard = function(data){
-      const box = $("#summaryFreeQuotaBox");
-      if (!box) return;
-      const q = data || {};
-      const sent     = Number(q.used ?? q.monthSent ?? 0);
-      const limit    = Number(q.limit ?? q.monthLimit ?? 0);
-      const remain   = Math.max(0, limit - sent);
-      const followers= Number(q.followers ?? 0);
-      const rounds   = followers > 0 ? Math.floor(remain / followers) : 0;
+    // ========= サマリ：無料枠カードの描画 =========
+    window.renderFreeQuotaCard = function (data) {
+      // data: { status:'ok', kind:'freeQuota', used, limit, remain, followers, followersEffective }
+      const used      = Number(data.used ?? 0);
+      const limit     = Number(data.limit ?? 0);
+      const remain    = Number(data.remain ?? Math.max(0, limit - used));
+      const followers = Number(data.followers ?? data.followersEffective ?? 0);
     
-      box.innerHTML = `
-        <div class="kv">
-          <div class="kvRow"><div class="kvKey">当月送信</div><div class="kvVal">${sent}</div></div>
-          <div class="kvRow"><div class="kvKey">上限</div><div class="kvVal">${limit}（残り：${remain}）</div></div>
-          <div class="kvRow"><div class="kvKey">フォロワー</div><div class="kvVal">${followers}</div></div>
-          <div class="kvRow"><div class="kvKey">全体配信あと</div><div class="kvVal">${rounds}</div></div>
+      const perBlast  = followers > 0 ? Math.floor(remain / followers) : 0;
+    
+      return `
+        <div class="card" style="margin-top:6px;">
+          <div class="sectionTitle">無料枠 確認</div>
+          <div class="list">
+            <div>当月送信：<b>${used}</b> / 上限：<b>${limit}</b>（残り：<b>${remain}</b>通）</div>
+            <div>フォロワー：<b>${followers}</b> 人</div>
+            <div>全体配信あと：<b>${perBlast}</b> 回</div>
+          </div>
         </div>`;
     };
     
-    // ===== サマリ：無料枠読み込み =====
-    window.loadSummaryFreeQuota = async function(){
-      const box = $("#summaryFreeQuotaBox");
-      if (box) box.innerHTML = `読み込み中… <span class="spinner"></span>`;
+    // ========= サマリ：無料枠の取得＆描画 =========
+    window.loadSummaryFreeQuota = async function () {
+      const box = document.getElementById('summaryFreeQuotaBox');
+      if (!box) {
+        console.warn('#summaryFreeQuotaBox が見つかりません');
+        return;
+      }
+      box.innerHTML = '読み込み中… <span class="spinner"></span>';
+    
       try {
-        const r = await api("?summary=1&freeQuota=1");
-        if (r?.status === "ok") {
-          window.renderFreeQuotaCard(r);
-        } else {
-          box.innerHTML = `<span class="err">${r?.message || "取得に失敗しました"}</span>`;
+        const r = await api('?summary=1&freeQuota=1');
+        console.log('freeQuota resp:', r);
+    
+        if (!r || r.status !== 'ok') {
+          box.innerHTML = `<div class="err">取得に失敗しました：${r?.message || 'unknown'}</div>`;
+          return;
         }
+        // 期待キーが欠けても描けるように防御
+        box.innerHTML = window.renderFreeQuotaCard(r);
       } catch (e) {
-        if (box) box.innerHTML = `<span class="err">通信エラー: ${e.message || e}</span>`;
+        console.error(e);
+        box.innerHTML = `<div class="err">エラー：${e.message || e}</div>`;
       }
     };
     })();
