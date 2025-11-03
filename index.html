@@ -961,6 +961,7 @@
     .scMeta { font-size:13px; color:var(--c-text); margin-top:6px; display:flex; flex-direction:column; gap:4px; }
     .scMeta .scLine { display:flex; align-items:baseline; gap:.5em; min-width:0; }
     .scMeta .scLine .lbl { font-weight:700; white-space:nowrap; }
+    .scMeta .lbl{ font-weight: 700; margin-right: 6px;}
         
     /* 種別＝右端・四角バッジ（既存） */
     .scKind{
@@ -2477,7 +2478,7 @@
         const events = (openList || []).map(x => ({
           id      : x.id ?? x.eventId ?? x.eid ?? '',
           ymd     : x.ymd ?? x.date ?? '',
-          hm      : x.hm ?? x.time ?? '',
+          hm      : x.hm ?? x.time ?? x['時間'] ?? '',
           place   : x.place ?? x.venue ?? x.location ?? '',
           deadline: x.deadline ?? x.limit ?? x.deadlineYmd ?? '',
           isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true),
@@ -3139,7 +3140,7 @@ function bootHomeQuickRender(){
   const events = filteredEvents.map(x => ({
     id      : String(x.eventId ?? x.id ?? ''),
     ymd     : ymdDow(parseYmdStrict(x.date)) || String(x.date || x.ymd || ''),
-    hm      : hmFromTimeCell(x.time ?? x.hm ?? ''),
+    hm      : hmFromTimeCell(x.time ?? x.hm ?? x['時間'] ?? ''),
     place   : x.place ?? x.venue ?? x.location ?? '',
     deadline: String(x.deadline ?? x.limit ?? x.deadlineYmd ?? ''),
     isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true),
@@ -3158,7 +3159,7 @@ function mountHomeWithFilters(){
   const events = filteredEvents.map(x => ({
     id      : String(x.eventId ?? x.id ?? ''),
     ymd     : ymdDow(parseYmdStrict(x.date)) || String(x.date || x.ymd || ''),
-    hm      : hmFromTimeCell(x.time ?? x.hm ?? ''),
+    hm      : hmFromTimeCell(x.time ?? x.hm ?? x['時間'] ?? ''),
     place   : x.place ?? x.venue ?? x.location ?? '',
     deadline: String(x.deadline ?? x.limit ?? x.deadlineYmd ?? ''),
     isNew   : (x.isNew === true) || (x.is_new === 'Y') || (x.new === true),
@@ -3776,13 +3777,14 @@ async function onRegister(){
       (it.meetPlace || "")
     ].filter(Boolean).join(" ");
     const placeTxt = it.place ? `@${it.place}` : "";
-    const perfTxt  = (it.performAt || it.time) ? `演奏開始 ${it.performAt || it.time}` : "";
+    const _hm = it.performAt || it.time || it.hm || it['時間'] || "";
+    const perfTxt  = _hm ? `演奏開始 ${_hm}` : "";
   
     // 折りたたみ内の中身（タイトルは出さない：演奏開始 / 集合 / @場所）
     const panelInner = `
       ${[perfTxt, meetTxt, placeTxt].filter(Boolean).length ? `
        <div class="scMeta">
-         ${perfTxt  ? `<div class="scLine"><span class="lbl">演奏開始</span> ${it.performAt || it.time}</div>` : ``}
+         ${perfTxt  ? `<div class="scLine"><span class="lbl">演奏開始</span> ${_hm}</div>` : ``}
          ${meetTxt  ? `<div class="scLine">${meetTxt}</div>` : ``}
         ${placeTxt ? `<div class="scLine">${placeTxt}</div>` : ``}
          ${memoText ? `<div class="scLine scMemo">${memoText}</div>` : ``}
