@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.2.8";  // stable ver→v4.2.6, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.2.9";  // stable ver→v4.2.6, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz9gG3Md3brjxLE7U5r5US8kyVEpT3kdwvExWZanIx_9FNAVj-WPZzCHxPoKRHkkTDxPQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -976,6 +976,12 @@
     .scTitleBtn .scCaret{
       flex:0 0 auto; margin-left:8px;
       font-size: 16px; line-height: 1;   /* 見やすく */
+    }
+    .scTitleBtn .scTime{
+      margin-left: .6rem;
+      font-weight: 600;
+      white-space: nowrap;
+      opacity: .9;
     }
     /* ===== 出欠結果一覧（管理者）・1枚カード版 ===== */
     .repCard { background:#fff; border:1px solid var(--c-border); border-radius:12px; padding:12px; }
@@ -3778,13 +3784,20 @@ async function onRegister(){
     ].filter(Boolean).join(" ");
     const placeTxt = it.place ? `@${it.place}` : "";
     const _hm = it.performAt || it.time || it.hm || it['時間'] || "";
-    const perfTxt  = _hm ? `演奏開始 ${_hm}` : "";
+    const timeForHeader = _hm
+      ? (kindText === '発表' ? `演奏開始 ${_hm}` : _hm)
+      : '';
+    const timeForPanel = _hm
+      ? (kindText === '発表'
+         ? `<span class="lbl">演奏開始</span> ${_hm}`
+         : `${_hm}`)
+      : '';
   
     // 折りたたみ内の中身（タイトルは出さない：演奏開始 / 集合 / @場所）
     const panelInner = `
       ${[perfTxt, meetTxt, placeTxt].filter(Boolean).length ? `
        <div class="scMeta">
-         ${perfTxt  ? `<div class="scLine"><span class="lbl">演奏開始</span> ${_hm}</div>` : ``}
+         ${_hm     ? `<div class="scLine">${timeForPanel}</div>` : ``}
          ${meetTxt  ? `<div class="scLine">${meetTxt}</div>` : ``}
         ${placeTxt ? `<div class="scLine">${placeTxt}</div>` : ``}
          ${memoText ? `<div class="scLine scMemo">${memoText}</div>` : ``}
@@ -3803,6 +3816,7 @@ async function onRegister(){
         <!-- 2行目：日付 + タイトル（1行省略） -->
         <button type="button" class="scTitleBtn" aria-expanded="false">
           <span class="scDate">${dateText}</span>
+          ${timeForHeader ? `<span class="scTime">${timeForHeader}</span>` : ``}
           <span class="scTitle">${it.title || ""}</span>
           <span class="scCaret" aria-hidden="true">∨</span>
         </button>
