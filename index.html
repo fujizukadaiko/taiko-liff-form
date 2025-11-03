@@ -4597,7 +4597,7 @@ window.reportReload = function(){ initAdminReportPage(); };
   }
   // 行の正規化
   function mapRow(x){
-    const name   = x.name ?? x.member ?? x.performerName ?? x.performer ?? '';
+    const name   = x.displayName ?? x.name ?? x.member ?? x.performerName ?? x.performer ?? '';
     const raw    = x.answer ?? x.attend ?? x.attendStatus ?? x.status ?? '';
     const attend = ['参加','欠席','未定','未回答'].includes(String(raw).trim())
       ? String(raw).trim()
@@ -4751,7 +4751,7 @@ window.reportReload = function(){ initAdminReportPage(); };
           </div>
          ${arr.map(p => `
           <div class="repPersonRow">
-            <div class="repName">${h(nameWithSegPrefix(p))}</div>
+            <div class="repName">${h(p.name)}</div>
             <div class="repAt">${
               (p.comment
                  ? `<span class="repComment">${h(String(p.comment).trim())}</span>`
@@ -4769,9 +4769,11 @@ window.reportReload = function(){ initAdminReportPage(); };
   }
   
   function nameWithSegPrefix(p){
-    const s = String(p?.seg || "");
-    return s.includes("大人") ? `【大人の部】${p.name}` : p.name;
-  }
+  const nm = String(p?.name||"");
+  if (nm.startsWith("【大人の部】")) return nm; // 既に付いていればそのまま
+  const s = String(p?.seg||"");
+  return s.includes("大人") ? `【大人の部】${nm}` : nm;
+}
   
   // 公演メタ（セレクトの選択肢）を取得して #repEvent を埋める
   async function loadReportMeta(){
