@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.3.3";  // stable ver→v4.3.1, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.3.4";  // stable ver→v4.3.1, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyZ7o-ax1M48FhD10l0xIKhl6bIAYS1mlyCXFcLLcdr6hnntBLW4gpAwhOhE8y78uBUVA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2999,6 +2999,11 @@ function bindHandlers(){
     show("#view-summary");       // サマリ画面を表示
     window.loadSummaryFreeQuota?.();      // 無料枠の初期表示
   };
+  document.getElementById('btnSummaryFreeQuota')
+    ?.addEventListener('click', () => window.loadSummaryFreeQuota?.());
+  document.getElementById('btnSummaryReload')
+    ?.addEventListener('click', () => window.loadSummaryFreeQuota?.());
+  
   // 管理画面
   $("#btnAdminBack").onclick = ()=> show("#view-home");
   document.getElementById('btnAdminReload')
