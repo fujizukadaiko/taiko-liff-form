@@ -3797,9 +3797,9 @@ async function onRegister(){
     const panelInner = `
       ${[_hm, meetTxt, placeTxt].filter(Boolean).length ? `
        <div class="scMeta">
+         ${placeTxt ? `<div class="scLine">${placeTxt}</div>` : ``}
          ${_hm     ? `<div class="scLine">${timeForPanel}</div>` : ``}
          ${meetTxt  ? `<div class="scLine">${meetTxt}</div>` : ``}
-        ${placeTxt ? `<div class="scLine">${placeTxt}</div>` : ``}
          ${memoText ? `<div class="scLine scMemo">${memoText}</div>` : ``}
        </div>
      ` : ``}
@@ -3816,7 +3816,6 @@ async function onRegister(){
         <!-- 2行目：日付 + タイトル（1行省略） -->
         <button type="button" class="scTitleBtn" aria-expanded="false">
           <span class="scDate">${dateText}</span>
-          ${timeForHeader ? `<span class="scTime">${timeForHeader}</span>` : ``}
           <span class="scTitle">${it.title || ""}</span>
           <span class="scCaret" aria-hidden="true">∨</span>
         </button>
