@@ -3781,13 +3781,13 @@ async function onRegister(){
     // 折りたたみ内の中身（タイトルは出さない：演奏開始 / 集合 / @場所）
     const panelInner = `
       ${[perfTxt, meetTxt, placeTxt].filter(Boolean).length ? `
-+       <div class="scMeta">
-+         ${perfTxt  ? `<div class="scLine"><span class="lbl">演奏開始</span> ${it.performAt || it.time}</div>` : ``}
-+         ${meetTxt  ? `<div class="scLine">${meetTxt}</div>` : ``}
-+         ${placeTxt ? `<div class="scLine">${placeTxt}</div>` : ``}
-+         ${memoText ? `<div class="scLine scMemo">${memoText}</div>` : ``}
-+       </div>
-+     ` : ``}
+       <div class="scMeta">
+         ${perfTxt  ? `<div class="scLine"><span class="lbl">演奏開始</span> ${it.performAt || it.time}</div>` : ``}
+         ${meetTxt  ? `<div class="scLine">${meetTxt}</div>` : ``}
+        ${placeTxt ? `<div class="scLine">${placeTxt}</div>` : ``}
+         ${memoText ? `<div class="scLine scMemo">${memoText}</div>` : ``}
+       </div>
+     ` : ``}
     `;
   
     return `
