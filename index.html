@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.3.9";  // stable ver→v4.3.1, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.4.0";  // stable ver→v4.3.1, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzXm-DRk3sxyyrtxVkyT3wOYZJe3mm9-vL1etUpT51rFjyhioZ5CoD45qRtOAnhNjaVdw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -569,32 +569,45 @@
     .badgeMuted { font-size:12px; padding:2px 8px; border-radius:9999px; background:#f0f0f7; color:#555; }
     .ok { color:#14a44d; } .ng { color:#d62d20; }
     /* KPI：横4並び（スマホでも崩れないよう少し小さめ） */
+    /* ── ① 4列を“常に”固定 ─────────────────────────── */
     .summaryKpis{
       display:grid;
-      grid-template-columns:repeat(2, minmax(0,1fr));
-      gap:10px;
+      grid-template-columns:repeat(4, minmax(0,1fr)); /* ← 常に4列 */
+      gap:6px;                                        /* 余白を少し詰める */
       margin-top:8px;
     }
-    @media (min-width:480px){
-      .summaryKpis{ grid-template-columns:repeat(2, minmax(0,1fr)); }
-    }
-    @media (min-width:720px){
-      .summaryKpis{ grid-template-columns:repeat(4, minmax(0,1fr)); }
-    }
-    /* 既存の .summaryCard .kpi を上書きしてグリッド向けに */
+    
+    /* ── ② 子要素はグリッド前提のコンパクト化 ───────────── */
     .summaryKpis .kpi{
-      display:block;         /* ← inline-block を無効化 */
+      display:block;
       width:100%;
-      min-width:0;           /* 文字で横に伸びないよう保険 */
-      margin:0;              /* ← 余白はグリッドの gap に任せる */
-      padding:10px 8px;
-      min-height:64px;
+      min-width:0;
+      margin:0;                 /* gap 管理 */
+      padding:8px 6px;          /* 余白を縮める */
+      min-height:52px;          /* ボックス高さ控えめ */
       border:1px solid #e6e6e6;
-      border-radius:12px;
+      border-radius:10px;
       background:#fff;
     }
-    .summaryKpis .kpi .kpiLabel{ font-size:0.9rem; line-height:1.2; }
-    .summaryKpis .kpi .kpiValue{ font-size:1.6rem; line-height:1.1; }
+    .summaryKpis .kpi .kpiLabel{
+      font-size:10px;           /* ラベルを小さく */
+      line-height:1.1;
+      letter-spacing:.01em;
+    }
+    .summaryKpis .kpi .kpiValue{
+      font-size:16px;           /* 数字も少し小さく */
+      line-height:1.05;
+      font-weight:700;
+      font-variant-numeric: tabular-nums;
+    }
+    
+    /* ── ③ 極小端末(幅≤360px)はさらに詰める保険 ──────── */
+    @media (max-width:360px){
+      .summaryKpis{ gap:4px; }
+      .summaryKpis .kpi{ padding:6px 4px; min-height:48px; }
+      .summaryKpis .kpi .kpiLabel{ font-size:9px; }
+      .summaryKpis .kpi .kpiValue{ font-size:15px; }
+    }
     .table.compact.smalltext { font-size: 13px; }
     .table.compact.smalltext th, 
     .table.compact.smalltext td { padding: 6px 8px; }
