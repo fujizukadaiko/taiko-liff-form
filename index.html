@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.3.2";  // stable ver→v4.3.1, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.3.3";  // stable ver→v4.3.1, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyZ7o-ax1M48FhD10l0xIKhl6bIAYS1mlyCXFcLLcdr6hnntBLW4gpAwhOhE8y78uBUVA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2997,7 +2997,7 @@ function bindHandlers(){
   $("#btnSummary").onclick = () => {
     if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
     show("#view-summary");       // サマリ画面を表示
-    loadSummaryFreeQuota();      // 無料枠の初期表示
+    window.loadSummaryFreeQuota?.();      // 無料枠の初期表示
   };
   // 管理画面
   $("#btnAdminBack").onclick = ()=> show("#view-home");
@@ -5468,15 +5468,15 @@ window.reportReload = function(){ initAdminReportPage(); };
         });
       });
     // ===== サマリ：無料枠描画 =====
-    function renderFreeQuotaCard(data){
+    window.renderFreeQuotaCard = function(data){
       const box = $("#summaryFreeQuotaBox");
       if (!box) return;
       const q = data || {};
-      const sent = Number(q.used ?? q.monthSent ?? 0);
-      const limit = Number(q.limit ?? q.monthLimit ?? 0);
-      const remain = Math.max(0, limit - sent);
-      const followers = Number(q.followers ?? 0);
-      const rounds = followers > 0 ? Math.floor(remain / followers) : 0;
+      const sent     = Number(q.used ?? q.monthSent ?? 0);
+      const limit    = Number(q.limit ?? q.monthLimit ?? 0);
+      const remain   = Math.max(0, limit - sent);
+      const followers= Number(q.followers ?? 0);
+      const rounds   = followers > 0 ? Math.floor(remain / followers) : 0;
     
       box.innerHTML = `
         <div class="kv">
@@ -5485,20 +5485,23 @@ window.reportReload = function(){ initAdminReportPage(); };
           <div class="kvRow"><div class="kvKey">フォロワー</div><div class="kvVal">${followers}</div></div>
           <div class="kvRow"><div class="kvKey">全体配信あと</div><div class="kvVal">${rounds}</div></div>
         </div>`;
-    }
+    };
     
     // ===== サマリ：無料枠読み込み =====
-    async function loadSummaryFreeQuota(){
+    window.loadSummaryFreeQuota = async function(){
       const box = $("#summaryFreeQuotaBox");
       if (box) box.innerHTML = `読み込み中… <span class="spinner"></span>`;
       try {
         const r = await api("?summary=1&freeQuota=1");
-        if (r?.status === "ok") renderFreeQuotaCard(r);
-        else box.innerHTML = `<span class="err">${r?.message || "取得に失敗しました"}</span>`;
+        if (r?.status === "ok") {
+          window.renderFreeQuotaCard(r);
+        } else {
+          box.innerHTML = `<span class="err">${r?.message || "取得に失敗しました"}</span>`;
+        }
       } catch (e) {
-        box.innerHTML = `<span class="err">通信エラー: ${e.message || e}</span>`;
+        if (box) box.innerHTML = `<span class="err">通信エラー: ${e.message || e}</span>`;
       }
-    }
+    };
     })();
 
 </script> 
