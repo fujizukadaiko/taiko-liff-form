@@ -4657,8 +4657,8 @@ window.reportReload = function(){ initAdminReportPage(); };
   }
   // HTMLエスケープ（XSS/崩れ防止）
   function h(s){
-    return String(s ?? '').replace(/[&<>"']/g, m => (
-      { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]
+    return String(s==null?'':s).replace(/[&<>"']/g, c => (
+      {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
     ));
   }
   // 行の正規化
