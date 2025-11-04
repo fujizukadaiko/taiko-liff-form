@@ -619,9 +619,9 @@
     .table.compact.history.verysmall {
       font-size: 12px;
     }
-    .table.compact.history.verysmall th,
-    .table.compact.history.verysmall td {
-      padding: 4px 6px;
+    @media (max-width:480px){
+      .table.verysmall th,
+      .table.verysmall td { font-size: 10.5px; }
     }
     .table.compact.history .nowrap { white-space: nowrap; }
 
