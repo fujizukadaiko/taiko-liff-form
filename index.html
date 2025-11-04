@@ -537,15 +537,7 @@
     .summaryCard .summaryHeader { font-weight:700; margin:6px 0 8px; }
     .summaryCard .summarySubHeader { font-weight:700; margin:10px 0 6px; }
     .table.compact th, .table.compact td { padding:4px 6px; }
-    /* 既に smalltext/history がある前提で、さらに小さくする */
-    .table.compact.history.verysmall {
-      font-size: 12px;
-    }
-    .table.compact.history.verysmall th,
-    .table.compact.history.verysmall td {
-      padding: 4px 6px;
-    }
-    .table.compact.history .nowrap { white-space: nowrap; }
+
     /* サマリ見出し行：右端へボタン寄せ */
     #view-summary .card .row.header {
       display:flex; align-items:center; gap:8px; margin-bottom:8px;
@@ -623,6 +615,15 @@
     .table.compact.history td, .table.compact.history th{
       font-size: 0.9rem; line-height:1.2;
     }
+    /* 既に smalltext/history がある前提で、さらに小さくする */
+    .table.compact.history.verysmall {
+      font-size: 12px;
+    }
+    .table.compact.history.verysmall th,
+    .table.compact.history.verysmall td {
+      padding: 4px 6px;
+    }
+    .table.compact.history .nowrap { white-space: nowrap; }
 
     /* ヘッダーのタイトル */
     .pageTitle{ font-weight:700; font-size:18px; }
@@ -630,6 +631,33 @@
         .kpi{ border:1px solid #e6e6e6; border-radius:12px; padding:12px; background:#fff; }
         .kpiLabel{ font-size:12px; color:#666; margin-bottom:6px; }
         .kpiValue{ font-size:22px; font-weight:700; }
+    /* タブボタンの下に余白を追加 */
+    #view-summary .card .tabsRow {
+      margin-bottom: 14px;
+    }
+    
+    /* ===== サマリ（当月配信）ブロック ===== */
+    .summaryBlock {
+      border: 1px solid #e5e5f0;
+      border-radius: 12px;
+      padding: 12px 12px 10px;
+      background: #fff;
+      margin-bottom: 14px;
+    }
+    
+    /* 履歴ブロック */
+    .summaryBlock.historyBlock {
+      border: 1px solid #e5e5f0;
+      border-radius: 12px;
+      padding: 12px 12px 10px;
+      background: #fff;
+      margin-bottom: 12px;
+    }
+    
+    /* テーブルと再取得ボタンの間に余白 */
+    #btnSummaryReload {
+      margin-top: 10px;
+    }
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -5737,25 +5765,30 @@ window.reportReload = function(){ initAdminReportPage(); };
     
         // 履歴（対象列を削除し、成功/失敗だけ表示）
         const recent = r.recent || [];
-        const recentRows = recent.map(x=>`
-          <tr>
+        const recentRows = recent.map(x=>{
+          const isFail = Number(x.fail) > 0;
+          const resultLabel = isFail
+            ? `<span class="ng">失敗</span>`
+            : `<span class="ok">成功</span>`;
+          return `<tr>
             <td class="nowrap">${h(x.at||'')}</td>
             <td>${h(x.type||'')}</td>
             <td class="mono">${h(x.eventId||'')}</td>
-            <td class="num ok">${fmtNum(x.success)}</td>
-            <td class="num ng">${fmtNum(x.fail)}</td>
-          </tr>`).join('') || `<tr><td colspan="5" class="muted">直近20件なし</td></tr>`;
+            <td class="num">${resultLabel}</td>
+          </tr>`;
+        }).join('') || `<tr><td colspan="4" class="muted">直近20件なし</td></tr>`;
     
         box.innerHTML = `
-          <div class="summaryHeader">当月配信サマリ（${month}）</div>
-          <div class="summaryBody">
+          <div class="summaryBlock">
+            <div class="summaryHeader">当月配信サマリ（${month}）</div>
             ${kpis}
-            <div class="sectionSub" style="margin-top:12px;">履歴（直近20件）</div>
-            <table class="table compact smalltext history verysmall">
+          </div>
+        
+          <div class="summaryBlock historyBlock">
+            <div class="summarySubHeader">履歴（直近20件）</div>
+            <table class="table compact verysmall history">
               <thead>
-                <tr>
-                  <th>日時</th><th>種別</th><th>公演ID</th><th>成功</th><th>失敗</th>
-                </tr>
+                <tr><th>日時</th><th>種別</th><th>公演ID</th><th>結果</th></tr>
               </thead>
               <tbody>${recentRows}</tbody>
             </table>
