@@ -650,20 +650,7 @@
     #btnSummaryReload {
       margin-top: 10px;
     }
-    /* 既に smalltext/history がある前提で、さらに小さくする */
-    .table.compact.history.verysmall {
-      font-size: 12px;
-    }
-    .table.verysmall th,
-    .table.verysmall td {
-      font-size: 11.5px;
-      line-height: 1.2;
-      padding: 4px 6px;
-    }
-    @media (max-width:480px){
-      .table.verysmall th,
-      .table.verysmall td { font-size: 10.5px; }
-    }
+    
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -2441,7 +2428,20 @@
     #view-custom-push .card:first-of-type{
       margin-top: 8px !important;     /* 1枚目カードの上マージンだけ薄く */
     }
-    
+    /* 既に smalltext/history がある前提で、さらに小さくする */
+    .table.compact.history.verysmall {
+      font-size: 12px;
+    }
+    .table.verysmall th,
+    .table.verysmall td {
+      font-size: 11.5px;
+      line-height: 1.2;
+      padding: 4px 6px;
+    }
+    @media (max-width:480px){
+      .table.verysmall th,
+      .table.verysmall td { font-size: 10.5px; }
+    }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
