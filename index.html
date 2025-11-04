@@ -616,7 +616,12 @@
       font-size: 0.9rem; line-height:1.2;
     }
     .table.compact.history .nowrap { white-space: nowrap; }
-
+    #view-summary table.table.compact.history.verysmall td,
+    #view-summary table.table.compact.history.verysmall th {
+      font-size: 11px !important;
+      line-height: 1.1 !important;
+      padding: 3px 5px !important;
+    }
     /* ヘッダーのタイトル */
     .pageTitle{ font-weight:700; font-size:18px; }
 
@@ -2428,24 +2433,6 @@
     #view-custom-push .card:first-of-type{
       margin-top: 8px !important;     /* 1枚目カードの上マージンだけ薄く */
     }
-    /* 履歴テーブル：verysmall を確実に適用（順不同で拾う） */
-      #view-summary table.table.history.verysmall,
-      #view-summary table.table.verysmall {
-        font-size: 9.5px !important;
-        line-height: 1.2 !important;
-      }
-      
-      #view-summary table.table.history.verysmall th,
-      #view-summary table.table.verysmall th,
-      #view-summary table.table.history.verysmall td,
-      #view-summary table.table.verysmall td {
-        padding: 4px 6px !important;
-        white-space: nowrap;
-      }
-      
-      /* 結果の色（保険で important 付与） */
-      #view-summary .ok { color:#14a44d !important; }
-      #view-summary .ng { color:#d62d20 !important; }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
