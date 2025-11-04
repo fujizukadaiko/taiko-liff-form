@@ -2428,20 +2428,24 @@
     #view-custom-push .card:first-of-type{
       margin-top: 8px !important;     /* 1枚目カードの上マージンだけ薄く */
     }
-    /* 既に smalltext/history がある前提で、さらに小さくする */
-    .table.compact.history.verysmall {
-      font-size: 12px;
-    }
-    .table.verysmall th,
-    .table.verysmall td {
-      font-size: 9.5px;
-      line-height: 1.2;
-      padding: 4px 6px;
-    }
-    @media (max-width:480px){
-      .table.verysmall th,
-      .table.verysmall td { font-size: 9.5px; }
-    }
+    /* 履歴テーブル：verysmall を確実に適用（順不同で拾う） */
+      #view-summary table.table.history.verysmall,
+      #view-summary table.table.verysmall {
+        font-size: 11.5px !important;
+        line-height: 1.2 !important;
+      }
+      
+      #view-summary table.table.history.verysmall th,
+      #view-summary table.table.verysmall th,
+      #view-summary table.table.history.verysmall td,
+      #view-summary table.table.verysmall td {
+        padding: 4px 6px !important;
+        white-space: nowrap;
+      }
+      
+      /* 結果の色（保険で important 付与） */
+      #view-summary .ok { color:#14a44d !important; }
+      #view-summary .ng { color:#d62d20 !important; }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
