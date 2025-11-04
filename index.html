@@ -537,6 +537,15 @@
     .summaryCard .summaryHeader { font-weight:700; margin:6px 0 8px; }
     .summaryCard .summarySubHeader { font-weight:700; margin:10px 0 6px; }
     .table.compact th, .table.compact td { padding:4px 6px; }
+    /* 既に smalltext/history がある前提で、さらに小さくする */
+    .table.compact.history.verysmall {
+      font-size: 12px;
+    }
+    .table.compact.history.verysmall th,
+    .table.compact.history.verysmall td {
+      padding: 4px 6px;
+    }
+    .table.compact.history .nowrap { white-space: nowrap; }
     /* サマリ見出し行：右端へボタン寄せ */
     #view-summary .card .row.header {
       display:flex; align-items:center; gap:8px; margin-bottom:8px;
@@ -1466,6 +1475,18 @@
     #view-custom-push { padding: 0 !important; } /* section自身の内側パディングをゼロ */
     #view-custom-push > .row-space{ margin: 8px 0 8px !important; }
     #view-custom-push .card:first-of-type{ margin-top: 8px !important; }
+
+    /* タブ（無料枠確認／配信履歴）の直下に少し余白 */
+    #view-summary .card .tabsRow { margin-bottom: 12px; }  /* ← クラス名を付ける（下でJSから設定） */
+    
+    /* サマリ本体を薄い枠で囲む */
+    .summaryCard .summaryBody {
+      border: 1px solid #e9e9f2;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+      margin-top: 8px;
+    }
   </style>
   
   <!-- LIFF SDK -->
@@ -5683,14 +5704,14 @@ window.reportReload = function(){ initAdminReportPage(); };
           }
         });
       })();
-
-     // ===== サマリ：配信履歴（当月） =====
+      
+    // ===== サマリ：配信履歴（当月） =====
     window.loadSummaryPushStats = async function(){
       const box = document.getElementById('summaryPushStatsBox');
       if (!box) return;
       box.innerHTML = `取得中… <span class="spinner"></span>`;
     
-      try{
+      try {
         const r = await api(`?summary=1&pushStats=1`);
         if (r?.status !== 'ok'){
           box.innerHTML = `<div class="err">エラー: ${h(r?.message||'取得に失敗しました')}</div>`;
@@ -5703,41 +5724,44 @@ window.reportReload = function(){ initAdminReportPage(); };
     
         const fmtNum = n => (typeof n==='number' ? n.toLocaleString() : String(n||'0'));
         const month  = h(r.month || '');
+        const logs   = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0};
     
-        const logs = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0,byType:{}};
+        // KPI 4つ（スマホでも4列に）
+        const kpis = `
+          <div class="summaryKpis">
+            <div class="kpi"><div class="kpiLabel">ログ件数</div><div class="kpiValue">${fmtNum(logs.count)}</div></div>
+            <div class="kpi"><div class="kpiLabel">対象件数</div><div class="kpiValue">${fmtNum(logs.totalTargets)}</div></div>
+            <div class="kpi"><div class="kpiLabel">成功数</div><div class="kpiValue">${fmtNum(logs.totalSuccess)}</div></div>
+            <div class="kpi"><div class="kpiLabel">失敗数</div><div class="kpiValue">${fmtNum(logs.totalFail)}</div></div>
+          </div>`;
     
+        // 履歴（対象列を削除し、成功/失敗だけ表示）
         const recent = r.recent || [];
-        const recentRows = recent.map(x=>{
-          return `<tr>
-            <td>${h(x.at||'')}</td>
+        const recentRows = recent.map(x=>`
+          <tr>
+            <td class="nowrap">${h(x.at||'')}</td>
             <td>${h(x.type||'')}</td>
-            <td>${h(x.eventId||'')}</td>
-            <td class="num">${fmtNum(x.targets)}</td>
+            <td class="mono">${h(x.eventId||'')}</td>
             <td class="num ok">${fmtNum(x.success)}</td>
             <td class="num ng">${fmtNum(x.fail)}</td>
-          </tr>`;
-        }).join('') || `<tr><td colspan="6" class="muted">直近20件なし</td></tr>`;
+          </tr>`).join('') || `<tr><td colspan="5" class="muted">直近20件なし</td></tr>`;
     
         box.innerHTML = `
-          <div class="summaryBlock">
-            <div class="summaryHeader">当月配信サマリ（${month}）</div>
-            <div class="summaryKpis">
-              <div class="kpi"><div class="kpiLabel">ログ件数</div><div class="kpiValue">${fmtNum(logs.count)}</div></div>
-              <div class="kpi"><div class="kpiLabel">対象件数</div><div class="kpiValue">${fmtNum(logs.totalTargets)}</div></div>
-              <div class="kpi"><div class="kpiLabel">成功数</div><div class="kpiValue">${fmtNum(logs.totalSuccess)}</div></div>
-              <div class="kpi"><div class="kpiLabel">失敗数</div><div class="kpiValue">${fmtNum(logs.totalFail)}</div></div>
-            </div>
-          </div>
-    
-          <div class="summaryBlock">
-            <div class="summarySubHeader">履歴（直近20件）</div>
-            <table class="table compact">
-              <thead><tr><th>日時</th><th>種別</th><th>公演ID</th><th>対象</th><th>成功</th><th>失敗</th></tr></thead>
+          <div class="summaryHeader">当月配信サマリ（${month}）</div>
+          <div class="summaryBody">
+            ${kpis}
+            <div class="sectionSub" style="margin-top:12px;">履歴（直近20件）</div>
+            <table class="table compact smalltext history verysmall">
+              <thead>
+                <tr>
+                  <th>日時</th><th>種別</th><th>公演ID</th><th>成功</th><th>失敗</th>
+                </tr>
+              </thead>
               <tbody>${recentRows}</tbody>
             </table>
           </div>
         `;
-      }catch(err){
+      } catch(err){
         console.error(err);
         box.innerHTML = `<div class="err">通信エラー: ${h(err?.message||err)}</div>`;
       }
