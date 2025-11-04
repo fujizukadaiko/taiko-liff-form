@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.4.1";  // stable ver→v4.3.1, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.4.2";  // stable ver→v4.3.1, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzXm-DRk3sxyyrtxVkyT3wOYZJe3mm9-vL1etUpT51rFjyhioZ5CoD45qRtOAnhNjaVdw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -655,7 +655,6 @@
     #btnSummaryReload {
       margin-top: 10px;
     }
-    
   </style>
 
   <!-- Tailwind の上乗せ -->
@@ -2096,7 +2095,7 @@
     </section>
 
     <!-- ===== サマリ（管理者） ===== -->
-    <section id="view-summary" class="view" hidden>
+    <section id="view-summary" data-view class="view" hidden>
      
      <div class="summaryHeaderRow" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <div class="pageTitle" style="margin:0;">サマリ</div>
@@ -3157,9 +3156,7 @@ function bindHandlers(){
   document.getElementById('btnSummary')?.addEventListener('click', () => {
     if (!state.isAdmin) { alert('管理者のみアクセス可能です'); return; }
     show('#view-summary');                  // サマリ画面を表示（内部で hidden=false）
-    const v = document.getElementById('view-summary');
-    if (v) v.hidden = false;                // 念のための保険
-  
+    const v = document.getElementById('view-summary');  
     window.loadSummaryFreeQuota?.();        // 無料枠の初期表示
   });
   
