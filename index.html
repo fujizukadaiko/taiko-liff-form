@@ -615,20 +615,6 @@
     .table.compact.history td, .table.compact.history th{
       font-size: 0.9rem; line-height:1.2;
     }
-    /* 既に smalltext/history がある前提で、さらに小さくする */
-    .table.compact.history.verysmall {
-      font-size: 12px;
-    }
-    .table.verysmall th,
-    .table.verysmall td {
-      font-size: 11.5px;
-      line-height: 1.2;
-      padding: 4px 6px;
-    }
-    @media (max-width:480px){
-      .table.verysmall th,
-      .table.verysmall td { font-size: 10.5px; }
-    }
     .table.compact.history .nowrap { white-space: nowrap; }
 
     /* ヘッダーのタイトル */
@@ -663,6 +649,20 @@
     /* テーブルと再取得ボタンの間に余白 */
     #btnSummaryReload {
       margin-top: 10px;
+    }
+    /* 既に smalltext/history がある前提で、さらに小さくする */
+    .table.compact.history.verysmall {
+      font-size: 12px;
+    }
+    .table.verysmall th,
+    .table.verysmall td {
+      font-size: 11.5px;
+      line-height: 1.2;
+      padding: 4px 6px;
+    }
+    @media (max-width:480px){
+      .table.verysmall th,
+      .table.verysmall td { font-size: 10.5px; }
     }
   </style>
 
