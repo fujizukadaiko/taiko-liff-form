@@ -2125,8 +2125,9 @@
         </div>
     
         <div class="small muted" style="margin-top:6px;">
-          ※ 「無料枠確認」はシステム経由での今月利用状況を表示します。<br>
-          ※ 「配信履歴」はPushlog/PushDetailから当月の集計を表示します。
+          ※ 「無料枠確認」は<strong>このシステム（Messaging API経由）</strong>で送信した今月の利用状況を表示します。<br>
+          ※ Official Accountアプリからの手動配信や、あいさつ／自動応答メッセージは<strong>含まれません</strong>。<br>
+          ※ 「配信履歴」は Pushlog / PushDetail をもとに当月の集計を表示します。
         </div>
       </div>
     </section>
@@ -5778,6 +5779,8 @@ window.reportReload = function(){ initAdminReportPage(); };
         box.innerHTML = `
           <div class="summaryBlock">
             <div class="summaryHeader">当月配信サマリ（${month}）</div>
+            <div class="small muted" style="margin: -4px 0 8px;">
+              ※ 本サマリの数値は「このシステム経由の送信」のみを対象としています。
             ${kpis}
           </div>
         
