@@ -5958,14 +5958,8 @@ window.reportReload = function(){ initAdminReportPage(); };
         form.set('category', category);
         form.set('message',  message);
       
-        const esc = encodeURIComponent; // 既存の esc() があればそれを使ってOK
-         const j = await api(
-         `?feedbackSubmit=1`
-         `&lineId=${esc(lineId||'')}`
-         `&name=${esc(name||'')}`
-         `&category=${esc(category||'その他')}`
-         `&message=${esc(message||'')}`
-       );
+        const esc = encodeURIComponent;
+        const j = await api(`?feedbackSubmit=1&lineId=${esc(lineId||'')}&name=${esc(name||'')}&category=${esc(category||'その他')}&message=${esc(message||'')}`);
       
         if (j?.status === 'ok'){
           showSnack('送信しました。ご協力ありがとうございます！');
