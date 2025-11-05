@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.0";  // stable ver→v4.4.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.5.1";  // stable ver→v4.4.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2274,7 +2274,14 @@
     
     /* 本文 */
     #view-custom-push .textarea{ min-height: 180px; }
-    
+    /* --- iOS ズーム防止：カスタム通知の本文だけ最終上書き（必ずCSSの末尾に） --- */
+    #view-custom-push textarea,
+    #view-custom-push textarea#cp_body,
+    #view-custom-push .textarea,
+    #view-custom-push .field-col textarea {
+      font-size: 16px !important;
+      -webkit-text-size-adjust: 100%;
+    }
     /* アクション行 */
     #view-custom-push .actions{
       display:flex; gap:12px; justify-content:flex-end; margin-top:16px;
