@@ -2599,7 +2599,26 @@
     #snackbar.show{ opacity:1; }
    
     /* ==== Changelog modal ==== */
-   #changelogModal .modal-card {
+   /* モーダル：初期は非表示 */
+    #changelogModal[hidden] { display: none; }
+    
+    /* 背景の半透明レイヤー（クリックで閉じる） */
+    #changelogModal .modal-backdrop{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.42);
+      z-index: 1300;
+    }
+    
+    /* モーダル本体を中央に固定配置 */
+    #changelogModal .modal-card{
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(92vw, 560px);
+      z-index: 1310;
+    #changelogModal .modal-card {
       background: #fff;
       border-radius: 14px;
       box-shadow: 0 8px 28px rgba(0,0,0,.15);
