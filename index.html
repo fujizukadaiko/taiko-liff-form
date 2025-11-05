@@ -2504,9 +2504,7 @@
       transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
     }
     #feedbackFab.fab img{
-      width: 26px; height: 26px; display: block; pointer-events: none;　filter: invert(1);
-      /* SVGがcurrentColor対応ならフィルタ不要 */
-      filter: none;
+      width: 26px; height: 26px; display: block; pointer-events: none; filter: invert(1) brightness(100%);
     }
     /* ホバー&押下（デスクトップ向け） */
     @media (hover:hover){
