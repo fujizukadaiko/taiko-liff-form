@@ -7,13 +7,28 @@
   
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
-  // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.8";  // stable ver→v4.5.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.5.9";  // stable ver→v4.5.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
-
- const ENV_NS = (() => {
+  
+  //更新履歴
+  window.__CHANGELOG_ENTRIES__ = [
+      {
+        date: "2025-11-05",
+        title: "ご意見募集ボタン（右下）を追加",
+        tags: ["改善","UI"],
+        body: "右下の吹き出しボタンからカテゴリー任意＋メッセージ送信が可能に。連投ガード/スナックバーあり。"
+      },
+      {
+        date: "2025-11-04",
+        title: "サマリ画面のUI改善",
+        tags: ["改善"],
+        body: "当月配信サマリのKPIをスマホでも4列化、履歴テーブルの簡素化とフォント調整。"
+      }
+    ];
+  
+  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
     // 短いハッシュでOK（djbx33a）
     let h = 5381;
@@ -6117,29 +6132,35 @@ window.reportReload = function(){ initAdminReportPage(); };
 </script>
   <script>
     (function(){
-      // ここではフロントだけで表示。あとでGASに差し替えOK
-      const ENTRIES = [
-        {
-          date: "2025-11-05",
-          title: "ご意見募集ボタン（右下）を追加",
-          tags: ["改善","UI"],
-          body: "右下の吹き出しボタンからカテゴリー任意＋メッセージ送信が可能に。連投ガード/スナックバーあり。"
-        },
-        {
-          date: "2025-11-04",
-          title: "サマリ画面のUI改善",
-          tags: ["改善"],
-          body: "当月配信サマリのKPIをスマホでも4列化、履歴テーブルの簡素化とフォント調整。"
-        }
-      ];
+      const ENTRIES = window.__CHANGELOG_ENTRIES__ || [];
+      const FRONT_VER = (window.__APP_CONFIG__ && window.__APP_CONFIG__.FRONT_VERSION) || (window.FRONT_VERSION || "");
+      const LS_KEY = `${window.ENV_NS || 'env'}:changelogSeenToken`; // 環境別に分離
     
-      const LS_KEY = "changelogLastSeen"; // 既読管理
       const modal = document.querySelector('#changelogModal');
       const list  = document.querySelector('#changelogList');
-      const btn   = document.querySelector('#ver') || document.querySelector('#versionChip');
+      const verEl = document.getElementById('ver');       // “Front v…” の表示要素
       const mark  = document.querySelector('#cgMarkRead');
     
-      // レンダリング
+      function latestToken(){
+        // バージョン優先。無ければ最新日付
+        const byDate = ENTRIES.map(e=>e.date).sort().slice(-1)[0] || "";
+        return FRONT_VER || byDate;
+      }
+      function refreshBadge(){
+        const last = localStorage.getItem(LS_KEY) || "";
+        const latest = latestToken();
+        const unread = latest && last !== latest;
+        verEl?.classList.toggle('has-unread', !!unread);
+      }
+      function markAsRead(){
+        const latest = latestToken();
+        if (latest) localStorage.setItem(LS_KEY, latest);
+        refreshBadge();
+      }
+    
+      function escapeHtml(s){
+        return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+      }
       function render(){
         if (!list) return;
         list.innerHTML = ENTRIES.map(e=>`
@@ -6153,43 +6174,23 @@ window.reportReload = function(){ initAdminReportPage(); };
           </div>
         `).join('');
       }
-    
-      function open(){ modal.hidden = false; }
+      function open(){ render(); modal.hidden = false; }
       function close(){ modal.hidden = true; }
-      function latestDate(){
-        return ENTRIES.map(e=>e.date).sort().slice(-1)[0] || "";
-      }
-      function refreshBadge(){
-        const lastSeen = localStorage.getItem(LS_KEY) || "";
-        const latest   = latestDate();
-        const unread   = latest && (!lastSeen || lastSeen < latest);
-        const verEl = document.getElementById('ver');
-        if (btn) btn.classList.toggle('has-unread', !!unread);
-      }
-      function markAsRead(){
-        const latest = latestDate();
-        if (latest) localStorage.setItem(LS_KEY, latest);
-        refreshBadge();
-      }
     
-      // ちょっとした XSS 対策
-      function escapeHtml(s){
-        return String(s==null ? "" : s).replace(/[&<>"']/g, c => (
-          {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
-        ));
+      // “Front v …” をクリックで開く
+      if (verEl){
+        if (!verEl.textContent) verEl.textContent = FRONT_VER;
+        verEl.setAttribute('role','button');
+        verEl.setAttribute('tabindex','0');
+        verEl.style.cursor = 'pointer';
+        verEl.addEventListener('click', open);
+        verEl.addEventListener('keydown', e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); open(); }});
       }
-    
-      // イベント
-      btn?.addEventListener('click', ()=>{ render(); open(); });
-      window.openChangelogModal = function(){
-        render(); open();
-      };
       modal?.addEventListener('click', e=>{ if (e.target.dataset.close) close(); });
-      document.addEventListener('keydown', e=>{ if (!modal.hidden && e.key === 'Escape') close(); });
+      document.addEventListener('keydown', e=>{ if (!modal.hidden && e.key==='Escape') close(); });
       mark?.addEventListener('click', ()=>{ markAsRead(); close(); });
     
-      // 初期バッジ
-      refreshBadge();
+      refreshBadge(); // 初期表示で未読ドット反映
     })();
     </script>
 
