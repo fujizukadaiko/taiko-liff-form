@@ -3273,16 +3273,14 @@ async function api(path, { signal } = {}){
 async function init(){
   try{
     $("#ver").textContent = FRONT_VERSION;
-    const verBtn = document.getElementById("versionChip");
-    verBtn?.addEventListener("click", openChangelogModal);
-    }
+
     try {
    await liff.init({ liffId: LIFF_ID });
  } catch (e) {
    console.error('[LIFF init failed]', e);
    const msg = (e && e.message) ? e.message : String(e);
    document.getElementById('eventsBox').innerHTML =
-     <span class="err">LIFF初期化エラー: ${msg}</span>;
+     `<span class="err">LIFF初期化エラー: ${msg}</span>`;
    return; // ここで中断
  }
     if (!liff.isLoggedIn()){ liff.login(); return; }
@@ -3297,7 +3295,7 @@ async function init(){
     const idt = liff.getDecodedIDToken();
     state.lineId = idt ? idt.sub : "";
     state.name   = idt && idt.name ? idt.name : "";
-    $("#hello").textContent = state.name ? こんにちは、${state.name} さん : "";
+    $("#hello").textContent = state.name ? `こんにちは、${state.name} さん` : "";
 
     /* ★ lineIdが確定したら、ドラフトを復元 */
     draftLoad();
@@ -3307,7 +3305,7 @@ async function init(){
 
     // Admin 判定
     try{
-      const j = await api(?isAdmin=1&id=${esc(state.lineId)});
+      const j = await api(`?isAdmin=1&id=${esc(state.lineId)}`);
       state.isAdmin = (j.status==="ok" && !!j.isAdmin);
       // 管理カードの表示切替
       $("#adminMenu").style.display = state.isAdmin ? "" : "none";
@@ -3315,7 +3313,7 @@ async function init(){
 
     await refreshData();
   }catch(err){
-    $("#eventsBox").innerHTML = <span class="err">初期化に失敗しました: ${err.message||err}</span>;
+    $("#eventsBox").innerHTML = `<span class="err">初期化に失敗しました: ${err.message||err}</span>`;
   }
 }
 
