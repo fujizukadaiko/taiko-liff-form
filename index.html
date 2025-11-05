@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.4.4";  // stable ver→v4.4.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.4.5";  // stable ver→v4.4.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyY_j2PEHvRy4igW9EvZYO_Tl_ESoEvVQzd2TR0-XTIOdiFMwBcPBn5iAE1C7drKekZw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2489,28 +2489,30 @@
     #feedbackModal .modal-card{
       position: fixed; left: 50%; top: 50%;
       transform: translate(-50%, -50%);
-      width: min(92vw, 520px);
+      width: min(90vw, 420px);
       background:#fff; border-radius: 14px;
       box-shadow: 0 16px 48px rgba(0,0,0,.25);
-      padding: 14px 14px 12px; z-index: 1300;
+      padding: 12px 12px 10px; z-index: 1300;
+      max-height: 80vh;              /* 画面内スクロール */
+      overflow: auto;
     }
     #feedbackModal .modal-header{
       display:flex; align-items:center; justify-content:space-between; gap:8px;
     }
-    #feedbackModal .modal-title{ font-weight:700; font-size:18px; }
+    #feedbackModal .modal-title{ font-weight:700; font-size:16px; }
     #feedbackModal .icon-btn{ border:none; background:transparent; font-size:20px; }
     
     #feedbackModal .label{ font-size:13px; color:#555; display:block; margin-bottom:4px; }
     #feedbackModal .select, 
     #feedbackModal .textarea{
-      width:100%; border:1px solid #ddd; border-radius:8px; padding:8px 10px;
-      font-size:14px; background:#fff;
+      width:100%; border:1px solid #ddd; border-radius:8px; padding:6px 10px;
+      font-size:13px; background:#fff; min-height: 120px; 
     }
     #feedbackModal .counter{ font-size:12px; color:#666; text-align:right; margin-top:4px; }
     #feedbackModal .modal-footer{
-      margin-top:12px; display:flex; justify-content:flex-end; gap:8px;
+      margin-top:10px; display:flex; justify-content:flex-end; gap:8px;
     }
-    #feedbackModal .btn{ padding:8px 14px; border-radius:8px; }
+    #feedbackModal .btn{ padding:8px 12px; border-radius:8px; }
     #feedbackModal .btn-outline{ background:#fff; border:1px solid #bbb; }
     #feedbackModal .btn-primary{ background:#6f5dbd; color:#fff; border:1px solid #6f5dbd; }
     
@@ -5941,15 +5943,30 @@ window.reportReload = function(){ initAdminReportPage(); };
       if (!message){ showSnack('メッセージを入力してください'); textarea.focus(); return; }
       if (message.length > LIMIT){ showSnack('文字数上限を超えています'); return; }
 
+      // 送信
       try{
         sending = true; sendBtn.disabled = true; sendBtn.textContent = '送信中…';
-        const payload = { lineId: await getCurrentLineId(), name: await getCurrentDisplayName(), category, message };
-        const res = await fetch(`${ENDPOINT}?feedbackSubmit=1`, {
-          method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload),
-        });
+      
+        const lineId = await getCurrentLineId();
+        const name   = await getCurrentDisplayName();
+      
+        // ← フォームエンコードに変更（ヘッダ不要！）
+        const form = new URLSearchParams();
+        form.set('feedbackSubmit', '1');
+        form.set('lineId', lineId);
+        form.set('name',   name);
+        form.set('category', category);
+        form.set('message',  message);
+      
+        const res = await fetch(ENDPOINT, { method:'POST', body: form });
         const j = await res.json().catch(()=>null);
-        if (j?.status === 'ok'){ showSnack('送信しました。ご協力ありがとうございます！'); textarea.value=''; updateCount(); startCooldown(); closeModal(); }
-        else { showSnack(j?.message || '送信に失敗しました'); }
+      
+        if (j?.status === 'ok'){
+          showSnack('送信しました。ご協力ありがとうございます！');
+          textarea.value = ''; updateCount(); startCooldown(); closeModal();
+        }else{
+          showSnack(j?.message || '送信に失敗しました');
+        }
       }catch(err){
         console.error(err); showSnack('通信エラーが発生しました');
       }finally{
