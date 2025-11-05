@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.7";  // stable ver→v4.5.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.5.8";  // stable ver→v4.5.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2598,11 +2598,11 @@
     }
     #snackbar.show{ opacity:1; }
    
-    /* ==== Changelog modal ==== */
-   /* モーダル：初期は非表示 */
-    #changelogModal[hidden] { display: none; }
+   /* ==== Changelog modal ==== */
+    /* 初期は非表示 */
+    #changelogModal[hidden]{ display:none; }
     
-    /* 背景の半透明レイヤー（クリックで閉じる） */
+    /* 背景（クリックで閉じる） */
     #changelogModal .modal-backdrop{
       position: fixed;
       inset: 0;
@@ -2610,7 +2610,7 @@
       z-index: 1300;
     }
     
-    /* モーダル本体を中央に固定配置 */
+    /* 本体：中央固定＋見た目 */
     #changelogModal .modal-card{
       position: fixed;
       left: 50%;
@@ -2618,7 +2618,6 @@
       transform: translate(-50%, -50%);
       width: min(92vw, 560px);
       z-index: 1310;
-    #changelogModal .modal-card {
       background: #fff;
       border-radius: 14px;
       box-shadow: 0 8px 28px rgba(0,0,0,.15);
@@ -2626,98 +2625,35 @@
       font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", sans-serif;
     }
     
-    .cg-item {
+    /* リストまわり */
+    .cg-item{
       border: 1px solid #e5e5ef;
       border-radius: 10px;
       padding: 10px 12px;
       margin-bottom: 10px;
       background: #fafafa;
     }
+    .cg-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+    .cg-title{ font-size:15px; font-weight:600; color:#333; }
+    .cg-tags{ display:flex; gap:6px; }
+    .cg-tag{ font-size:11px; color:#666; background:#f1f1f6; padding:2px 6px; border-radius:6px; }
+    .cg-date{ font-size:12px; color:#999; margin-bottom:6px; }
+    .cg-body{ font-size:13px; line-height:1.5; color:#444; }
     
-    .cg-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 4px;
-    }
+    /* フッター＆ボタン */
+    #changelogModal .modal-footer{ display:flex; justify-content:flex-end; gap:10px; margin-top:12px; }
+    #changelogModal .btn{ border-radius:8px; padding:6px 14px; font-size:13px; }
+    #changelogModal .btn-outline{ background:#fff; border:1px solid #ccc; color:#444; }
+    #changelogModal .btn-primary{ background:#6f5dbd; border:1px solid #6f5dbd; color:#fff; }
     
-    .cg-title {
-      font-size: 15px;
-      font-weight: 600;
-      color: #333;
-    }
+    /* タイトル控えめ */
+    #changelogModal .modal-title{ font-size:16px; font-weight:600; color:#222; }
     
-    .cg-tags {
-      display: flex;
-      gap: 6px;
-    }
-    
-    .cg-tag {
-      font-size: 11px;
-      color: #666;
-      background: #f1f1f6;
-      padding: 2px 6px;
-      border-radius: 6px;
-    }
-    
-    .cg-date {
-      font-size: 12px;
-      color: #999;
-      margin-bottom: 6px;
-    }
-    
-    .cg-body {
-      font-size: 13px;
-      line-height: 1.5;
-      color: #444;
-    }
-    
-    #changelogModal .modal-footer {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 12px;
-    }
-    
-    #changelogModal .btn {
-      border-radius: 8px;
-      padding: 6px 14px;
-      font-size: 13px;
-    }
-    
-    #changelogModal .btn-outline {
-      background: #fff;
-      border: 1px solid #ccc;
-      color: #444;
-    }
-    
-    #changelogModal .btn-primary {
-      background: #6f5dbd;
-      border: 1px solid #6f5dbd;
-      color: #fff;
-    }
-    
-    /* タイトルも控えめに */
-    #changelogModal .modal-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #222;
-    }
- 
-    /* バージョン表示に未読ドットを付ける */
-    #ver {
-      position: relative;
-      display: inline-block;
-    }
-    
-    /* ここも #btnChangelog → #ver に変更 */
+    /* バージョン表示の未読ドット */
+    #ver{ position:relative; display:inline-block; }
     #ver.has-unread::after{
-      content:"";
-      position:absolute;
-      top:-3px; right:-6px;
-      width:8px; height:8px;
-      background:#e11d48;
-      border-radius:9999px;
+      content:""; position:absolute; top:-3px; right:-6px; width:8px; height:8px;
+      background:#e11d48; border-radius:9999px;
     }
   </style>
 
@@ -6227,6 +6163,7 @@ window.reportReload = function(){ initAdminReportPage(); };
         const lastSeen = localStorage.getItem(LS_KEY) || "";
         const latest   = latestDate();
         const unread   = latest && (!lastSeen || lastSeen < latest);
+        const verEl = document.getElementById('ver');
         if (btn) btn.classList.toggle('has-unread', !!unread);
       }
       function markAsRead(){
