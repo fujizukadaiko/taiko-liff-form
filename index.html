@@ -5962,7 +5962,8 @@ window.reportReload = function(){ initAdminReportPage(); };
         );
         console.debug('fb response', j);
       
-        if (j?.status === 'ok'){
+        const ok = j && (j.status === 'ok' || j.inserted === true);
+        if (ok){
           showSnack('送信しました。ご協力ありがとうございます！');
           textarea.value = ''; updateCount(); startCooldown(); closeModal();
         }else{
