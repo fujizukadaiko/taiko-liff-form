@@ -3275,7 +3275,7 @@ async function init(){
     $("#ver").textContent = FRONT_VERSION;
     const verBtn = document.getElementById("versionChip");
     verBtn?.addEventListener("click", openChangelogModal);
-    
+    }
     try {
    await liff.init({ liffId: LIFF_ID });
  } catch (e) {
