@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.4.2";  // stable ver→v4.3.1, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.4.3";  // stable ver→v4.4.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzXm-DRk3sxyyrtxVkyT3wOYZJe3mm9-vL1etUpT51rFjyhioZ5CoD45qRtOAnhNjaVdw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyY_j2PEHvRy4igW9EvZYO_Tl_ESoEvVQzd2TR0-XTIOdiFMwBcPBn5iAE1C7drKekZw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -2433,6 +2433,94 @@
     #view-custom-push .card:first-of-type{
       margin-top: 8px !important;     /* 1枚目カードの上マージンだけ薄く */
     }
+
+    <!-- ご意見ボタン（仮） -->
+    <button id="feedbackFab" class="fab" aria-label="ご意見を送る">💬</button>
+    
+    <!-- ご意見モーダル -->
+    <div id="feedbackModal" class="modal" hidden>
+      <div class="modal-backdrop" data-close="1"></div>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fbTitle">
+        <div class="modal-header">
+          <div id="fbTitle" class="modal-title">ご意見を送る</div>
+          <button class="icon-btn" data-close="1" aria-label="閉じる">×</button>
+        </div>
+    
+        <div class="modal-body">
+          <label class="label">カテゴリ（任意）</label>
+          <select id="fbCategory" class="select">
+            <option value="その他" selected>その他</option>
+            <option value="ご要望">ご要望</option>
+            <option value="不具合">不具合</option>
+            <option value="デザイン">デザイン</option>
+          </select>
+    
+          <label class="label" style="margin-top:10px;">メッセージ（必須）</label>
+          <textarea id="fbMessage" class="textarea" rows="5" maxlength="300" placeholder="ご意見・ご要望をお聞かせください"></textarea>
+          <div class="counter"><span id="fbCount">0</span> / 300</div>
+        </div>
+    
+        <div class="modal-footer">
+          <button class="btn btn-outline" data-close="1">キャンセル</button>
+          <button id="fbSendBtn" class="btn btn-primary">送信</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- スナックバー -->
+    <div id="snackbar" class="snackbar" role="status" aria-live="polite"></div>
+
+    /* ========== FAB（右下固定） ========== */
+    #feedbackFab.fab{
+      position: fixed; right: 16px; bottom: 16px;
+      width: 52px; height: 52px; border-radius: 26px;
+      font-size: 22px; line-height: 52px; text-align: center;
+      background: #6f5dbd; color: #fff; border: none;
+      box-shadow: 0 8px 20px rgba(0,0,0,.2);
+      z-index: 1200;  /* ヘッダーより上、モーダルより下でもOK */
+    }
+    #feedbackFab.fab:active{ transform: translateY(1px); }
+    
+    /* ========== モーダル ========== */
+    #feedbackModal .modal-backdrop{
+      position: fixed; inset:0; background: rgba(0,0,0,.42);
+    }
+    #feedbackModal .modal-card{
+      position: fixed; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(92vw, 520px);
+      background:#fff; border-radius: 14px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.25);
+      padding: 14px 14px 12px; z-index: 1300;
+    }
+    #feedbackModal .modal-header{
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+    }
+    #feedbackModal .modal-title{ font-weight:700; font-size:18px; }
+    #feedbackModal .icon-btn{ border:none; background:transparent; font-size:20px; }
+    
+    #feedbackModal .label{ font-size:13px; color:#555; display:block; margin-bottom:4px; }
+    #feedbackModal .select, 
+    #feedbackModal .textarea{
+      width:100%; border:1px solid #ddd; border-radius:8px; padding:8px 10px;
+      font-size:14px; background:#fff;
+    }
+    #feedbackModal .counter{ font-size:12px; color:#666; text-align:right; margin-top:4px; }
+    #feedbackModal .modal-footer{
+      margin-top:12px; display:flex; justify-content:flex-end; gap:8px;
+    }
+    #feedbackModal .btn{ padding:8px 14px; border-radius:8px; }
+    #feedbackModal .btn-outline{ background:#fff; border:1px solid #bbb; }
+    #feedbackModal .btn-primary{ background:#6f5dbd; color:#fff; border:1px solid #6f5dbd; }
+    
+    /* ========== スナックバー ========== */
+    #snackbar.snackbar{
+      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+      background: rgba(35,35,35,.95); color:#fff; padding:10px 14px; border-radius:10px;
+      font-size:14px; opacity:0; pointer-events:none; transition: opacity .2s ease;
+      z-index: 1400;
+    }
+    #snackbar.show{ opacity:1; }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -5799,7 +5887,113 @@ window.reportReload = function(){ initAdminReportPage(); };
     })();
 
 </script> 
+ 
+  <script>
+  (function(){
+    const ENDPOINT = window.GAS_ENDPOINT || window.API_BASE || ''; // 既存の api() があればそれでもOK
+    const LIMIT = 300;
+    const COOLDOWN_SEC = 60;
+    const LS_KEY = 'fbCooldownAt';
   
+    async function getCurrentLineId(){
+      return window.STATE?.lineId || window.state?.lineId || '';
+    }
+    async function getCurrentDisplayName(){
+      return window.STATE?.displayName || window.state?.displayName || '';
+    }
+  
+    // ---- ユーティリティ ----
+    const $ = s => document.querySelector(s);
+    const modal = $('#feedbackModal');
+    const fab   = $('#feedbackFab');
+    const textarea = $('#fbMessage');
+    const counter  = $('#fbCount');
+    const sendBtn  = $('#fbSendBtn');
+    const snackbar = $('#snackbar');
+  
+    function openModal(){ modal.hidden = false; textarea.focus(); updateCount(); }
+    function closeModal(){ modal.hidden = true; }
+    function showSnack(message){
+      snackbar.textContent = message;
+      snackbar.classList.add('show');
+      setTimeout(()=> snackbar.classList.remove('show'), 2600);
+    }
+    function updateCount(){
+      const len = textarea.value.length;
+      counter.textContent = String(len);
+    }
+    function nowTs(){ return Math.floor(Date.now()/1000); }
+    function cooldownLeft(){
+      const at = Number(localStorage.getItem(LS_KEY)||'0');
+      const left = at ? (COOLDOWN_SEC - (nowTs()-at)) : 0;
+      return Math.max(0, left);
+    }
+    function startCooldown(){
+      localStorage.setItem(LS_KEY, String(nowTs()));
+    }
+  
+    // ---- イベント ----
+    fab?.addEventListener('click', openModal);
+    modal?.addEventListener('click', (e)=>{
+      if (e.target.dataset.close) closeModal();
+    });
+    textarea?.addEventListener('input', updateCount);
+  
+    let sending = false;
+    sendBtn?.addEventListener('click', async ()=>{
+      if (sending) return;
+      const cd = cooldownLeft();
+      if (cd > 0){
+        showSnack(`連続送信はできません。${cd}秒後に再度お試しください`);
+        return;
+      }
+  
+      const message = (textarea.value || '').replace(/\s+/g,' ').trim();
+      const category = ($('#fbCategory')?.value || 'その他').trim();
+  
+      if (!message){
+        showSnack('メッセージを入力してください');
+        textarea.focus();
+        return;
+      }
+      if (message.length > LIMIT){
+        showSnack('文字数上限を超えています');
+        return;
+      }
+  
+      // 送信
+      try{
+        sending = true; sendBtn.disabled = true; sendBtn.textContent = '送信中…';
+  
+        const lineId = await getCurrentLineId();
+        const name   = await getCurrentDisplayName();
+        const payload = { lineId, name, category, message };
+  
+        // 既存の api() がある場合はそれを使ってOK
+        const url = `${ENDPOINT}?feedbackSubmit=1`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload),
+        });
+        const j = await res.json().catch(()=>null);
+  
+        if (j?.status === 'ok'){
+          showSnack('送信しました。ご協力ありがとうございます！');
+          textarea.value = ''; updateCount(); startCooldown(); closeModal();
+        }else{
+          showSnack(j?.message || '送信に失敗しました');
+        }
+      }catch(err){
+        console.error(err);
+        showSnack('通信エラーが発生しました');
+      }finally{
+        sending = false; sendBtn.disabled = false; sendBtn.textContent = '送信';
+      }
+    });
+  
+  })();
+  </script>
 <script>
 // ===== 起動 =====
 document.addEventListener('DOMContentLoaded', () => {
