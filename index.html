@@ -6263,80 +6263,73 @@ window.reportReload = function(){ initAdminReportPage(); };
       }
     })();
     </script>
- <script>
-(function(){
-
-  // ご意見一覧を取得して描画
-   window.loadFeedbackList = async function(){
-      const box = document.getElementById('feedbackListBox');
-      if (!box) return;
-      box.innerHTML = '読み込み中…';
-  
-      // ローカルのエスケープ（この関数内だけで使う）
-      const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-        ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
-      );
-  
-      try{
-        // 管理API：一覧取得
-        const j = await api(`?feedbackList=1&lineId=${esc(state.lineId||'')}`);
-        console.debug('[fb] list raw', j);
-  
-        if (j?.status !== 'ok' || !Array.isArray(j.items)) {
-          box.innerHTML = '<div class="err">取得に失敗しました</div>';
-          return;
-        }
-  
-        // 期待フィールドに正規化（列名のブレを吸収）
-        const norm = it => ({
-          no:      it.no ?? it.No ?? '',
-          name:    it.name ?? it.名前 ?? '',
-          at:      it.at ?? it.date ?? it.送信日時 ?? '',
-          category:it.category ?? it.カテゴリ ?? 'その他',
-          message: it.message ?? it.メッセージ ?? '',
-          status:  it.status ?? it.ステータス ?? '未対応',
-        });
-  
-        const items = j.items.map(norm);
-  
-        // カテゴリごとにグループ化
-        const byCat = {};
-        for (const it of items) {
-          const k = it.category || 'その他';
-          (byCat[k] ||= []).push(it);
-        }
-  
-        // 1行（アコーディオン）
-        const row = it => `
-          <details class="fb-item">
-            <summary class="fb-sum">
-              <span class="mono">#${esc(it.no)}</span>
-              <span class="name">${esc(it.name || '（名無し）')}</span>
-              <span class="date">${esc(it.at)}</span>
-              <span class="status">${esc(it.status)}</span>
-            </summary>
-            <div class="fb-body">${esc(it.message)}</div>
-          </details>
-        `;
-  
-        // 全体HTML
-        const html = Object.keys(byCat).sort().map(cat => `
-          <div class="fb-cat card" style="margin-bottom:12px;">
-            <div class="sectionTitle" style="margin:0 0 8px;">${esc(cat)}</div>
-            <div class="fb-list">
-              ${byCat[cat].map(row).join('') || '<div class="small muted">なし</div>'}
+    <script>
+    (function(){
+    
+      // ご意見一覧を取得して描画
+      window.loadFeedbackList = async function(){
+        const box = document.getElementById('feedbackListBox');
+        if (!box) return;
+        box.innerHTML = '読み込み中…';
+    
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+          ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
+        );
+    
+        try{
+          const j = await api(`?feedbackList=1&lineId=${esc(state.lineId||'')}`);
+          console.debug('[fb] list raw', j);
+    
+          if (j?.status !== 'ok' || !Array.isArray(j.items)) {
+            box.innerHTML = '<div class="err">取得に失敗しました</div>';
+            return;
+          }
+    
+          const norm = it => ({
+            no: it.no ?? it.No ?? '',
+            name: it.name ?? it.名前 ?? '',
+            at: it.at ?? it.date ?? it.送信日時 ?? '',
+            category: it.category ?? it.カテゴリ ?? 'その他',
+            message: it.message ?? it.メッセージ ?? '',
+            status: it.status ?? it.ステータス ?? '未対応',
+          });
+    
+          const items = j.items.map(norm);
+    
+          const byCat = {};
+          for (const it of items) (byCat[it.category || 'その他'] ||= []).push(it);
+    
+          const row = it => `
+            <details class="fb-item">
+              <summary class="fb-sum">
+                <span class="mono">#${esc(it.no)}</span>
+                <span class="name">${esc(it.name || '（名無し）')}</span>
+                <span class="date">${esc(it.at)}</span>
+                <span class="status">${esc(it.status)}</span>
+              </summary>
+              <div class="fb-body">${esc(it.message)}</div>
+            </details>
+          `;
+    
+          const html = Object.keys(byCat).sort().map(cat => `
+            <div class="fb-cat card" style="margin-bottom:12px;">
+              <div class="sectionTitle" style="margin:0 0 8px;">${esc(cat)}</div>
+              <div class="fb-list">
+                ${byCat[cat].map(row).join('') || '<div class="small muted">なし</div>'}
+              </div>
             </div>
-          </div>
-        `).join('') || '<div class="small muted">データがありません</div>';
-  
-        box.innerHTML = html;
-  
-      } catch(err){
-        console.error(err);
-        box.innerHTML = `<div class="err">通信エラー: ${esc(err?.message||err)}</div>`;
-      }
-    };
-  </script>
+          `).join('') || '<div class="small muted">データがありません</div>';
+    
+          box.innerHTML = html;
+    
+        } catch(err){
+          console.error(err);
+          box.innerHTML = `<div class="err">通信エラー: ${esc(err?.message||err)}</div>`;
+        }
+      };
+    
+    })(); 
+    </script>
 <script>
 // ===== 起動 =====
 document.addEventListener('DOMContentLoaded', () => {
