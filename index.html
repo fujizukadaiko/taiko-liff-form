@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.2";  // stable ver→v4.5.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.5.3";  // stable ver→v4.5.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -1522,6 +1522,10 @@
   <header class="is-sticky">
     <div class="siteTitle">藤塚太鼓 出欠・予定</div>
     <div class="ver" id="ver"></div>
+    <button id="versionChip" class="version-chip" type="button"
+    aria-haspopup="dialog" aria-controls="changelogModal">
+    ver
+  </button>
   </header>
 
   <main>
@@ -2179,6 +2183,25 @@
     <!-- スナックバー -->
     <div id="snackbar" class="snackbar" role="status" aria-live="polite"></div>
   
+  <!-- 更新履歴モーダル -->
+  <div id="changelogModal" class="modal" hidden>
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="cgTitle">
+      <div class="modal-header">
+        <div id="cgTitle" class="modal-title">更新履歴</div>
+        <button class="icon-btn" data-close="1" aria-label="閉じる">×</button>
+      </div>
+  
+      <div class="modal-body">
+        <div id="changelogList" class="cg-list"></div>
+      </div>
+  
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-close="1">閉じる</button>
+        <button id="cgMarkRead" class="btn btn-primary">既読にする</button>
+      </div>
+    </div>
+  </div>
   <style>
     /* ===== Custom Push UI style (scoped) ===== */
     #view-custom-push {
@@ -2578,6 +2601,37 @@
       z-index: 1400;
     }
     #snackbar.show{ opacity:1; }
+   
+    /* ==== Changelog modal ==== */
+    #changelogModal .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.42); }
+    #changelogModal .modal-card{
+      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:min(92vw, 560px); background:#fff; border-radius:14px;
+      box-shadow:0 16px 48px rgba(0,0,0,.25); padding:14px; z-index:1300;
+    }
+    #changelogModal .modal-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    #changelogModal .modal-title{ font-weight:700; font-size:18px; }
+    #changelogModal .modal-footer{ margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
+    #changelogModal .btn{ padding:8px 14px; border-radius:8px; }
+    #changelogModal .btn-outline{ background:#fff; border:1px solid #bbb; }
+    #changelogModal .btn-primary{ background:#6f5dbd; color:#fff; border:1px solid #6f5dbd; }
+    
+    /* リスト */
+    .cg-list{ display:grid; gap:12px; max-height:50vh; overflow:auto; padding-right:4px; }
+    .cg-item{ border:1px solid #eee; border-radius:12px; padding:10px 12px; background:#fff; }
+    .cg-item .cg-head{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .cg-date{ font-size:12px; color:#666; }
+    .cg-title{ font-weight:700; }
+    .cg-tags{ margin-left:auto; display:flex; gap:6px; }
+    .cg-tag{ font-size:11px; padding:2px 8px; border-radius:999px; background:#f0f0f7; color:#555; white-space:nowrap; }
+    .cg-body{ font-size:14px; line-height:1.6; white-space:pre-line; }
+    
+    /* ヘッダのバージョンに“未読バッジ” */
+    #btnChangelog{ position:relative; cursor:pointer; }
+    #btnChangelog.has-unread::after{
+      content:""; position:absolute; top:-3px; right:-5px; width:8px; height:8px;
+      background:#e11d48; border-radius:9999px;
+    }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -6038,6 +6092,79 @@ window.reportReload = function(){ initAdminReportPage(); };
   })();
 });
 </script>
+  <script>
+    (function(){
+      // ここではフロントだけで表示。あとでGASに差し替えOK
+      const ENTRIES = [
+        {
+          date: "2025-11-05",
+          title: "ご意見募集ボタン（右下）を追加",
+          tags: ["改善","UI"],
+          body: "右下の吹き出しボタンからカテゴリー任意＋メッセージ送信が可能に。連投ガード/スナックバーあり。"
+        },
+        {
+          date: "2025-11-04",
+          title: "サマリ画面のUI改善",
+          tags: ["改善"],
+          body: "当月配信サマリのKPIをスマホでも4列化、履歴テーブルの簡素化とフォント調整。"
+        }
+      ];
+    
+      const LS_KEY = "changelogLastSeen"; // 既読管理
+      const modal = document.querySelector('#changelogModal');
+      const list  = document.querySelector('#changelogList');
+      const btn   = document.querySelector('#btnChangelog');
+      const mark  = document.querySelector('#cgMarkRead');
+    
+      // レンダリング
+      function render(){
+        if (!list) return;
+        list.innerHTML = ENTRIES.map(e=>`
+          <div class="cg-item">
+            <div class="cg-head">
+              <div class="cg-title">${escapeHtml(e.title)}</div>
+              <div class="cg-tags">${(e.tags||[]).map(t=>`<span class="cg-tag">${escapeHtml(t)}</span>`).join('')}</div>
+            </div>
+            <div class="cg-date">${escapeHtml(e.date)}</div>
+            <div class="cg-body">${escapeHtml(e.body)}</div>
+          </div>
+        `).join('');
+      }
+    
+      function open(){ modal.hidden = false; }
+      function close(){ modal.hidden = true; }
+      function latestDate(){
+        return ENTRIES.map(e=>e.date).sort().slice(-1)[0] || "";
+      }
+      function refreshBadge(){
+        const lastSeen = localStorage.getItem(LS_KEY) || "";
+        const latest   = latestDate();
+        const unread   = latest && (!lastSeen || lastSeen < latest);
+        if (btn) btn.classList.toggle('has-unread', !!unread);
+      }
+      function markAsRead(){
+        const latest = latestDate();
+        if (latest) localStorage.setItem(LS_KEY, latest);
+        refreshBadge();
+      }
+    
+      // ちょっとした XSS 対策
+      function escapeHtml(s){
+        return String(s==null ? "" : s).replace(/[&<>"']/g, c => (
+          {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]
+        ));
+      }
+    
+      // イベント
+      btn?.addEventListener('click', ()=>{ render(); open(); });
+      modal?.addEventListener('click', e=>{ if (e.target.dataset.close) close(); });
+      document.addEventListener('keydown', e=>{ if (!modal.hidden && e.key === 'Escape') close(); });
+      mark?.addEventListener('click', ()=>{ markAsRead(); close(); });
+    
+      // 初期バッジ
+      refreshBadge();
+    })();
+    </script>
 <script>
 // ===== 起動 =====
 document.addEventListener('DOMContentLoaded', () => {
