@@ -6277,7 +6277,7 @@ window.reportReload = function(){ initAdminReportPage(); };
         );
     
         try{
-          const j = await api(`?feedbackList=1&lineId=${esc(state.lineId||'')}`);
+          const j = await api(`?feedbackList=1&lineId=${encodeURIComponent(state.lineId||'')}`);
           console.debug('[fb] list raw', j);
     
           if (j?.status !== 'ok' || !Array.isArray(j.items)) {
