@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.6.6";  // stable ver→v4.5.9, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.6.7";  // stable ver→v4.5.9, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzQSQDlvLF39WKZ09a8tJfKlpUW0DipfrcsbjcioyonCFPUlkr51KELKCjBkpIgeqxbIw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   
@@ -6324,8 +6324,17 @@ window.reportReload = function(){ initAdminReportPage(); };
             </div>
           `).join('') || '<div class="small muted">データがありません</div>';
     
-          box.innerHTML = html;
-    
+          //box.innerHTML = html;
+          box.innerHTML = items.map(it => 
+            `<div style="padding:6px 8px;border-bottom:1px solid #eee;">
+               <span class="mono">#${esc(it.no)}</span>
+               <strong>${esc(it.name || '（名無し）')}</strong>
+               <span style="color:#666;">${esc(it.at)}</span>
+               <span style="margin-left:6px;">[${esc(it.category)}]</span>
+               <span style="margin-left:6px;">${esc(it.status)}</span>
+               <div style="color:#444;margin-top:4px;">${esc(it.message)}</div>
+             </div>`
+          ).join('');
         } catch(err){
           console.error(err);
           box.innerHTML = `<div class="err">通信エラー: ${esc(err?.message||err)}</div>`;
