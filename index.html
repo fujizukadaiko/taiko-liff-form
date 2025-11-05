@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.6";  // stable ver→v4.5.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.5.7";  // stable ver→v4.5.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2599,6 +2599,28 @@
     #snackbar.show{ opacity:1; }
    
     /* ==== Changelog modal ==== */
+    #changelogModal .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.42); }
+    #changelogModal .modal-card{
+      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:min(92vw, 560px); background:#fff; border-radius:14px;
+      box-shadow:0 16px 48px rgba(0,0,0,.25); padding:14px; z-index:1300;
+    }
+    #changelogModal .modal-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    #changelogModal .modal-title{ font-weight:700; font-size:18px; }
+    #changelogModal .modal-footer{ margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
+    #changelogModal .btn{ padding:8px 14px; border-radius:8px; }
+    #changelogModal .btn-outline{ background:#fff; border:1px solid #bbb; }
+    #changelogModal .btn-primary{ background:#6f5dbd; color:#fff; border:1px solid #6f5dbd; }
+    
+    /* リスト */
+    .cg-list{ display:grid; gap:12px; max-height:50vh; overflow:auto; padding-right:4px; }
+    .cg-item{ border:1px solid #eee; border-radius:12px; padding:10px 12px; background:#fff; }
+    .cg-item .cg-head{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .cg-date{ font-size:12px; color:#666; }
+    .cg-title{ font-weight:700; }
+    .cg-tags{ margin-left:auto; display:flex; gap:6px; }
+    .cg-tag{ font-size:11px; padding:2px 8px; border-radius:999px; background:#f0f0f7; color:#555; white-space:nowrap; }
+    .cg-body{ font-size:14px; line-height:1.6; white-space:pre-line; }
    /* モーダル：初期は非表示 */
     #changelogModal[hidden] { display: none; }
     
