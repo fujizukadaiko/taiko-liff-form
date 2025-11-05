@@ -1557,7 +1557,7 @@
         <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin-report">出欠結果一覧</button>
         <button id="btnAdminCustomPush" class="btn btn-outline btn-sm btn-compact" data-view-target="view-custom-push">カスタム通知</button>
         <button id="btnSummary" class="btn btn-outline btn-sm btn-compact" data-view-target="view-summary">サマリ</button>
-        <<button id="btnFeedback" class="btn btn-outline btn-sm btn-compact" data-view-target="view-feedback">ご意見BOX</button>
+        <button id="btnFeedback" class="btn btn-outline btn-sm btn-compact" data-view-target="view-feedback">ご意見BOX</button>
       </div>
       <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
     </div>
@@ -2148,7 +2148,7 @@
     </section>
     <!-- ===== サマリ END ===== -->
     <!-- ===== ご意見BOX（管理者） ===== -->
-    <section id="view-feedback" hidden>
+    <section id="view-feedback" class="view" hidden>
       <div class="row-space">
         <div class="sectionTitle">ご意見BOX</div>
       </div>
@@ -3430,6 +3430,13 @@ function bindHandlers(){
     ?.addEventListener('click', () => window.loadSummaryFreeQuota?.());
   document.getElementById('btnSummaryToTop')
   ?.addEventListener('click', ()=> show('#view-home'));
+  
+  // 管理メニュー：ご意見BOX
+  document.getElementById('btnFeedback')?.addEventListener('click', async () => {
+    if (!state.isAdmin){ alert('管理者のみアクセス可能です'); return; }
+    show('#view-feedback');          // ← 既存と同じ切替
+    await window.loadFeedbackList?.(); // ← 初回ロード（下で定義）
+  });
   
   // 管理画面
   $("#btnAdminBack").onclick = ()=> show("#view-home");
@@ -6259,97 +6266,59 @@ window.reportReload = function(){ initAdminReportPage(); };
   <script>
     (function(){
     
-      // 管理メニューのボタン → ページ遷移
-      document.getElementById('btnFeedback')?.addEventListener('click', ()=>{
-        showView('feedback');              // 既存と同じ遷移関数
-        loadFeedbackList();                // 初回ロード
-      });
-    
-      // 再読込
-      document.getElementById('fbReload')?.addEventListener('click', loadFeedbackList);
-    
-      // ステータス選択変更（イベント委譲）
-      document.getElementById('feedbackListBox')?.addEventListener('change', async (e)=>{
-        const sel = e.target;
-        if (!sel.classList?.contains('fb-status')) return;
-        const no = sel.dataset.no;
-        const st = sel.value;
-        if (!no) return;
-    
-        sel.disabled = true;
-        try{
-          const j = await api(`?feedbackSetStatus=1&lineId=${esc(state.lineId)}&no=${esc(no)}&status=${esc(st)}`);
-          if (j?.status === 'ok'){
-            // 反映OK。軽く視覚フィードバックしたければここで
-          }else{
-            alert('更新に失敗しました');
-          }
-        }catch(err){
-          console.error(err);
-          alert('通信エラーが発生しました');
-        }finally{
-          sel.disabled = false;
-        }
-      });
-    
-      // 一覧ロード
-      async function loadFeedbackList(){
+      // ご意見一覧を取得して描画
+      window.loadFeedbackList = async function(){
         const box = document.getElementById('feedbackListBox');
         if (!box) return;
         box.innerHTML = '読み込み中…';
-    
+      
         try{
-          const j = await api(`?feedbackList=1&lineId=${esc(state.lineId)}`);
-          if (j?.status !== 'ok'){ box.innerHTML = `<span class="err">取得に失敗</span>`; return; }
-    
+          // 管理API（doGet側の feedbackList=1）を利用
+          const j = await api(`?feedbackList=1&lineId=${esc(state.lineId||'')}`);
+          if (j?.status !== 'ok'){ box.innerHTML = '取得に失敗しました'; return; }
+      
           const items = Array.isArray(j.items) ? j.items : [];
-          if (!items.length){
-            box.innerHTML = `<div class="muted small">データがありません</div>`;
-            return;
-          }
-    
-          // カテゴリ別にグループ化
+          // カテゴリごとにグルーピング
           const byCat = {};
           for (const it of items){
-            const c = it.category || 'その他';
-            (byCat[c] ||= []).push(it);
+            const cat = String(it.category || 'その他');
+            (byCat[cat] ||= []).push(it);
           }
-    
-          const statusOpts = ['未対応','対応中','完了','保留','却下'];
-          const optHtml = (cur) => statusOpts.map(s => `<option value="${esc(s)}"${s===cur?' selected':''}>${esc(s)}</option>`).join('');
-    
-          // カテゴリごとにレンダリング（新しい順）
-          const cats = Object.keys(byCat).sort((a,b)=>a.localeCompare(b,'ja'));
-          const html = cats.map(cat=>{
-            const rows = (byCat[cat]||[]).sort((a,b)=>(b.no||0)-(a.no||0)).map(x=>{
-              const title = `#${x.no}　${esc(x.name||'(名無し)')}　${esc(x.at||'')}`;
-              return `
-                <details class="fb-acc">
-                  <summary>
-                    <div class="fb-row">
-                      <div class="fb-meta">${title}</div>
-                      <span class="badge-st">${esc(x.status||'未対応')}</span>
-                      <select class="select-mini fb-status" data-no="${esc(x.no)}">
-                        ${optHtml(x.status||'未対応')}
-                      </select>
-                    </div>
-                  </summary>
-                  <div class="fb-msg" style="margin-top:8px;">${esc(x.message||'')}</div>
-                </details>`;
-            }).join('');
-    
-            return `<div class="fb-cat">【${esc(cat)}】</div>${rows}`;
-          }).join('');
-    
+      
+          // 1カテゴリ＝1カード風ブロック、メッセージはアコーディオン（details/summary）
+          const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+          const renderRow = (it)=>`
+            <details class="fb-item">
+              <summary>
+                <span class="mono">#${escHtml(it.no)}</span>
+                <span class="name">${escHtml(it.name||'（名無し）')}</span>
+                <span class="date">${escHtml(it.at||it.date||'')}</span>
+                <select class="fb-status" data-no="${escHtml(it.no)}">
+                  ${['未対応','対応中','完了','保留','却下'].map(s=>`<option value="${s}" ${s===it.status?'selected':''}>${s}</option>`).join('')}
+                </select>
+              </summary>
+              <div class="body">${escHtml(it.message||'')}</div>
+            </details>`;
+      
+          const html = Object.keys(byCat).sort().map(cat=>`
+            <div class="fb-cat card" style="margin-bottom:12px;">
+              <div class="sectionTitle" style="margin:0 0 8px;">${escHtml(cat)}</div>
+              <div class="fb-list">
+                ${byCat[cat].map(renderRow).join('') || '<div class="small muted">なし</div>'}
+              </div>
+            </div>
+          `).join('') || '<div class="small muted">データがありません</div>';
+      
           box.innerHTML = html;
-    
         }catch(err){
           console.error(err);
-          box.innerHTML = `<span class="err">通信エラー: ${esc(err?.message||err)}</span>`;
+          box.innerHTML = `<div class="err">通信エラー: ${escHtml(err?.message||err)}</div>`;
         }
-      }
-    
-    })();
+      };
+      
+      // 再読込ボタン
+      document.getElementById('fbReload')
+        ?.addEventListener('click', ()=> window.loadFeedbackList?.());
     </script>
 <script>
 // ===== 起動 =====
