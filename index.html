@@ -1512,23 +1512,6 @@
       background: #fff;
       margin-top: 8px;
     }
-    .version-chip {
-      background: transparent;
-      border: 0;
-      padding: 4px 8px;
-      font: inherit;
-      color: #6F4BD8; /* テーマ色 */
-      cursor: pointer;
-      border-radius: 8px;
-    }
-    .version-chip:hover {
-      opacity: .8;
-    }
-    header.is-sticky {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
   </style>
   
   <!-- LIFF SDK -->
@@ -1538,13 +1521,7 @@
 <body>
   <header class="is-sticky">
   <div class="siteTitle">藤塚太鼓 出欠・予定</div>
-  <button id="versionChip"
-          class="version-chip"
-          type="button"
-          aria-haspopup="dialog"
-          aria-controls="changelogModal">
-    <div id="ver"></div>
-  </button>
+  <div class="ver" id="ver"></div>
 </header>
 
   <main>
@@ -6182,6 +6159,39 @@ window.reportReload = function(){ initAdminReportPage(); };
     
       // 初期バッジ
       refreshBadge();
+    })();
+    </script>
+
+    <script>
+    (function(){
+      function attachVersionButton() {
+        const el = document.getElementById('ver');
+        if (!el) return;
+    
+        // バージョン文字列が未表示なら FRONT_VERSION を反映
+        if (!el.textContent) el.textContent = (typeof FRONT_VERSION === 'string' ? FRONT_VERSION : '');
+    
+        // 見た目はテキスト、挙動はボタン
+        el.setAttribute('role', 'button');
+        el.setAttribute('tabindex', '0');
+        el.style.cursor = 'pointer';
+    
+        // クリック/Enter/Space で changelog を開く
+        const open = () => {
+          try { document.getElementById('btnChangelog')?.click(); }
+          catch (e) { console.error(e); }
+        };
+        el.addEventListener('click', open);
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
+      }
+    
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachVersionButton);
+      } else {
+        attachVersionButton();
+      }
     })();
     </script>
 <script>
