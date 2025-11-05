@@ -9,9 +9,9 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.4.5";  // stable ver→v4.4.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.4.6";  // stable ver→v4.4.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyY_j2PEHvRy4igW9EvZYO_Tl_ESoEvVQzd2TR0-XTIOdiFMwBcPBn5iAE1C7drKekZw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxkjoPcG_HghzoP5roJwQUPw7P9ZWzGJEkbkLp_AuEGK72W-yREiUb_c5veDKhu3FASGw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
  const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -2148,7 +2148,7 @@
       <div class="modal-backdrop" data-close="1"></div>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fbTitle">
         <div class="modal-header">
-          <div id="fbTitle" class="modal-title">ご意見を送る</div>
+          <div id="fbTitle" class="modal-title">意見を送る</div>
           <button class="icon-btn" data-close="1" aria-label="閉じる">×</button>
         </div>
     
@@ -2506,7 +2506,7 @@
     #feedbackModal .select, 
     #feedbackModal .textarea{
       width:100%; border:1px solid #ddd; border-radius:8px; padding:6px 10px;
-      font-size:13px; background:#fff; min-height: 120px; 
+      font-size:13px; background:#fff;  
     }
     #feedbackModal .counter{ font-size:12px; color:#666; text-align:right; margin-top:4px; }
     #feedbackModal .modal-footer{
