@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.9";  // stable ver→v4.5.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.6.0";  // stable ver→v4.5.9, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   
@@ -1557,6 +1557,7 @@
         <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin-report">出欠結果一覧</button>
         <button id="btnAdminCustomPush" class="btn btn-outline btn-sm btn-compact" data-view-target="view-custom-push">カスタム通知</button>
         <button id="btnSummary" class="btn btn-outline btn-sm btn-compact" data-view-target="view-summary">サマリ</button>
+        <<button id="btnFeedback" class="btn btn-outline btn-sm btn-compact" data-view-target="view-feedback">ご意見BOX</button>
       </div>
       <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
     </div>
@@ -2146,7 +2147,21 @@
       </div>
     </section>
     <!-- ===== サマリ END ===== -->
+    <!-- ===== ご意見BOX（管理者） ===== -->
+    <section id="view-feedback" hidden>
+      <div class="row-space">
+        <div class="sectionTitle">ご意見BOX</div>
+      </div>
     
+      <div class="card">
+        <div class="row header" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div class="sectionTitle" style="flex:1;">受信一覧（カテゴリ別）</div>
+          <button id="fbReload" class="btn btn-ghost btn-sm">再読込</button>
+        </div>
+    
+        <div id="feedbackListBox">読み込み中…</div>
+      </div>
+    </section>
   </main>
 
   <footer id="legalFooter" class="legal-footer" aria-label="legal links">
@@ -2213,6 +2228,7 @@
       </div>
     </div>
   </div>
+  
   <style>
     /* ===== Custom Push UI style (scoped) ===== */
     #view-custom-push {
@@ -2670,6 +2686,16 @@
       content:""; position:absolute; top:-3px; right:-6px; width:8px; height:8px;
       background:#e11d48; border-radius:9999px;
     }
+    /* ご意見BOX 用の軽いスタイル */
+    .fb-cat { font-weight:700; margin:12px 0 6px; }
+    .fb-acc { border:1px solid #eee; border-radius:10px; padding:8px 10px; margin:8px 0; background:#fff; }
+    .fb-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .fb-meta{ font-size:13px; color:#666; }
+    .badge-st { font-size:11px; padding:2px 8px; border-radius:999px; background:#f0f0f7; color:#555; }
+    .select-mini{ font-size:13px; padding:6px 8px; border:1px solid #ddd; border-radius:8px; }
+    .fb-msg { font-size:14px; line-height:1.6; white-space:pre-wrap; color:#333; }
+    details.fb-acc > summary { cursor:pointer; list-style:none; }
+    details.fb-acc > summary::-webkit-details-marker{ display:none; }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -6228,6 +6254,101 @@ window.reportReload = function(){ initAdminReportPage(); };
       } else {
         attachVersionButton();
       }
+    })();
+    </script>
+  <script>
+    (function(){
+    
+      // 管理メニューのボタン → ページ遷移
+      document.getElementById('btnFeedback')?.addEventListener('click', ()=>{
+        showView('feedback');              // 既存と同じ遷移関数
+        loadFeedbackList();                // 初回ロード
+      });
+    
+      // 再読込
+      document.getElementById('fbReload')?.addEventListener('click', loadFeedbackList);
+    
+      // ステータス選択変更（イベント委譲）
+      document.getElementById('feedbackListBox')?.addEventListener('change', async (e)=>{
+        const sel = e.target;
+        if (!sel.classList?.contains('fb-status')) return;
+        const no = sel.dataset.no;
+        const st = sel.value;
+        if (!no) return;
+    
+        sel.disabled = true;
+        try{
+          const j = await api(`?feedbackSetStatus=1&lineId=${esc(state.lineId)}&no=${esc(no)}&status=${esc(st)}`);
+          if (j?.status === 'ok'){
+            // 反映OK。軽く視覚フィードバックしたければここで
+          }else{
+            alert('更新に失敗しました');
+          }
+        }catch(err){
+          console.error(err);
+          alert('通信エラーが発生しました');
+        }finally{
+          sel.disabled = false;
+        }
+      });
+    
+      // 一覧ロード
+      async function loadFeedbackList(){
+        const box = document.getElementById('feedbackListBox');
+        if (!box) return;
+        box.innerHTML = '読み込み中…';
+    
+        try{
+          const j = await api(`?feedbackList=1&lineId=${esc(state.lineId)}`);
+          if (j?.status !== 'ok'){ box.innerHTML = `<span class="err">取得に失敗</span>`; return; }
+    
+          const items = Array.isArray(j.items) ? j.items : [];
+          if (!items.length){
+            box.innerHTML = `<div class="muted small">データがありません</div>`;
+            return;
+          }
+    
+          // カテゴリ別にグループ化
+          const byCat = {};
+          for (const it of items){
+            const c = it.category || 'その他';
+            (byCat[c] ||= []).push(it);
+          }
+    
+          const statusOpts = ['未対応','対応中','完了','保留','却下'];
+          const optHtml = (cur) => statusOpts.map(s => `<option value="${esc(s)}"${s===cur?' selected':''}>${esc(s)}</option>`).join('');
+    
+          // カテゴリごとにレンダリング（新しい順）
+          const cats = Object.keys(byCat).sort((a,b)=>a.localeCompare(b,'ja'));
+          const html = cats.map(cat=>{
+            const rows = (byCat[cat]||[]).sort((a,b)=>(b.no||0)-(a.no||0)).map(x=>{
+              const title = `#${x.no}　${esc(x.name||'(名無し)')}　${esc(x.at||'')}`;
+              return `
+                <details class="fb-acc">
+                  <summary>
+                    <div class="fb-row">
+                      <div class="fb-meta">${title}</div>
+                      <span class="badge-st">${esc(x.status||'未対応')}</span>
+                      <select class="select-mini fb-status" data-no="${esc(x.no)}">
+                        ${optHtml(x.status||'未対応')}
+                      </select>
+                    </div>
+                  </summary>
+                  <div class="fb-msg" style="margin-top:8px;">${esc(x.message||'')}</div>
+                </details>`;
+            }).join('');
+    
+            return `<div class="fb-cat">【${esc(cat)}】</div>${rows}`;
+          }).join('');
+    
+          box.innerHTML = html;
+    
+        }catch(err){
+          console.error(err);
+          box.innerHTML = `<span class="err">通信エラー: ${esc(err?.message||err)}</span>`;
+        }
+      }
+    
     })();
     </script>
 <script>
