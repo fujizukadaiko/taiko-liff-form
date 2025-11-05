@@ -5958,12 +5958,14 @@ window.reportReload = function(){ initAdminReportPage(); };
         form.set('category', category);
         form.set('message',  message);
       
-        const q = new URLSearchParams({
-          feedbackSubmit: '1',
-          lineId, name, category, message
-        });
-        const res = await fetch(`${ENDPOINT}?${q.toString()}`, { method: 'GET' });
-        const j = await res.json().catch(()=>null);
+        const esc = encodeURIComponent; // 既存の esc() があればそれを使ってOK
+         const j = await api(
+         `?feedbackSubmit=1`
+         `&lineId=${esc(lineId||'')}`
+         `&name=${esc(name||'')}`
+         `&category=${esc(category||'その他')}`
+         `&message=${esc(message||'')}`
+       );
       
         if (j?.status === 'ok'){
           showSnack('送信しました。ご協力ありがとうございます！');
