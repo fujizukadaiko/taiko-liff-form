@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.4.7";  // stable ver→v4.4.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.4.8";  // stable ver→v4.4.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -5958,8 +5958,19 @@ window.reportReload = function(){ initAdminReportPage(); };
         form.set('category', category);
         form.set('message',  message);
       
-        const esc = encodeURIComponent;
-        const j = await api(`?feedbackSubmit=1&lineId=${esc(lineId||'')}&name=${esc(name||'')}&category=${esc(category||'その他')}&message=${esc(message||'')}`);
+        const res = await fetch(ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            feedbackSubmit: '1',
+            lineId,
+            name,
+            category,
+            message
+          })
+        });
+        const j = await res.json().catch(()=>null);
+        console.debug('fb response', j);
       
         if (j?.status === 'ok'){
           showSnack('送信しました。ご協力ありがとうございます！');
