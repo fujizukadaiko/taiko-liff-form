@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.3";  // stable ver→v4.5.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.5.4";  // stable ver→v4.5.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -6153,6 +6153,9 @@ window.reportReload = function(){ initAdminReportPage(); };
     
       // イベント
       btn?.addEventListener('click', ()=>{ render(); open(); });
+      window.openChangelogModal = function(){
+        render(); open();
+      };
       modal?.addEventListener('click', e=>{ if (e.target.dataset.close) close(); });
       document.addEventListener('keydown', e=>{ if (!modal.hidden && e.key === 'Escape') close(); });
       mark?.addEventListener('click', ()=>{ markAsRead(); close(); });
@@ -6178,11 +6181,15 @@ window.reportReload = function(){ initAdminReportPage(); };
     
         // クリック/Enter/Space で changelog を開く
         const open = () => {
-          try { document.getElementById('btnChangelog')?.click(); }
-          catch (e) { console.error(e); }
+          if (typeof window.openChangelogModal === 'function') {
+            window.openChangelogModal();   // ← ここに変更
+          } else {
+            // フォールバック：既存のボタンがあればクリック
+            document.getElementById('btnChangelog')?.click();
+          }
         };
         el.addEventListener('click', open);
-        el.addEventListener('keydown', (e) => {
+        el.addEventListener('keydown', (e)=>{
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
         });
       }
