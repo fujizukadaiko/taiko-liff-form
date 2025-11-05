@@ -5949,22 +5949,17 @@ window.reportReload = function(){ initAdminReportPage(); };
       
         const lineId = await getCurrentLineId();
         const name   = await getCurrentDisplayName();
-      
-        // ← フォームエンコードに変更（ヘッダ不要！）
-       const form = new URLSearchParams();
-        form.set('feedbackSubmit', '1');
-        form.set('lineId',  lineId || '');
-        form.set('name',    name   || '');
-        form.set('category', category || 'その他');
-        form.set('message',  message || '');
         
         console.debug('fb endpoint', ENDPOINT); // デバッグ用に一時的に出すと安心
         
-        const res = await fetch(ENDPOINT, {
-          method: 'POST',
-          body: form   // ← Content-Type は付けない（ブラウザが自動付与 & preflight回避）
-        });
-        const j = await res.json().catch(()=>null);
+        const esc = encodeURIComponent;
+        const j = await api(
+          `?feedbackSubmit=1` +
+          `&lineId=${esc(lineId || '')}` +
+          `&name=${esc(name || '')}` +
+          `&category=${esc(category || 'その他')}` +
+          `&message=${esc(message || '')}`
+        );
         console.debug('fb response', j);
       
         if (j?.status === 'ok'){
