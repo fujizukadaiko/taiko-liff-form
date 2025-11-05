@@ -5958,7 +5958,11 @@ window.reportReload = function(){ initAdminReportPage(); };
         form.set('category', category);
         form.set('message',  message);
       
-        const res = await fetch(ENDPOINT, { method:'POST', body: form });
+        const q = new URLSearchParams({
+          feedbackSubmit: '1',
+          lineId, name, category, message
+        });
+        const res = await fetch(`${ENDPOINT}?${q.toString()}`, { method: 'GET' });
         const j = await res.json().catch(()=>null);
       
         if (j?.status === 'ok'){
