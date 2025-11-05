@@ -6295,7 +6295,11 @@ window.reportReload = function(){ initAdminReportPage(); };
           });
     
           const items = j.items.map(norm);
-    
+          // ★一時デバッグ表示：まずは items が画面に描けるか確認
+          box.innerHTML = `<pre class="mono" style="font-size:12px;white-space:pre-wrap;">${
+            esc(JSON.stringify(items, null, 2))
+          }</pre>`;
+          return; // ← いったんここで終了（描画できるか確認するため）
           const byCat = {};
           for (const it of items) (byCat[it.category || 'その他'] ||= []).push(it);
     
