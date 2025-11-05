@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.1";  // stable ver→v4.4.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.5.2";  // stable ver→v4.5.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2141,9 +2141,9 @@
 </footer>
 
     <!-- ご意見ボタン -->
-    <button id="feedbackFab" class="fab" aria-label="意見を送る">
+    <button id="feedbackFab" class="fab" aria-label="ご意見BOX">
       <img src="./assets/feedback.svg" alt="" />
-      <span class="sr-only">意見を送る</span>
+      <span class="sr-only">ご意見BOX</span>
     </button>
     
     <!-- ご意見モーダル -->
@@ -2151,7 +2151,7 @@
       <div class="modal-backdrop" data-close="1"></div>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fbTitle">
         <div class="modal-header">
-          <div id="fbTitle" class="modal-title">意見を送る</div>
+          <div id="fbTitle" class="modal-title">ご意見BOX</div>
           <button class="icon-btn" data-close="1" aria-label="閉じる">×</button>
         </div>
     
@@ -2159,7 +2159,7 @@
           <label class="label">カテゴリ（任意）</label>
           <select id="fbCategory" class="select">
             <option value="その他" selected>その他</option>
-            <option value="ご要望">ご要望</option>
+            <option value="要望">要望</option>
             <option value="不具合">不具合</option>
             <option value="デザイン">デザイン</option>
           </select>
