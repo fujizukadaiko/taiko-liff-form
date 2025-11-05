@@ -2140,7 +2140,7 @@
   <a href="https://fujizukadaiko.github.io/taiko-liff-form-prod/terms.html" target="_blank" rel="noopener">利用規約</a>
 </footer>
 
-    <!-- ご意見ボタン（仮） -->
+    <!-- ご意見ボタン -->
     <button id="feedbackFab" class="fab" aria-label="意見を送る">
       <img src="./assets/feedback.svg" alt="" />
       <span class="sr-only">意見を送る</span>
@@ -2481,22 +2481,59 @@
     #view-custom-push .card:first-of-type{
       margin-top: 8px !important;     /* 1枚目カードの上マージンだけ薄く */
     }
-
-    /* ========== FAB（右下固定） ========== */
+    
+    /* === ご意見FAB：仕上げ版 === */
     #feedbackFab.fab{
-      position: fixed; right: 16px; bottom: 16px;
-      width: 52px; height: 52px; border-radius: 26px;
-      padding: 0; border: none; background: #6f5dbd;
-      box-shadow: 0 8px 20px rgba(0,0,0,.2);
-      display: inline-flex; align-items: center; justify-content: center;
-      z-index: 1200; cursor: pointer;
+      position: fixed;
+      right: 16px;
+      bottom: calc(16px + env(safe-area-inset-bottom, 0px)); /* iOSセーフエリア */
+      width: 56px;
+      height: 56px;
+      border: none;
+      border-radius: 9999px;
+      padding: 0;
+      background: linear-gradient(180deg, #7c6ae6 0%, #6f5dbd 100%); /* 紫グラデ */
+      color: #fff;              /* ← SVGをcurrentColorで白く */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 24px rgba(0,0,0,.22);
+      cursor: pointer;
+      z-index: 1200;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
     }
     #feedbackFab.fab img{
-      width: 26px; height: 26px; display: block; pointer-events: none; filter: invert(1);
-      /* レティナでも滲みにくいサイズ感 */
+      width: 26px; height: 26px; display: block; pointer-events: none;
+      /* SVGがcurrentColor対応ならフィルタ不要 */
+      filter: none;
+    }
+    /* ホバー&押下（デスクトップ向け） */
+    @media (hover:hover){
+      #feedbackFab.fab:hover { box-shadow: 0 12px 28px rgba(0,0,0,.28); transform: translateY(-1px); }
     }
     #feedbackFab.fab:active{ transform: translateY(1px); }
-    /* スクリーンリーダー用テキスト（視覚的に非表示） */
+    
+    /* キーボード操作のフォーカスリング */
+    #feedbackFab.fab:focus-visible{
+      outline: 3px solid rgba(255,255,255,.9);
+      outline-offset: 2px;
+    }
+    
+    /* ダークモード配色の微調整（任意） */
+    @media (prefers-color-scheme: dark){
+      #feedbackFab.fab{
+        background: linear-gradient(180deg, #6c5bd5 0%, #5b4aa8 100%);
+        box-shadow: 0 10px 24px rgba(0,0,0,.45);
+      }
+    }
+    
+    /* 低モーションユーザーへ配慮 */
+    @media (prefers-reduced-motion: reduce){
+      #feedbackFab.fab{ transition: none; }
+    }
+    
+    /* 視覚的に非表示（既存） */
     .sr-only{
       position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
