@@ -1520,13 +1520,15 @@
 
 <body>
   <header class="is-sticky">
-    <div class="siteTitle">藤塚太鼓 出欠・予定</div>
-    <div class="ver" id="ver"></div>
-    <button id="versionChip" class="version-chip" type="button"
-    aria-haspopup="dialog" aria-controls="changelogModal">
-    ver
+  <div class="siteTitle">藤塚太鼓 出欠・予定</div>
+  <button id="versionChip"
+          class="version-chip"
+          type="button"
+          aria-haspopup="dialog"
+          aria-controls="changelogModal">
+    <span id="ver"></span>
   </button>
-  </header>
+</header>
 
   <main>
     <!-- 友だち未追加アラート -->
@@ -3253,48 +3255,50 @@ async function api(path, { signal } = {}){
 /* ===== 初期化 ===== */
 async function init(){
   try{
+    // ① バージョン表示（自動反映）＆ クリックで更新履歴を開く
     $("#ver").textContent = FRONT_VERSION;
+    const verBtn = document.getElementById("versionChip");
+    verBtn?.addEventListener("click", openChangelogModal); // ← 関数は後で実装/仮実装してOK
 
-    try {
-   await liff.init({ liffId: LIFF_ID });
- } catch (e) {
-   console.error('[LIFF init failed]', e);
-   const msg = (e && e.message) ? e.message : String(e);
-   document.getElementById('eventsBox').innerHTML =
-     `<span class="err">LIFF初期化エラー: ${msg}</span>`;
-   return; // ここで中断
- }
+    // ② LIFF 初期化
+    await liff.init({ liffId: LIFF_ID });
     if (!liff.isLoggedIn()){ liff.login(); return; }
 
+    // ③ 友だち判定（あれば）
     if (liff.getFriendship){
       try{
         const fr = await liff.getFriendship();
-        if (fr && fr.friendFlag===false) $("#friendAlert").style.display="";
+        if (fr && fr.friendFlag === false) $("#friendAlert").style.display = "";
       }catch(_){}
     }
 
+    // ④ ユーザー情報
     const idt = liff.getDecodedIDToken();
     state.lineId = idt ? idt.sub : "";
-    state.name   = idt && idt.name ? idt.name : "";
+    state.name   = idt?.name || "";
     $("#hello").textContent = state.name ? `こんにちは、${state.name} さん` : "";
 
-    /* ★ lineIdが確定したら、ドラフトを復元 */
+    // ⑤ 既存初期化
     draftLoad();
-
     bindHandlers();
     resetRegisterForm();
 
-    // Admin 判定
+    // ⑥ Admin 判定
     try{
       const j = await api(`?isAdmin=1&id=${esc(state.lineId)}`);
-      state.isAdmin = (j.status==="ok" && !!j.isAdmin);
-      // 管理カードの表示切替
-      $("#adminMenu").style.display = state.isAdmin ? "" : "none";
-    }catch(_){ state.isAdmin = false; $("#adminMenu").style.display="none"; }
+      state.isAdmin = (j.status === "ok" && !!j.isAdmin);
+    }catch(_){
+      state.isAdmin = false;
+    }
+    $("#adminMenu").style.display = state.isAdmin ? "" : "none";
 
+    // ⑦ データ初回ロード
     await refreshData();
+
   }catch(err){
-    $("#eventsBox").innerHTML = `<span class="err">初期化に失敗しました: ${err.message||err}</span>`;
+    console.error("[init error]", err);
+    $("#eventsBox").innerHTML =
+      `<span class="err">初期化に失敗しました: ${err?.message || err}</span>`;
   }
 }
 
