@@ -5951,23 +5951,18 @@ window.reportReload = function(){ initAdminReportPage(); };
         const name   = await getCurrentDisplayName();
       
         // ← フォームエンコードに変更（ヘッダ不要！）
-        const form = new URLSearchParams();
+       const form = new URLSearchParams();
         form.set('feedbackSubmit', '1');
-        form.set('lineId', lineId);
-        form.set('name',   name);
-        form.set('category', category);
-        form.set('message',  message);
-      
+        form.set('lineId',  lineId || '');
+        form.set('name',    name   || '');
+        form.set('category', category || 'その他');
+        form.set('message',  message || '');
+        
+        console.debug('fb endpoint', ENDPOINT); // デバッグ用に一時的に出すと安心
+        
         const res = await fetch(ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            feedbackSubmit: '1',
-            lineId,
-            name,
-            category,
-            message
-          })
+          body: form   // ← Content-Type は付けない（ブラウザが自動付与 & preflight回避）
         });
         const j = await res.json().catch(()=>null);
         console.debug('fb response', j);
