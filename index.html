@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.5.4";  // stable ver→v4.5.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.5.5";  // stable ver→v4.5.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2599,34 +2599,106 @@
     #snackbar.show{ opacity:1; }
    
     /* ==== Changelog modal ==== */
-    #changelogModal .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.42); }
-    #changelogModal .modal-card{
-      position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
-      width:min(92vw, 560px); background:#fff; border-radius:14px;
-      box-shadow:0 16px 48px rgba(0,0,0,.25); padding:14px; z-index:1300;
+   #changelogModal .modal-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.15);
+      padding: 18px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", sans-serif;
     }
-    #changelogModal .modal-header{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-    #changelogModal .modal-title{ font-weight:700; font-size:18px; }
-    #changelogModal .modal-footer{ margin-top:12px; display:flex; justify-content:flex-end; gap:8px; }
-    #changelogModal .btn{ padding:8px 14px; border-radius:8px; }
-    #changelogModal .btn-outline{ background:#fff; border:1px solid #bbb; }
-    #changelogModal .btn-primary{ background:#6f5dbd; color:#fff; border:1px solid #6f5dbd; }
     
-    /* リスト */
-    .cg-list{ display:grid; gap:12px; max-height:50vh; overflow:auto; padding-right:4px; }
-    .cg-item{ border:1px solid #eee; border-radius:12px; padding:10px 12px; background:#fff; }
-    .cg-item .cg-head{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
-    .cg-date{ font-size:12px; color:#666; }
-    .cg-title{ font-weight:700; }
-    .cg-tags{ margin-left:auto; display:flex; gap:6px; }
-    .cg-tag{ font-size:11px; padding:2px 8px; border-radius:999px; background:#f0f0f7; color:#555; white-space:nowrap; }
-    .cg-body{ font-size:14px; line-height:1.6; white-space:pre-line; }
+    .cg-item {
+      border: 1px solid #e5e5ef;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: #fafafa;
+    }
     
-    /* ヘッダのバージョンに“未読バッジ” */
-    #btnChangelog{ position:relative; cursor:pointer; }
-    #btnChangelog.has-unread::after{
-      content:""; position:absolute; top:-3px; right:-5px; width:8px; height:8px;
-      background:#e11d48; border-radius:9999px;
+    .cg-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    
+    .cg-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .cg-tags {
+      display: flex;
+      gap: 6px;
+    }
+    
+    .cg-tag {
+      font-size: 11px;
+      color: #666;
+      background: #f1f1f6;
+      padding: 2px 6px;
+      border-radius: 6px;
+    }
+    
+    .cg-date {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 6px;
+    }
+    
+    .cg-body {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #444;
+    }
+    
+    #changelogModal .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    
+    #changelogModal .btn {
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+    }
+    
+    #changelogModal .btn-outline {
+      background: #fff;
+      border: 1px solid #ccc;
+      color: #444;
+    }
+    
+    #changelogModal .btn-primary {
+      background: #6f5dbd;
+      border: 1px solid #6f5dbd;
+      color: #fff;
+    }
+    
+    /* タイトルも控えめに */
+    #changelogModal .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #222;
+    }
+ 
+    /* バージョン表示に未読ドットを付ける */
+    #ver {
+      position: relative;
+      display: inline-block;
+    }
+    
+    /* ここも #btnChangelog → #ver に変更 */
+    #ver.has-unread::after{
+      content:"";
+      position:absolute;
+      top:-3px; right:-6px;
+      width:8px; height:8px;
+      background:#e11d48;
+      border-radius:9999px;
     }
   </style>
 
@@ -6109,7 +6181,7 @@ window.reportReload = function(){ initAdminReportPage(); };
       const LS_KEY = "changelogLastSeen"; // 既読管理
       const modal = document.querySelector('#changelogModal');
       const list  = document.querySelector('#changelogList');
-      const btn   = document.querySelector('#btnChangelog');
+      const btn   = document.querySelector('#ver') || document.querySelector('#versionChip');
       const mark  = document.querySelector('#cgMarkRead');
     
       // レンダリング
