@@ -9,7 +9,7 @@
 <script>
   // 以後、このブロックだけを更新してください
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.4.8";  // stable ver→v4.4.2, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.4.9";  // stable ver→v4.4.2, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZ6qKV5lmJUhnGWAaj4mX6wA_f12wvkw4Cs_KF8rjCxbUaRbyyBuYijBVC_CoMGkKjUg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
 
@@ -2141,7 +2141,10 @@
 </footer>
 
     <!-- ご意見ボタン（仮） -->
-    <button id="feedbackFab" class="fab" aria-label="ご意見を送る">💬</button>
+    <<button id="feedbackFab" class="fab" aria-label="意見を送る">
+      <img src="./assets/feedback.png" alt="" />
+      <span class="sr-only">意見を送る</span>
+    </button>
     
     <!-- ご意見モーダル -->
     <div id="feedbackModal" class="modal" hidden>
@@ -2475,13 +2478,21 @@
     #feedbackFab.fab{
       position: fixed; right: 16px; bottom: 16px;
       width: 52px; height: 52px; border-radius: 26px;
-      font-size: 22px; line-height: 52px; text-align: center;
-      background: #6f5dbd; color: #fff; border: none;
+      padding: 0; border: none; background: #6f5dbd;
       box-shadow: 0 8px 20px rgba(0,0,0,.2);
-      z-index: 1200;  /* ヘッダーより上、モーダルより下でもOK */
+      display: inline-flex; align-items: center; justify-content: center;
+      z-index: 1200; cursor: pointer;
+    }
+    #feedbackFab.fab img{
+      width: 26px; height: 26px; display: block; pointer-events: none;
+      /* レティナでも滲みにくいサイズ感 */
     }
     #feedbackFab.fab:active{ transform: translateY(1px); }
-    
+    /* スクリーンリーダー用テキスト（視覚的に非表示） */
+    .sr-only{
+      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
     /* ========== モーダル ========== */
     #feedbackModal .modal-backdrop{
       position: fixed; inset:0; background: rgba(0,0,0,.42);
@@ -2512,7 +2523,7 @@
     #feedbackModal .modal-footer{
       margin-top:10px; display:flex; justify-content:flex-end; gap:8px;
     }
-    #feedbackModal .btn{ padding:8px 12px; border-radius:8px; }
+    #feedbackModal .btn{ padding:6px 12px; border-radius:8px; }
     #feedbackModal .btn-outline{ background:#fff; border:1px solid #bbb; }
     #feedbackModal .btn-primary{ background:#6f5dbd; color:#fff; border:1px solid #6f5dbd; }
     
