@@ -2142,7 +2142,7 @@
 
     <!-- ご意見ボタン（仮） -->
     <<button id="feedbackFab" class="fab" aria-label="意見を送る">
-      <img src="./assets/feedback.png" alt="" />
+      <img src="./assets/feedback.svg" alt="" />
       <span class="sr-only">意見を送る</span>
     </button>
     
@@ -2484,7 +2484,7 @@
       z-index: 1200; cursor: pointer;
     }
     #feedbackFab.fab img{
-      width: 26px; height: 26px; display: block; pointer-events: none;
+      width: 26px; height: 26px; display: block; pointer-events: none; filter: invert(1);
       /* レティナでも滲みにくいサイズ感 */
     }
     #feedbackFab.fab:active{ transform: translateY(1px); }
