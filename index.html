@@ -6269,6 +6269,9 @@ window.reportReload = function(){ initAdminReportPage(); };
       // ご意見一覧（カテゴリ別表示＋アコーディオン）
       window.loadFeedbackList = async function(){
         console.debug('[fb] loadFeedbackList invoked');
+        // ① 念のためビューを可視化（hiddenで潰れてないか確認）
+        document.querySelector('#view-feedback')?.removeAttribute('hidden');
+        
         const box = document.getElementById('feedbackListBox');
         if (!box) return;
         box.innerHTML = '読み込み中…';
@@ -6280,6 +6283,9 @@ window.reportReload = function(){ initAdminReportPage(); };
         try{
           const lid = state?.lineId || STATE?.lineId || '';
           const j = await api(`?feedbackList=1&lineId=${encodeURIComponent(lid)}`);
+           // ② ここでレスポンスを可視化
+          console.debug('[fb] api response', j); 
+          
           if (j?.status !== 'ok' || !Array.isArray(j.items)){
             box.innerHTML = '<div class="err">取得に失敗しました</div>'; return;
           }
