@@ -6285,8 +6285,8 @@ window.reportReload = function(){ initAdminReportPage(); };
     </script>
     <script>
     (function(){
-      document.getElementById('btnFeedbackBack')!.onclick = () => show('#view-home');
-      document.getElementById('fbReload')!.onclick = () => window.loadFeedbackList?.();
+      document.getElementById('btnFeedbackBack')?.addEventListener('click', () => show('#view-home'));
+      document.getElementById('fbReload')?.addEventListener('click', () => window.loadFeedbackList?.());
       // ご意見一覧（カテゴリ別表示＋アコーディオン）
       window.loadFeedbackList = async function(){
         console.debug('[fb] loadFeedbackList invoked');
