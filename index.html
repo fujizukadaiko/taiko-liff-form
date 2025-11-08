@@ -2716,6 +2716,61 @@
       font-size: 13px; padding: 6px 8px;
       border:1px solid #ddd; border-radius:8px; background:#fff; color:#333;
     }
+    /* ご意見BOX：ヘッダー行を左右に配置 */
+    #view-feedback .row.header{
+      display:flex; align-items:center; gap:8px; margin-bottom:8px;
+    }
+    #view-feedback .row.header .sectionTitle{ flex:1; } /* ←これでボタンが右端へ */
+    /* 行のレイアウト微調整 */
+    #view-feedback .fb-row{ border-bottom:1px solid #eee; padding:8px 4px; }
+    #view-feedback .fb-row:last-child{ border-bottom:0; }
+    
+    #view-feedback .fb-row-head{
+      display:flex; align-items:center; gap:10px; margin-bottom:4px;
+    }
+    #view-feedback .fb-row-head .mono{ font-variant-numeric: tabular-nums; color:#666; }
+    #view-feedback .fb-row-head .name{ font-weight:600; }
+    #view-feedback .fb-row-head .date{ margin-left:auto; color:#666; }
+    
+    /* 本文とステータスを左右に */
+    #view-feedback .fb-row-body{
+      display:flex; gap:8px; align-items:flex-start;
+    }
+    #view-feedback .fb-row-body .fb-msg{ white-space:pre-wrap; line-height:1.5; }
+    
+    /* ステータスは右側に寄せる（PC幅で横並び、狭い時は下に回る） */
+    #view-feedback .fb-status-wrap{
+      margin-left:auto; display:flex; align-items:center;
+    }
+    
+    /* セレクトのベース */
+    #view-feedback .fb-status{
+      min-width: 112px;
+      border:1px solid #ddd; border-radius:8px; padding:6px 8px;
+      background:#f7f7f9; color:#444;
+    }
+    
+    /* ステータス色（select 自体に色を付ける） */
+    #view-feedback .fb-status.is-未対応{ background:#f3f4f6; color:#374151; } /* Gray */
+    #view-feedback .fb-status.is-対応中{ background:#fef9c3; color:#92400e; } /* Yellow */
+    #view-feedback .fb-status.is-保留  { background:#e0f2fe; color:#1e3a8a; } /* Blue */
+    #view-feedback .fb-status.is-完了  { background:#ecfdf5; color:#065f46; } /* Green */
+    #view-feedback .fb-status.is-却下  { background:#fee2e2; color:#991b1b; } /* Red */
+    
+    /* カテゴリ <summary> 見た目控えめに＆右側に件数 */
+    #view-feedback .fb-cat-head{
+      display:flex; align-items:center; gap:8px; cursor:pointer; list-style:none;
+    }
+    #view-feedback .fb-cat-head .sectionTitle{ margin:0; font-size:16px; font-weight:600; }
+    #view-feedback .fb-cat-head .fb-count{ margin-left:auto; color:#666; font-size:12px; }
+    
+    /* スピナー（既存の .spinner を流用するなら不要） */
+    #view-feedback .spinner{
+      display:inline-block; width:14px; height:14px; border-radius:50%;
+      border:2px solid #ccc; border-top-color:#6f5dbd; animation: sp 0.8s linear infinite;
+      vertical-align:-2px; margin-left:6px;
+    }
+    @keyframes sp { to { transform: rotate(360deg); } }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -6283,131 +6338,156 @@ window.reportReload = function(){ initAdminReportPage(); };
       }
     })();
     </script>
-    <script>
+   <script>
     (function(){
       document.getElementById('btnFeedbackBack')?.addEventListener('click', () => show('#view-home'));
       document.getElementById('fbReload')?.addEventListener('click', () => window.loadFeedbackList?.());
-      // ご意見一覧（カテゴリ別表示＋アコーディオン）
+    
+      // ステータス色ユーティリティ
+      function statusClass(v){
+        switch(v){
+          case '完了': return 'is-完了';
+          case '却下': return 'is-却下';
+          case '保留': return 'is-保留';
+          case '対応中': return 'is-対応中';
+          default: return 'is-未対応';
+        }
+      }
+      function applyStatusColor(sel){
+        sel.classList.remove('is-未対応','is-対応中','is-保留','is-完了','is-却下');
+        sel.classList.add(statusClass(sel.value));
+      }
+    
+      // ご意見一覧（カテゴリ別／カテゴリ単位でアコーディオン）
       window.loadFeedbackList = async function(){
         console.debug('[fb] loadFeedbackList invoked');
-        // ① 念のためビューを可視化（hiddenで潰れてないか確認）
         document.querySelector('#view-feedback')?.removeAttribute('hidden');
-        // 日時整形
-        const pad = n => String(n).padStart(2, '0');
-        const fmtDate = (s) => {
+    
+        const pad = n => String(n).padStart(2,'0');
+        const fmtDate = (s)=>{
           if (!s) return '';
-          // 既に "yyyy/MM/dd HH:mm:ss" の場合は前半を使う
           if (/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(s)) return s.slice(0,16);
-          const d = new Date(s);
-          if (isNaN(d.getTime())) return String(s);
+          const d = new Date(s); if (isNaN(d)) return String(s);
           return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         };
-        
+    
         const box = document.getElementById('feedbackListBox');
         if (!box) return;
         box.innerHTML = '読み込み中… <span class="spinner"></span>';
-      
+    
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
           ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
         );
-      
+    
         try{
           const lid = state?.lineId || STATE?.lineId || '';
           const j = await api(`?feedbackList=1&lineId=${encodeURIComponent(lid)}`);
-           // ② ここでレスポンスを可視化
-          console.debug('[fb] api response', j); 
-          
+          console.debug('[fb] api response', j);
           if (j?.status !== 'ok' || !Array.isArray(j.items)){
             box.innerHTML = '<div class="err">取得に失敗しました</div>'; return;
           }
-      
-          // 正規化
-          const items = j.items.map(it => ({
-            no:       it.no ?? it.No ?? '',
-            name:     it.name ?? it.名前 ?? '',
-            at:       it.at ?? it.date ?? it.送信日時 ?? '',
+    
+          const items = j.items.map(it=>({
+            no: it.no ?? it.No ?? '',
+            name: it.name ?? it.名前 ?? '',
+            at: it.at ?? it.date ?? it.送信日時 ?? '',
             category: it.category ?? it.カテゴリ ?? 'その他',
-            message:  it.message ?? it.メッセージ ?? '',
-            status:   it.status ?? it.ステータス ?? '未対応',
+            message: it.message ?? it.メッセージ ?? '',
+            status: it.status ?? it.ステータス ?? '未対応',
           }));
-      
-          // カテゴリごと
+    
+          // ★ ここが今回抜けていた箇所：カテゴリごとにグループ化
           const byCat = {};
-          for (const it of items) (byCat[it.category] ||= []).push(it);
-          
-          // details/summary のテンプレを置き換え
+          for (const it of items){
+            (byCat[it.category] ||= []).push(it);
+          }
+    
+          const CAT_ORDER = ["ご要望","不具合","デザイン","その他"];
+          const orderKey = c => {
+            const i = CAT_ORDER.indexOf(c);
+            return i >= 0 ? i : 999;
+          };
+    
           const row = it => `
-            <details class="fb-item">
-              <summary class="fb-sum">
+            <div class="fb-row">
+              <div class="fb-row-head">
                 <span class="mono">#${esc(it.no)}</span>
                 <span class="name">${esc(it.name || '（名無し）')}</span>
                 <span class="date">${esc(fmtDate(it.at))}</span>
-              </summary>
-              <div class="fb-body">
-                <div class="fb-body-row">
-                  <div class="fb-msg">${esc(it.message)}</div>
-                  <div class="fb-status-wrap">
-                    <select class="fb-status" data-no="${esc(it.no)}" data-cur="${esc(it.status)}">
-                      ${['未対応','対応中','完了','保留','却下'].map(s =>
-                        `<option value="${s}" ${s===it.status?'selected':''}>${s}</option>`).join('')}
-                    </select>
-                  </div>
+              </div>
+              <div class="fb-row-body">
+                <div class="fb-msg">${esc(it.message)}</div>
+                <div class="fb-status-wrap">
+                  <select class="fb-status" data-no="${esc(it.no)}" data-cur="${esc(it.status)}">
+                    ${['未対応','対応中','保留','完了','却下'].map(s =>
+                      `<option value="${s}" ${s===it.status?'selected':''}>${s}</option>`).join('')}
+                  </select>
                 </div>
               </div>
-            </details>
-          `;
-          
-          const html = Object.keys(byCat).sort().map(cat => `
-            <div class="fb-cat card" style="margin-bottom:12px;">
-              <div class="sectionTitle" style="margin:0 0 8px;">${esc(cat)}</div>
-              <div class="fb-list">
-                ${byCat[cat].map(row).join('') || '<div class="small muted">なし</div>'}
-              </div>
             </div>
-          `).join('') || '<div class="small muted">データがありません</div>';
-          
+          `;
+    
+          const html = Object.keys(byCat)
+            .sort((a,b)=> orderKey(a)-orderKey(b) || a.localeCompare(b))
+            .map(cat => `
+              <details class="fb-cat card" open>
+                <summary class="fb-cat-head">
+                  <span class="sectionTitle">${esc(cat)}</span>
+                  <span class="fb-count">${byCat[cat].length} 件</span>
+                </summary>
+                <div class="fb-list">
+                  ${byCat[cat].map(row).join('') || '<div class="small muted">なし</div>'}
+                </div>
+              </details>
+            `).join('') || '<div class="small muted">データがありません</div>';
+    
           box.innerHTML = html;
+    
+          // 初期の色付け
+          box.querySelectorAll('.fb-status').forEach(applyStatusColor);
+    
         }catch(err){
           console.error(err);
           box.innerHTML = `<div class="err">通信エラー: ${esc(err?.message||err)}</div>`;
         }
       };
-    // ステータス変更イベント（イベント委任）
-    (function(){
-      const box = document.getElementById('feedbackListBox');
-      if (!box) return;
     
-      box.addEventListener('change', async (e)=>{
-        const sel = e.target;
-        if (!sel.classList.contains('fb-status')) return;
+      // ステータス変更（委任）
+      (function(){
+        const box = document.getElementById('feedbackListBox');
+        if (!box) return;
     
-        const no  = sel.dataset.no;
-        const to  = sel.value;
-        const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+        box.addEventListener('change', async (e)=>{
+          const sel = e.target;
+          if (!sel.classList?.contains('fb-status')) return;
     
-        // 楽観ロック風にUI更新
-        sel.disabled = true;
+          const no = sel.dataset.no;
+          const to = sel.value;
+          const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
     
-        try{
-          const lid = state?.lineId || STATE?.lineId || '';
-          const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
-          const r = await api(q);
-          if (r?.status === 'ok'){
-            sel.dataset.cur = to; // 確定
-          }else{
-            // 失敗 → 戻す
-            sel.value = prev;
-            alert(r?.message || '更新に失敗しました');
+          // 変更直後に色も更新
+          applyStatusColor(sel);
+    
+          sel.disabled = true;
+          try{
+            const lid = state?.lineId || STATE?.lineId || '';
+            const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
+            const r = await api(q);
+            if (r?.status === 'ok'){
+              sel.dataset.cur = to;
+            }else{
+              sel.value = prev; applyStatusColor(sel);
+              alert(r?.message || '更新に失敗しました');
+            }
+          }catch(err){
+            sel.value = prev; applyStatusColor(sel);
+            alert('通信エラー:' + (err?.message||err));
+          }finally{
+            sel.disabled = false;
           }
-        }catch(err){
-          sel.value = prev;
-          alert('通信エラー:' + (err?.message||err));
-        }finally{
-          sel.disabled = false;
-        }
-      });
+        });
       })();
-    })(); 
+    })();
     </script>
 <script>
 // ===== 起動 =====
