@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.6.7";  // stable ver→v4.5.9, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.6.8";  // stable ver→v4.5.9, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzQSQDlvLF39WKZ09a8tJfKlpUW0DipfrcsbjcioyonCFPUlkr51KELKCjBkpIgeqxbIw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   
@@ -2150,7 +2150,10 @@
     <!-- ===== ご意見BOX（管理者） ===== -->
     <section id="view-feedback" class="view" hidden>
       <div class="row-space">
-        <div class="sectionTitle">ご意見BOX</div>
+        <div class="row header" style="display:flex; align-items:center; gap:8px; margin:0;">
+          <div class="sectionTitle" style="flex:1;">ご意見BOX</div>
+          <button id="btnFeedbackBack" class="btn btn-outline btn-sm btn-compact">トップに戻る</button>
+        </div>
       </div>
     
       <div class="card">
@@ -2696,14 +2699,23 @@
     .fb-msg { font-size:14px; line-height:1.6; white-space:pre-wrap; color:#333; }
     details.fb-acc > summary { cursor:pointer; list-style:none; }
     details.fb-acc > summary::-webkit-details-marker{ display:none; }
-    /* ご意見BOXの行 */
-    .fb-item { border:1px solid #eee; border-radius:10px; padding:6px 8px; margin-bottom:8px; background:#fff; }
-    .fb-sum  { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-    .fb-sum .mono{ font-family: ui-monospace, Menlo, Consolas, monospace; color:#666; }
-    .fb-sum .name{ font-weight:600; }
-    .fb-sum .date{ color:#666; font-size:12px; margin-left:auto; }
-    .fb-body { padding:8px 2px 4px; white-space:pre-wrap; line-height:1.5; }
-    .fb-status{ margin-left:8px; }
+    /* ご意見BOXの各行レイアウト */
+    .fb-item { border:1px solid #eee; border-radius:10px; padding:8px 10px; margin:8px 0; background:#fff; }
+    .fb-sum { display:flex; align-items:center; gap:10px; }
+    .fb-sum .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight:600; }
+    .fb-sum .name { font-weight:600; }
+    .fb-sum .date { margin-left:auto; color:#666; font-size:12px; }
+    
+    /* 本文＋ステータスの2カラム */
+    .fb-body-row { display:flex; align-items:flex-start; gap:10px; }
+    .fb-msg { flex:1 1 auto; white-space:pre-wrap; word-break:break-word; color:#333; }
+    .fb-status-wrap { flex:0 0 auto; }
+    
+    /* ステータスのプルダウンを“控えめ”に */
+    .fb-status {
+      font-size: 13px; padding: 6px 8px;
+      border:1px solid #ddd; border-radius:8px; background:#fff; color:#333;
+    }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -6273,16 +6285,27 @@ window.reportReload = function(){ initAdminReportPage(); };
     </script>
     <script>
     (function(){
-    
+      document.getElementById('btnFeedbackBack')!.onclick = () => show('#view-home');
+      document.getElementById('fbReload')!.onclick = () => window.loadFeedbackList?.();
       // ご意見一覧（カテゴリ別表示＋アコーディオン）
       window.loadFeedbackList = async function(){
         console.debug('[fb] loadFeedbackList invoked');
         // ① 念のためビューを可視化（hiddenで潰れてないか確認）
         document.querySelector('#view-feedback')?.removeAttribute('hidden');
+        // 日時整形
+        const pad = n => String(n).padStart(2, '0');
+        const fmtDate = (s) => {
+          if (!s) return '';
+          // 既に "yyyy/MM/dd HH:mm:ss" の場合は前半を使う
+          if (/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(s)) return s.slice(0,16);
+          const d = new Date(s);
+          if (isNaN(d.getTime())) return String(s);
+          return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
         
         const box = document.getElementById('feedbackListBox');
         if (!box) return;
-        box.innerHTML = '読み込み中…';
+        box.innerHTML = '読み込み中… <span class="spinner"></span>';
       
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
           ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
@@ -6311,22 +6334,29 @@ window.reportReload = function(){ initAdminReportPage(); };
           // カテゴリごと
           const byCat = {};
           for (const it of items) (byCat[it.category] ||= []).push(it);
-      
-          // 1行テンプレ（details/summary）
+          
+          // details/summary のテンプレを置き換え
           const row = it => `
             <details class="fb-item">
               <summary class="fb-sum">
                 <span class="mono">#${esc(it.no)}</span>
                 <span class="name">${esc(it.name || '（名無し）')}</span>
-                <span class="date">${esc(it.at)}</span>
-                <select class="fb-status" data-no="${esc(it.no)}" data-cur="${esc(it.status)}">
-                  ${['未対応','対応中','完了','保留','却下'].map(s =>
-                    `<option value="${s}" ${s===it.status?'selected':''}>${s}</option>`).join('')}
-                </select>
+                <span class="date">${esc(fmtDate(it.at))}</span>
               </summary>
-              <div class="fb-body">${esc(it.message)}</div>
-            </details>`;
-      
+              <div class="fb-body">
+                <div class="fb-body-row">
+                  <div class="fb-msg">${esc(it.message)}</div>
+                  <div class="fb-status-wrap">
+                    <select class="fb-status" data-no="${esc(it.no)}" data-cur="${esc(it.status)}">
+                      ${['未対応','対応中','完了','保留','却下'].map(s =>
+                        `<option value="${s}" ${s===it.status?'selected':''}>${s}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </details>
+          `;
+          
           const html = Object.keys(byCat).sort().map(cat => `
             <div class="fb-cat card" style="margin-bottom:12px;">
               <div class="sectionTitle" style="margin:0 0 8px;">${esc(cat)}</div>
@@ -6335,7 +6365,7 @@ window.reportReload = function(){ initAdminReportPage(); };
               </div>
             </div>
           `).join('') || '<div class="small muted">データがありません</div>';
-      
+          
           box.innerHTML = html;
         }catch(err){
           console.error(err);
