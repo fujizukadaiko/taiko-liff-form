@@ -6266,55 +6266,52 @@ window.reportReload = function(){ initAdminReportPage(); };
     <script>
     (function(){
     
-      // ご意見一覧を取得して描画
+      // ご意見一覧（カテゴリ別表示＋アコーディオン）
       window.loadFeedbackList = async function(){
         const box = document.getElementById('feedbackListBox');
         if (!box) return;
         box.innerHTML = '読み込み中…';
-    
+      
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
           ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
         );
-    
+      
         try{
-          const j = await api(`?feedbackList=1&lineId=${encodeURIComponent(state.lineId||'')}`);
-          console.debug('[fb] list raw', j);
-    
-          if (j?.status !== 'ok' || !Array.isArray(j.items)) {
-            box.innerHTML = '<div class="err">取得に失敗しました</div>';
-            return;
+          const lid = state?.lineId || STATE?.lineId || '';
+          const j = await api(`?feedbackList=1&lineId=${encodeURIComponent(lid)}`);
+          if (j?.status !== 'ok' || !Array.isArray(j.items)){
+            box.innerHTML = '<div class="err">取得に失敗しました</div>'; return;
           }
-    
-          const norm = it => ({
-            no: it.no ?? it.No ?? '',
-            name: it.name ?? it.名前 ?? '',
-            at: it.at ?? it.date ?? it.送信日時 ?? '',
+      
+          // 正規化
+          const items = j.items.map(it => ({
+            no:       it.no ?? it.No ?? '',
+            name:     it.name ?? it.名前 ?? '',
+            at:       it.at ?? it.date ?? it.送信日時 ?? '',
             category: it.category ?? it.カテゴリ ?? 'その他',
-            message: it.message ?? it.メッセージ ?? '',
-            status: it.status ?? it.ステータス ?? '未対応',
-          });
-    
-          const items = j.items.map(norm);
-          // ★一時デバッグ表示：まずは items が画面に描けるか確認
-          box.innerHTML = `<pre class="mono" style="font-size:12px;white-space:pre-wrap;">${
-            esc(JSON.stringify(items, null, 2))
-          }</pre>`;
-          return; // ← いったんここで終了（描画できるか確認するため）
+            message:  it.message ?? it.メッセージ ?? '',
+            status:   it.status ?? it.ステータス ?? '未対応',
+          }));
+      
+          // カテゴリごと
           const byCat = {};
-          for (const it of items) (byCat[it.category || 'その他'] ||= []).push(it);
-    
+          for (const it of items) (byCat[it.category] ||= []).push(it);
+      
+          // 1行テンプレ（details/summary）
           const row = it => `
             <details class="fb-item">
               <summary class="fb-sum">
                 <span class="mono">#${esc(it.no)}</span>
                 <span class="name">${esc(it.name || '（名無し）')}</span>
                 <span class="date">${esc(it.at)}</span>
-                <span class="status">${esc(it.status)}</span>
+                <select class="fb-status" data-no="${esc(it.no)}" data-cur="${esc(it.status)}">
+                  ${['未対応','対応中','完了','保留','却下'].map(s =>
+                    `<option value="${s}" ${s===it.status?'selected':''}>${s}</option>`).join('')}
+                </select>
               </summary>
               <div class="fb-body">${esc(it.message)}</div>
-            </details>
-          `;
-    
+            </details>`;
+      
           const html = Object.keys(byCat).sort().map(cat => `
             <div class="fb-cat card" style="margin-bottom:12px;">
               <div class="sectionTitle" style="margin:0 0 8px;">${esc(cat)}</div>
@@ -6323,24 +6320,47 @@ window.reportReload = function(){ initAdminReportPage(); };
               </div>
             </div>
           `).join('') || '<div class="small muted">データがありません</div>';
-    
-          //box.innerHTML = html;
-          box.innerHTML = items.map(it => 
-            `<div style="padding:6px 8px;border-bottom:1px solid #eee;">
-               <span class="mono">#${esc(it.no)}</span>
-               <strong>${esc(it.name || '（名無し）')}</strong>
-               <span style="color:#666;">${esc(it.at)}</span>
-               <span style="margin-left:6px;">[${esc(it.category)}]</span>
-               <span style="margin-left:6px;">${esc(it.status)}</span>
-               <div style="color:#444;margin-top:4px;">${esc(it.message)}</div>
-             </div>`
-          ).join('');
-        } catch(err){
+      
+          box.innerHTML = html;
+        }catch(err){
           console.error(err);
           box.innerHTML = `<div class="err">通信エラー: ${esc(err?.message||err)}</div>`;
         }
       };
+    // ステータス変更イベント（イベント委任）
+    (function(){
+      const box = document.getElementById('feedbackListBox');
+      if (!box) return;
     
+      box.addEventListener('change', async (e)=>{
+        const sel = e.target;
+        if (!sel.classList.contains('fb-status')) return;
+    
+        const no  = sel.dataset.no;
+        const to  = sel.value;
+        const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+    
+        // 楽観ロック風にUI更新
+        sel.disabled = true;
+    
+        try{
+          const lid = state?.lineId || STATE?.lineId || '';
+          const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
+          const r = await api(q);
+          if (r?.status === 'ok'){
+            sel.dataset.cur = to; // 確定
+          }else{
+            // 失敗 → 戻す
+            sel.value = prev;
+            alert(r?.message || '更新に失敗しました');
+          }
+        }catch(err){
+          sel.value = prev;
+          alert('通信エラー:' + (err?.message||err));
+        }finally{
+          sel.disabled = false;
+        }
+      });
     })(); 
     </script>
 <script>
