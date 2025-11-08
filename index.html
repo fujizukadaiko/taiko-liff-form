@@ -6268,6 +6268,7 @@ window.reportReload = function(){ initAdminReportPage(); };
     
       // ご意見一覧（カテゴリ別表示＋アコーディオン）
       window.loadFeedbackList = async function(){
+        console.debug('[fb] loadFeedbackList invoked');
         const box = document.getElementById('feedbackListBox');
         if (!box) return;
         box.innerHTML = '読み込み中…';
