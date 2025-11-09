@@ -2798,7 +2798,10 @@
     #view-feedback .row.header .sectionTitle{
       flex: 1 1 auto;   /* ←これが“右寄せ”のキモ。タイトルが余白を食ってボタンが右端へ */
     }
-    #btnFeedbackBack { margin-left: auto; }
+    #btnFeedbackBack { margin-left: auto !important; }
+    #view-feedback .row.header { display:flex; align-items:center; gap:8px; }
+    #view-feedback .row.header > .sectionTitle { flex: 1 1 auto !important; }
+    #view-feedback .row.header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
