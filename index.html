@@ -2789,6 +2789,16 @@
       vertical-align:-2px; margin-left:6px;
     }
     @keyframes sp { to { transform: rotate(360deg); } }
+    /* ご意見BOXヘッダ行：タイトルを左、ボタンを右端へ */
+    #view-feedback .row.header{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    #view-feedback .row.header .sectionTitle{
+      flex: 1 1 auto;   /* ←これが“右寄せ”のキモ。タイトルが余白を食ってボタンが右端へ */
+    }
+    #btnFeedbackBack { margin-left: auto; }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
