@@ -2758,11 +2758,29 @@
     #view-feedback .fb-status.is-却下  { background:#fee2e2; color:#991b1b; } /* Red */
     
     /* カテゴリ <summary> 見た目控えめに＆右側に件数 */
-    #view-feedback .fb-cat-head{
-      display:flex; align-items:center; gap:8px; cursor:pointer; list-style:none;
+    /* ご意見BOX：カテゴリ見出し（summary）を太字＋大きめ */
+    #view-feedback .fb-cat-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 2px;
+      cursor: pointer;
     }
-    #view-feedback .fb-cat-head .sectionTitle{ margin:0; font-size:16px; font-weight:600; }
-    #view-feedback .fb-cat-head .fb-count{ margin-left:auto; color:#666; font-size:12px; }
+    
+    #view-feedback .fb-cat-head .sectionTitle {
+      font-size: 17px;          /* ←少し大きく */
+      font-weight: 700;         /* ←太字 */
+      color: #2b2346;           /* ←落ち着いたインク色 */
+    }
+    
+    #view-feedback .fb-cat-head .fb-count {
+      margin-left: auto;
+      font-size: 13px;
+      color: #777;
+      background: #f1f1f6;
+      border-radius: 999px;
+      padding: 2px 8px;
+}
     
     /* スピナー（既存の .spinner を流用するなら不要） */
     #view-feedback .spinner{
@@ -6419,15 +6437,14 @@ window.reportReload = function(){ initAdminReportPage(); };
             </div>
           `;
     
-          // カテゴリ単位アコーディオン（details.fb-acc）
+          // カテゴリ単位アコーディオン（カテゴリ見出しが大項目）
           const html = Object.keys(byCat)
             .sort((a,b)=> orderKey(a)-orderKey(b) || a.localeCompare(b))
             .map(cat => `
-              <div class="fb-cat">${esc(cat)}</div>
               <details class="fb-acc" open>
-                <summary>
-                  <span class="fb-meta">${esc(cat)} のご意見</span>
-                  <span class="badge-st" style="margin-left:8px;">${byCat[cat].length} 件</span>
+                <summary class="fb-cat-head">
+                  <span class="sectionTitle">${esc(cat)}</span>
+                  <span class="fb-count">${byCat[cat].length} 件</span>
                 </summary>
                 <div class="fb-list">
                   ${byCat[cat].map(row).join('') || '<div class="small muted">なし</div>'}
