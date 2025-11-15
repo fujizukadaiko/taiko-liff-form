@@ -6330,70 +6330,121 @@ window.reportReload = function(){ initAdminReportPage(); };
 });
 </script>
   <script>
-    (function(){
-      const ENTRIES = window.__CHANGELOG_ENTRIES__ || [];
-      const FRONT_VER = (window.__APP_CONFIG__ && window.__APP_CONFIG__.FRONT_VERSION) || (window.FRONT_VERSION || "");
-      const LS_KEY = `${window.ENV_NS || 'env'}:changelogSeenToken`; // 環境別に分離
-    
-      const modal = document.querySelector('#changelogModal');
-      const list  = document.querySelector('#changelogList');
-      const verEl = document.getElementById('ver');       // “Front v…” の表示要素
-      const mark  = document.querySelector('#cgMarkRead');
-    
-      function latestToken(){
-        // バージョン優先。無ければ最新日付
-        const byDate = ENTRIES.map(e=>e.date).sort().slice(-1)[0] || "";
-        return FRONT_VER || byDate;
+    (function () {
+      // --- 1. エントリ一覧（共通設定にあればそれを使う） ---
+      const ENTRIES =
+        window.CHANGELOG_ENTRIES ||   // 共通設定側で定義している場合
+        window.__CHANGELOG_ENTRIES__ || // 名前違いの保険
+        [];                            // どれも無ければ空
+  
+      const LS_KEY = "changelogLastSeen"; // 既読管理キー
+  
+      const modal = document.querySelector("#changelogModal");
+      const list  = document.querySelector("#changelogList");
+      const verEl = document.getElementById("ver");   // ヘッダーのバージョン表示
+  
+      // --- 2. HTMLエスケープ ---
+      function escapeHtml(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, c => (
+          {"&":"&amp;","<":"&lt;","~":"&tilde;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c] || c
+        ));
       }
-      function refreshBadge(){
-        const last = localStorage.getItem(LS_KEY) || "";
-        const latest = latestToken();
-        const unread = latest && last !== latest;
-        verEl?.classList.toggle('has-unread', !!unread);
-      }
-      function markAsRead(){
-        const latest = latestToken();
-        if (latest) localStorage.setItem(LS_KEY, latest);
-        refreshBadge();
-      }
-    
-      function escapeHtml(s){
-        return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-      }
-      function render(){
+  
+      // --- 3. 更新履歴の描画 ---
+      function render() {
         if (!list) return;
-        list.innerHTML = ENTRIES.map(e=>`
+        list.innerHTML = ENTRIES.map(e => `
           <div class="cg-item">
             <div class="cg-head">
               <div class="cg-title">${escapeHtml(e.title)}</div>
-              <div class="cg-tags">${(e.tags||[]).map(t=>`<span class="cg-tag">${escapeHtml(t)}</span>`).join('')}</div>
+              <div class="cg-tags">
+                ${(e.tags || []).map(t =>
+                  `<span class="cg-tag">${escapeHtml(t)}</span>`
+                ).join("")}
+              </div>
             </div>
-            <div class="cg-date">${escapeHtml(e.date)}</div>
-            <div class="cg-body">${escapeHtml(e.body)}</div>
+            <div class="cg-date">${escapeHtml(e.date || "")}</div>
+            <div class="cg-body">${escapeHtml(e.body || "")}</div>
           </div>
-        `).join('');
+        `).join("");
       }
-      function open(){
+  
+      // --- 4. 未読管理 ---
+      function latestDate() {
+        return ENTRIES.map(e => e.date).sort().slice(-1)[0] || "";
+      }
+  
+      function refreshBadge() {
+        const lastSeen = localStorage.getItem(LS_KEY) || "";
+        const latest   = latestDate();
+        const unread   = latest && (!lastSeen || lastSeen < latest);
+  
+        if (verEl) {
+          verEl.classList.toggle("has-unread", !!unread);
+        }
+      }
+  
+      function markAsRead() {
+        const latest = latestDate();
+        if (latest) {
+          localStorage.setItem(LS_KEY, latest);
+        }
+        refreshBadge();
+      }
+  
+      // --- 5. モーダル開閉 ---
+      function openModal() {
+        if (!modal) return;
+        render();         // ← ここで毎回描画する（これが抜けていると中身が空になる）
         modal.hidden = false;
-        markAsRead();              // ← 開いた瞬間に既読として記録
+        markAsRead();     // 開いたタイミングで既読扱い
       }
-      function close(){ modal.hidden = true; }
-    
-      // “Front v …” をクリックで開く
-      if (verEl){
-        if (!verEl.textContent) verEl.textContent = FRONT_VER;
-        verEl.setAttribute('role','button');
-        verEl.setAttribute('tabindex','0');
-        verEl.style.cursor = 'pointer';
-        verEl.addEventListener('click', open);
-        verEl.addEventListener('keydown', e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); open(); }});
+  
+      function closeModal() {
+        if (!modal) return;
+        modal.hidden = true;
       }
-      modal?.addEventListener('click', e=>{ if (e.target.dataset.close) close(); });
-      document.addEventListener('keydown', e=>{ if (!modal.hidden && e.key==='Escape') close(); });
-    
-      refreshBadge(); // 初期表示で未読ドット反映
+  
+      // --- 6. イベント設定 ---
+  
+      // ヘッダのバージョン文字をボタンとして扱う
+      if (verEl) {
+        verEl.setAttribute("role", "button");
+        verEl.setAttribute("tabindex", "0");
+        verEl.style.cursor = "pointer";
+  
+        const openHandler = () => openModal();
+  
+        verEl.addEventListener("click", openHandler);
+        verEl.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openHandler();
+          }
+        });
+  
+        // 外からも呼べるようにしておく（既存コード用）
+        window.openChangelogModal = openHandler;
+      }
+  
+      // モーダル内の×ボタン／背景クリック
+      modal?.addEventListener("click", e => {
+        if (e.target.dataset.close) {
+          closeModal();
+        }
+      });
+  
+      // Escキーで閉じる
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape" && !modal.hidden) {
+          closeModal();
+        }
+      });
+  
+      // --- 7. 初期バッジ更新 ---
+      refreshBadge();
     })();
-    </script>
+  </script>
 
     <script>
     (function(){
