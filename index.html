@@ -2734,14 +2734,63 @@
     #view-feedback .fb-row-head .date{ margin-left:auto; color:#666; }
     
     /* 本文とステータスを左右に */
-    #view-feedback .fb-row-body{
-      display:flex; gap:8px; align-items:flex-start;
+     /* 1件ぶんの枠 */
+    #view-feedback .fb-row{
+      border-bottom: 1px solid #eee;
+      padding: 8px 4px;
     }
-    #view-feedback .fb-row-body .fb-msg{ white-space:pre-wrap; line-height:1.5; }
+    #view-feedback .fb-row:last-child{
+      border-bottom: 0;
+    }
     
-    /* ステータスは右側に寄せる（PC幅で横並び、狭い時は下に回る） */
+    /* 1行目：#No / 名前 / 日時（これは今のまま） */
+    #view-feedback .fb-row-head{
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;          /* ← 1行目と2行目の間にちょっと余白 */
+    }
+    #view-feedback .fb-row-head .mono{
+      font-variant-numeric: tabular-nums;
+      color:#666;
+    }
+    #view-feedback .fb-row-head .name{
+      font-weight: 600;
+    }
+    #view-feedback .fb-row-head .date{
+      margin-left: auto;
+      color:#666;
+    }
+    
+    /* 2行目：コメント + ステータスを「必ず」別行にして左右に並べる */
+    #view-feedback .fb-row-body{
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      width: 100%;
+    }
+    #view-feedback .fb-row-body .fb-msg{
+      flex: 1 1 auto;             /* 左側は広く使う */
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.5;
+    }
     #view-feedback .fb-status-wrap{
-      margin-left:auto; display:flex; align-items:center;
+      flex: 0 0 auto;
+      margin-left: auto;          /* 右端に寄せる */
+      display: flex;
+      align-items: center;
+    }
+    
+    /* セレクトの見た目は今の設定をそのまま使う */
+    #view-feedback .fb-status{
+      min-width: 112px;
+      border:1px solid #ddd;
+      border-radius:8px;
+      padding:6px 8px;
+      font-size:13px;
+      background:#f7f7f9;
+      color:#444;
     }
     
     /* セレクトのベース */
