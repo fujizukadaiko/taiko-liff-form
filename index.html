@@ -2803,6 +2803,17 @@
     #view-feedback .row.header { display:flex; align-items:center; gap:8px; }
     #view-feedback .row.header > .sectionTitle { flex: 1 1 auto !important; }
     #view-feedback .row.header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+
+    /* カテゴリタイトル右上の「新規あり」ドット */
+    #view-feedback .fb-cat.has-unread > .fb-cat-head::after {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-left: 6px;
+      border-radius: 9999px;
+      background: #e11d48; /* 赤 */
+    }
   </style>
 
   <!-- ===== HomeEventsUI v7 ===== -->
@@ -6371,148 +6382,195 @@ window.reportReload = function(){ initAdminReportPage(); };
     })();
     </script>
    <script>
-    (function(){
-      document.getElementById('btnFeedbackBack')?.addEventListener('click', () => show('#view-home'));
-      document.getElementById('fbReload')?.addEventListener('click', () => window.loadFeedbackList?.());
+    (function () {
+      // 戻る / 再読込ボタン
+      document.getElementById('btnFeedbackBack')
+        ?.addEventListener('click', () => show('#view-home'));
+      document.getElementById('fbReload')
+        ?.addEventListener('click', () => window.loadFeedbackList?.());
     
-      function statusClass(v){
-        switch(v){
-          case '完了': return 'is-完了';
-          case '却下': return 'is-却下';
-          case '保留': return 'is-保留';
+      // 「どこまで読んだか」を保存するキー（Noベース）
+      const FB_LS_KEY = 'feedbackLastSeenNo';
+    
+      // ステータス → CSS クラス
+      function statusClass(value) {
+        switch (value) {
+          case '完了':   return 'is-完了';
+          case '却下':   return 'is-却下';
+          case '保留':   return 'is-保留';
           case '対応中': return 'is-対応中';
-          default: return 'is-未対応';
+          default:       return 'is-未対応';
         }
       }
-      function applyStatusColor(sel){
+      function applyStatusColor(sel) {
         sel.classList.remove('is-未対応','is-対応中','is-保留','is-完了','is-却下');
         sel.classList.add(statusClass(sel.value));
       }
     
-      window.loadFeedbackList = async function(){
+      // ご意見一覧（カテゴリ別表示）
+      window.loadFeedbackList = async function () {
+        console.debug('[fb] loadFeedbackList invoked');
+    
+        // 念のためビューを可視化
         document.querySelector('#view-feedback')?.removeAttribute('hidden');
     
-        const pad = n => String(n).padStart(2,'0');
-        const fmtDate = (s)=>{
+        // 日時整形
+        const pad = n => String(n).padStart(2, '0');
+        const fmtDate = (s) => {
           if (!s) return '';
-          if (/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(s)) return s.slice(0,16);
-          const d = new Date(s); if (isNaN(d)) return String(s);
-          return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+          if (/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
+          const d = new Date(s);
+          if (isNaN(d.getTime())) return String(s);
+          return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         };
-        const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-          ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])
-        );
     
         const box = document.getElementById('feedbackListBox');
         if (!box) return;
         box.innerHTML = '読み込み中… <span class="spinner"></span>';
     
-        try{
-          const lid = state?.lineId || STATE?.lineId || '';
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+          ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c])
+        );
+    
+        try {
+          const lid = (window.state?.lineId || window.STATE?.lineId || '');
           const j = await api(`?feedbackList=1&lineId=${encodeURIComponent(lid)}`);
-          if (j?.status !== 'ok' || !Array.isArray(j.items)){
-            box.innerHTML = '<div class="err">取得に失敗しました</div>'; return;
+          console.debug('[fb] api response', j);
+    
+          if (j?.status !== 'ok' || !Array.isArray(j.items)) {
+            box.innerHTML = '<div class="err">取得に失敗しました</div>';
+            return;
           }
     
-          const items = j.items.map(it=>({
-            no: it.no ?? it.No ?? '',
-            name: it.name ?? it.名前 ?? '',
-            at: it.at ?? it.date ?? it.送信日時 ?? '',
+          // 正規化
+          const items = j.items.map(it => ({
+            no:       it.no ?? it.No ?? '',
+            name:     it.name ?? it.名前 ?? '',
+            at:       it.at ?? it.date ?? it.送信日時 ?? '',
             category: it.category ?? it.カテゴリ ?? 'その他',
-            message: it.message ?? it.メッセージ ?? '',
-            status: it.status ?? it.ステータス ?? '未対応',
+            message:  it.message ?? it.メッセージ ?? '',
+            status:   it.status ?? it.ステータス ?? '未対応',
           }));
     
-          // グループ化
+          // カテゴリごとにグルーピング
           const byCat = {};
-          for (const it of items) (byCat[it.category] ||= []).push(it);
+          for (const it of items) {
+            const c = it.category || 'その他';
+            (byCat[c] ||= []).push(it);
+          }
     
-          // 表示順
-          const CAT_ORDER = ['要望','不具合','デザイン','その他'];
-          const orderKey = c => { const i = CAT_ORDER.indexOf(c); return i>=0 ? i : 999; };
+          // カテゴリの表示順
+          const CAT_ORDER = ['ご要望', '不具合', 'デザイン', 'その他'];
+          const orderKey = (c) => {
+            const i = CAT_ORDER.indexOf(c);
+            return i >= 0 ? i : 999;
+          };
     
-          // 1行
+          const lastSeen = Number(localStorage.getItem(FB_LS_KEY) || '0');
+    
+          // 1件の行（アコーディオンなし）
           const row = it => `
-            <div class="fb-item">
-              <div class="fb-row fb-row-head">
+            <div class="fb-row">
+              <div class="fb-row-head">
                 <span class="mono">#${esc(it.no)}</span>
                 <span class="name">${esc(it.name || '（名無し）')}</span>
                 <span class="date">${esc(fmtDate(it.at))}</span>
               </div>
-              <div class="fb-row fb-row-body">
+              <div class="fb-row-body">
                 <div class="fb-msg">${esc(it.message)}</div>
                 <div class="fb-status-wrap">
-                  <select class="fb-status select-mini" data-no="${esc(it.no)}" data-cur="${esc(it.status)}">
+                  <select class="fb-status" data-no="${esc(it.no)}" data-cur="${esc(it.status)}">
                     ${['未対応','対応中','保留','完了','却下'].map(s =>
-                      `<option value="${s}" ${s===it.status?'selected':''}>${s}</option>`).join('')}
+                      `<option value="${s}" ${s === it.status ? 'selected' : ''}>${s}</option>`
+                    ).join('')}
                   </select>
                 </div>
               </div>
             </div>
           `;
     
-          // カテゴリ単位アコーディオン（カテゴリ見出しが大項目）
+          // カテゴリごとに <details> で折りたたみ（※デフォルト閉じる）
           const html = Object.keys(byCat)
-            .sort((a,b)=> orderKey(a)-orderKey(b) || a.localeCompare(b))
-            .map(cat => `
-              <details class="fb-acc" open>
-                <summary class="fb-cat-head">
-                  <span class="sectionTitle">${esc(cat)}</span>
-                  <span class="fb-count">${byCat[cat].length} 件</span>
-                </summary>
-                <div class="fb-list">
-                  ${byCat[cat].map(row).join('') || '<div class="small muted">なし</div>'}
-                </div>
-              </details>
-            `).join('') || '<div class="small muted">データがありません</div>';
+            .sort((a, b) => orderKey(a) - orderKey(b) || a.localeCompare(b))
+            .map(cat => {
+              const arr = byCat[cat];
+              const maxNo = Math.max(...arr.map(it => Number(it.no) || 0));
+              const hasUnread = maxNo > lastSeen;
+              return `
+                <details class="fb-cat card${hasUnread ? ' has-unread' : ''}" data-maxno="${maxNo}">
+                  <summary class="fb-cat-head">
+                    <span class="sectionTitle">${esc(cat)}</span>
+                    <span class="fb-count">${arr.length}件</span>
+                  </summary>
+                  <div class="fb-list">
+                    ${arr.map(row).join('') || '<div class="small muted">なし</div>'}
+                  </div>
+                </details>
+              `;
+            })
+            .join('') || '<div class="small muted">データがありません</div>';
     
           box.innerHTML = html;
     
-          // 初期の色付け
-          box.querySelectorAll('.fb-status').forEach(applyStatusColor);
+          // ステータス色の初期適用
+          box.querySelectorAll('.fb-status').forEach(sel => applyStatusColor(sel));
     
-        }catch(err){
+          // カテゴリを開いたら「新規あり」バッジを消して既読を更新
+          box.querySelectorAll('details.fb-cat').forEach(det => {
+            det.addEventListener('toggle', () => {
+              if (!det.open) return;
+              if (!det.classList.contains('has-unread')) return;
+    
+              const catMax = Number(det.dataset.maxno || '0');
+              const cur = Number(localStorage.getItem(FB_LS_KEY) || '0');
+              const next = Math.max(cur, catMax);
+              localStorage.setItem(FB_LS_KEY, String(next));
+              det.classList.remove('has-unread');
+            });
+          });
+    
+        } catch (err) {
           console.error(err);
-          box.innerHTML = `<div class="err">通信エラー: ${esc(err?.message||err)}</div>`;
-    }
-  };
-
-  // ステータス変更（委任）
-  (function(){
-    const box = document.getElementById('feedbackListBox');
-    if (!box) return;
-    box.addEventListener('change', async (e)=>{
-      const sel = e.target;
-      if (!sel.classList?.contains('fb-status')) return;
-
-      const no = sel.dataset.no;
-      const to = sel.value;
-      const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
-
-      // 変更直後に色も更新
-      applyStatusColor(sel);
-
-      sel.disabled = true;
-      try{
-        const lid = state?.lineId || STATE?.lineId || '';
-        const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
-        const r = await api(q);
-        if (r?.status === 'ok'){
-          sel.dataset.cur = to;
-        }else{
-          sel.value = prev; applyStatusColor(sel);
-          alert(r?.message || '更新に失敗しました');
+          box.innerHTML = `<div class="err">通信エラー: ${esc(err?.message || err)}</div>`;
         }
-      }catch(err){
-        sel.value = prev; applyStatusColor(sel);
-        alert('通信エラー:' + (err?.message||err));
-      }finally{
-        sel.disabled = false;
-      }
-    });
-  })();
-})();
-</script>
+      };
+    
+      // ステータス変更イベント（イベント委任）
+      (function () {
+        const box = document.getElementById('feedbackListBox');
+        if (!box) return;
+    
+        box.addEventListener('change', async (e) => {
+          const sel = e.target;
+          if (!sel.classList || !sel.classList.contains('fb-status')) return;
+    
+          const no = sel.dataset.no;
+          const to = sel.value;
+          const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+    
+          sel.disabled = true;
+    
+          try {
+            const lid = (window.state?.lineId || window.STATE?.lineId || '');
+            const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
+            const r = await api(q);
+            if (r?.status === 'ok') {
+              sel.dataset.cur = to;
+              applyStatusColor(sel);
+            } else {
+              sel.value = prev;
+              alert(r?.message || '更新に失敗しました');
+            }
+          } catch (err) {
+            sel.value = prev;
+            alert('通信エラー:' + (err?.message || err));
+          } finally {
+            sel.disabled = false;
+          }
+        });
+      })();
+    })();
+    </script>
 <script>
 // ===== 起動 =====
 document.addEventListener('DOMContentLoaded', () => {
