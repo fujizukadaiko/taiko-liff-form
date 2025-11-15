@@ -8,25 +8,31 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.6.9";  // stable ver→v4.5.9, PROD v1.0.2 未反映
+  const FRONT_VERSION = "Front v4.7.0";  // stable ver→v4.7.0, PROD v1.0.2 未反映
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzQSQDlvLF39WKZ09a8tJfKlpUW0DipfrcsbjcioyonCFPUlkr51KELKCjBkpIgeqxbIw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   
-  //更新履歴
+  // 更新履歴
   window.__CHANGELOG_ENTRIES__ = [
-      {
-        date: "2025-11-05",
-        title: "ご意見募集ボタン（右下）を追加",
-        tags: ["改善","UI"],
-        body: "右下の吹き出しボタンからカテゴリー任意＋メッセージ送信が可能に。連投ガード/スナックバーあり。"
-      },
-      {
-        date: "2025-11-04",
-        title: "サマリ画面のUI改善",
-        tags: ["改善"],
-        body: "当月配信サマリのKPIをスマホでも4列化、履歴テーブルの簡素化とフォント調整。"
-      }
-    ];
+    {
+      date: "2025-11-15",
+      title: "ご意見送信フォーム（右下ボタン）を追加",
+      tags: ["機能追加","UI"],
+      body: "気づいた点や改善要望を送信できるフォームを追加しました。右下の吹き出しボタンから利用できます。"
+    },
+    {
+      date: "2025-11-15",
+      title: "今後の予定に演奏時間を表示",
+      tags: ["改善","UI"],
+      body: "イベント一覧に演奏時間（目安）を表示するようにしました。当日のスケジュール調整に役立ちます。"
+    },
+    {
+      date: "2025-11-15",
+      title: "更新履歴ページを追加",
+      tags: ["機能追加","UI"],
+      body: "アプリ内の変更点を確認できるようになりました。右上「Front v〜」から開けます。未読マークも表示されます。"
+    }
+  ];
   
   const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
