@@ -8,9 +8,9 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.7.0";  // stable ver→v4.7.0, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v4.7.1";  // stable ver→v4.7.0, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzQSQDlvLF39WKZ09a8tJfKlpUW0DipfrcsbjcioyonCFPUlkr51KELKCjBkpIgeqxbIw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZpnt32H5RnhE61TIL6T-CKWb0WTB6hKHT3WAJhTl-ZD1nV3jiGFqQxtjwJPuSQVBQ7A/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   
   // 更新履歴
   window.__CHANGELOG_ENTRIES__ = [
@@ -3841,7 +3841,8 @@ async function refreshData(){
   // 1) まずスピナーを出す
   $("#eventsBox").innerHTML  = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
-  $("#btnPrimary").textContent = "読み込み中..."; $("#btnPrimary").disabled = true;
+  $("#btnPrimary").textContent = "読み込み中…";
+  $("#btnPrimary").disabled = true;
   $("#btnEditNames").style.display = "none";
 
   // 2) キャッシュがあれば“即表示”
@@ -3852,67 +3853,85 @@ async function refreshData(){
   if (cachedEvents){
     state.events = cachedEvents;
     if (cachedMembers) state.members = cachedMembers;
+    if (cachedAnswers) state.answers = cachedAnswers;
+    // イベントと会員情報だけで一旦クイック描画
     bootHomeQuickRender();
-    if (cachedAnswers){
-      state.answers = cachedAnswers;
-      mountHomeWithFilters();
-    }
   }
 
-  // 3) イベント & 会員を並列に取得（タイムアウト/リトライ付き）
-  let eventsResp = null, whoResp = null;
+  // 3) サーバから最新の homeInit を取得
+  let home = null;
   try{
-    const [evRes, whoRes] = await Promise.allSettled([
-      fetchJsonWithTimeout("?events=1", 15000),
-      fetchJsonWithTimeout(`?whoami=1&id=${esc(state.lineId)}`, 15000)
-    ]);
-    if (evRes.status === "fulfilled")  eventsResp = evRes.value;
-    if (whoRes.status === "fulfilled")  whoResp   = whoRes.value;
-  }catch(_){}
+    home = await fetchJsonWithTimeout(
+      `?homeInit=1&id=${esc(state.lineId)}`,
+      15000
+    );
+  }catch(_){
+    // 通信エラーなど：キャッシュだけで表示しているので致命傷にはしない
+  }
 
-  state.events  = (eventsResp?.status==="ok" && Array.isArray(eventsResp.events)) ? eventsResp.events : (state.events||[]);
-  // ★ 取得済みのイベントでドラフトを剪定
-  pruneDraftAgainstCurrentEvents();
-  state.members = (whoResp?.status==="ok" ? (whoResp.members||[]) : (state.members||[]));
-  // ★ notify を同期（値が無い時は true を既定に）
-  state.notify  = (whoResp?.status==="ok" && typeof whoResp.notify === "boolean")
-                 ? whoResp.notify : (typeof state.notify === "boolean" ? state.notify : true);
-  state.viewerOnly = (whoResp?.status==="ok" && typeof whoResp.viewerOnly === "boolean")
-                   ? whoResp.viewerOnly : state.viewerOnly;
-  updateSegFilterUI();
-
-  // 3-α) 取得できた段階で一旦「イベントだけ」再描画して体感を上げる
-  bootHomeQuickRender();
-
-  // 4) 回答はイベントIDが分かってから取得（遅れてもOK）
-  state.answers = state.answers || {};
-  try{
-    const ids = (state.events||[]).map(e=>e.eventId).filter(Boolean);
-    if (ids.length){
-      const r = await fetchJsonWithTimeout(`?getAttendanceAll=1&lineId=${esc(state.lineId)}&eventIds=${esc(JSON.stringify(ids))}`, 15000);
-      if (r.status === "ok" && r.map) {
-        state.answers = r.map;
-        // 回答が来たら差し替え
-        mountHomeWithFilters();
-        cacheSet(`answers:${state.lineId}`, state.answers);
-      }
+  // 4) 取得できたら state に反映
+  if (home && home.status === "ok"){
+    // events
+    if (Array.isArray(home.events)) {
+      state.events = home.events;
+      pruneDraftAgainstCurrentEvents(); // 既存のドラフト剪定ロジックを維持
     }
-  }catch(_){ /* 無視：画面は表示済み */ }
+
+    // whoami
+    if (home.whoami && home.whoami.status === "ok"){
+      state.members = Array.isArray(home.whoami.members)
+        ? home.whoami.members
+        : [];
+      state.notify = (typeof home.whoami.notify === "boolean")
+        ? home.whoami.notify
+        : (typeof state.notify === "boolean" ? state.notify : true);
+      state.viewerOnly = (typeof home.whoami.viewerOnly === "boolean")
+        ? home.whoami.viewerOnly
+        : !!state.viewerOnly;
+    }
+
+    // isAdmin（必要ならどこかで使う用に保持）
+    if (typeof home.isAdmin === "boolean"){
+      state.isAdmin = home.isAdmin;
+    }
+
+    // answers（イベントごとの回答マップ）
+    if (home.answers && typeof home.answers === "object"){
+      state.answers = home.answers;
+    }
+
+    // 区分フィルタUIの更新
+    updateSegFilterUI();
+
+    // 4-α) 改めてクイック描画（最新データに差し替え）
+    bootHomeQuickRender();
+
+    // 4-β) 回答込みで最終描画
+    mountHomeWithFilters();
+  }
 
   // 5) キャッシュ保存（次回起動を高速に）
-  if (state.events?.length)  cacheSet("events", state.events);
-  if (state.members)         cacheSet(`whoami:${state.lineId}`, state.members);
+  if (state.events && state.events.length){
+    cacheSet("events", state.events);
+  }
+  if (state.members){
+    cacheSet(`whoami:${state.lineId}`, state.members);
+  }
+  if (state.answers){
+    cacheSet(`answers:${state.lineId}`, state.answers);
+  }
 
   // 6) ボタンの復帰
-   const hasPerf = hasPerformers();
-   const viewer  = isViewer();
-   $("#btnPrimary").textContent = viewer
-     ? "登録氏名の編集"
-     : (hasPerf ? "出欠を入力 / 変更する" : "初回登録に進む");
-   $("#btnPrimary").disabled = false;
-   // サブの「登録氏名の編集」は“閲覧者では出さない”
-   const showEditSubBtn = hasPerf && !viewer; // 演奏者が1件以上 かつ 閲覧者でない
-   $("#btnEditNames").style.display = showEditSubBtn ? "" : "none";
+  const hasPerf = hasPerformers();
+  const viewer  = isViewer();
+  $("#btnPrimary").textContent = viewer
+    ? "登録氏名の編集"
+    : (hasPerf ? "出欠を入力 / 変更する" : "初回登録に進む");
+  $("#btnPrimary").disabled = false;
+
+  // サブの「登録氏名の編集」は“閲覧者では出さない”
+  const showEditSubBtn = hasPerf && !viewer; // 演奏者が1件以上 かつ 閲覧者でない
+  $("#btnEditNames").style.display = showEditSubBtn ? "" : "none";
 }
 
 /* ===== HOME描画 ===== */
