@@ -8,9 +8,9 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.8.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v4.8.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycby0QtaxrT7-8PckhZ_WujBNqN_7bv2dvtUP_wNP1h8DdvTXyLzfhfStvId64FpFGiGCpQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyjRDCMvohnSx1tAbCJXyPVy3XGlwpMoxYetQqHuSvMkNxkDEhZKtP7jlZ6oyLYu9ePeg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   
   // 更新履歴
   window.__CHANGELOG_ENTRIES__ = [
@@ -3903,10 +3903,42 @@ async function refreshData(){
     // 区分フィルタUIの更新
     updateSegFilterUI();
 
-    // 4-α) 改めてクイック描画（最新データに差し替え）
+    // ★ 4-α) HomeEventsUI v7 に直接データを渡す
+    //   openList / myFamilyAnswers があればそれを優先利用
+    if (Array.isArray(home.openList) && Array.isArray(home.myFamilyAnswers)) {
+      window.renderHomeFromRaw(
+        home.openList,
+        home.myFamilyAnswers,
+        state.members
+      );
+    } else {
+      // 旧API互換: state の中身から openList / myFamilyAnswers を組み立てる fallback
+      const openListLegacy = (state.events || []).map(ev => ({
+        id      : ev.eventId ?? ev.id ?? "",
+        ymd     : ev.date ?? ev.ymd ?? "",
+        hm      : ev.time ?? ev.hm ?? "",
+        place   : ev.place || "",
+        deadline: ev.deadline || "",
+        isNew   : !!(ev.isNew || ev.is_new || ev.new),
+        segment : ev.segment || ev.segmentCode || ""
+      }));
+      const myFamilyAnswersLegacy = [];
+      Object.keys(state.answers || {}).forEach(eid => {
+        (state.answers[eid] || []).forEach(a => {
+          myFamilyAnswersLegacy.push({
+            eventId: eid,
+            name   : a.performerName || a.name || "",
+            answer : (a.attend || a.answer || "").trim() || "未回答"
+          });
+        });
+      });
+      window.renderHomeFromRaw(openListLegacy, myFamilyAnswersLegacy, state.members);
+    }
+
+    // 4-β) 既存のクイック描画（HOMEヘッダなど）
     bootHomeQuickRender();
 
-    // 4-β) 回答込みで最終描画
+    // 4-γ) 回答込みで最終描画（フォーム側など）
     mountHomeWithFilters();
   }
 
