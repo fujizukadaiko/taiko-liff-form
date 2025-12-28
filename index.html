@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v5.0.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v5.0.3";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -2923,11 +2923,26 @@
   
     /* Util */
     function parseYmd(s){
-      if (!s) return null;
-      const m = String(s).match(/(\d{4})[\/\-](\d{2})[\/\-](\d{2})/);
-      if (!m) return null;
-      const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
-      return isNaN(d) ? null : d;
+      const str = String(s || "").trim();
+      if (!str) return null;
+    
+      let y, m, d;
+    
+      // ① 8桁（20260111）
+      const m8 = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+      if (m8) {
+        y = +m8[1]; m = +m8[2]; d = +m8[3];
+      } else {
+        // ② 2026-01-11 / 2026/01/11
+        const m2 = str.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+        if (!m2) return null;
+        y = +m2[1]; m = +m2[2]; d = +m2[3];
+      }
+    
+      const dt = new Date(y, m - 1, d);
+      if (isNaN(dt)) return null;
+      dt.setHours(0,0,0,0);
+      return dt;
     }
     function deadlineClass(deadlineStr){
       const d = parseYmd(deadlineStr); if (!d) return '';
@@ -2970,21 +2985,46 @@
   }
   
     function rowHtml(ev, sum){
-      const dateStr  = ev.ymd || ev.date || '';
-      const hm       = ev.hm || '';
-      const place    = ev.place || ev.venue || '';
-      const newBadge = (ev.isNew || ev.is_new) ? '<span class="badge-new">NEW</span>' : '';
-      const dl       = ev.deadline || ev.limit || ev.deadlineYmd || '';
-      const dlCls    = `deadline ${deadlineClass(dl)}`;
-      const atMark   = place ? ' @' : '';
+      // 元データ（D1/GAS 両対応）
+      const rawYmd = ev.ymd || ev.date || "";
+      const rawHm  = ev.hm || ev.time || ev.performAt || ev["時間"] || "";
+      const place  = ev.place || ev.venue || "";
+    
+      // 表示用フォーマット
+      const ymdDisp = fmtYmd(rawYmd);          // "2026/01/11（日）"
+      const hmDisp  = fmtTime(rawHm);          // "14:00"
+      const atMark  = place ? " @" : "";
+    
+      // タイトル行に出す文字列
+      const titleText = hmDisp
+        ? `${ymdDisp} ${hmDisp}${atMark} ${place}`
+        : `${ymdDisp}${atMark} ${place}`;
+    
+      const dateLineHtml = hmDisp
+        ? `${ymdDisp} <small>${hmDisp}</small>${atMark}`
+        : `${ymdDisp}${atMark}`;
+    
+      const newBadge = (ev.isNew || ev.is_new)
+        ? '<span class="badge-new">NEW</span>'
+        : "";
+    
+      // 締切
+      const rawDl = ev.deadline || ev.limit || ev.deadlineYmd || "";
+      const dlDisp = fmtYmdNoWeekday(rawDl);   // "2026/01/11"
+      const dlCls  = `deadline ${deadlineClass(rawDl)}`;
+    
       // 区分（左）バッジ
-      const segNorm  = normSeg(ev.segment || '');
+      const segNorm  = normSeg(ev.segment || "");
       const segLbl   = dispSeg(segNorm);
-      const segCls   = segNorm==='adult' ? 'seg-adult' : segNorm==='child' ? 'seg-child' : 'seg-both';
-      const segBadge = segLbl ? `<span class="seg-badge ${segCls}">${segLbl}</span>` : '';
-  
+      const segCls   = segNorm === "adult" ? "seg-adult"
+                      : segNorm === "child" ? "seg-child"
+                      : "seg-both";
+      const segBadge = segLbl
+        ? `<span class="seg-badge ${segCls}">${segLbl}</span>`
+        : "";
+    
       return `
-        <div class="eventRow" data-evt="${ev.id}" data-seg="${segNorm || 'both'}">
+        <div class="eventRow" data-evt="${ev.id}" data-seg="${segNorm || "both"}">
           <div class="eventMeta">
             <!-- 1行目：左=区分 / 右=回答ステータス + NEW -->
             <div class="eventHead">
@@ -2994,15 +3034,17 @@
                 ${newBadge}
               </div>
             </div>
-  
+    
             <!-- 2行目：日付 時刻 @ 場所 -->
-            <div class="eventTitle" title="${dateStr}${hm ? ` ${hm}` : ''}${atMark} ${place}">
-              <span class="title-date">${dateStr}${hm ? ` <small>${hm}</small>` : ''}${atMark}</span>
+            <div class="eventTitle" title="${titleText}">
+              <span class="title-date">${dateLineHtml}</span>
               <span class="title-place">${place}</span>
             </div>
-  
+    
             <!-- 3行目：締切 -->
-            <div class="eventSub">締切：<span class="${dlCls}">${dl || '—'}</span></div>
+            <div class="eventSub">
+              締切：<span class="${dlCls}">${dlDisp || "—"}</span>
+            </div>
           </div>
         </div>
         <div class="eventDetail" data-detail="${ev.id}"></div>
@@ -5556,6 +5598,12 @@ window.reportReload = function(){ initAdminReportPage(); };
         return `${d.getFullYear()}/${z(d.getMonth()+1)}/${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`;
       }
       return String(v||'');
+    }
+      function fmtYmdNoWeekday(s){
+      const full = fmtYmd(s);   // 例: "2026/01/11（日）"
+      if (!full) return "";
+      // 末尾の （…） を削る
+      return full.replace(/（[^）]*）$/, "");
     }
     function mapSeg(raw){
       const s = String(raw||'');
