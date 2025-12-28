@@ -8,9 +8,10 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.8.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v4.9.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw8XGfexRrVgcCixie5SXrN9Ql7SMl0Ey987jiVMCHlX6OEuoxkunrgp9uqdYRhoxnQ9Q/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+  const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
   
   // 更新履歴
   window.__CHANGELOG_ENTRIES__ = [
@@ -3836,7 +3837,7 @@ function mountHomeWithFilters(){
   window.HomeEventsUI?.mount({ events, myAnswersMap, performers, nameSegMap });
 }
 
-/* ===== データ読み直し（段階表示 & キャッシュ対応） ===== */
+/* ===== データ読み直し（D1直版） ===== */
 async function refreshData(){
   // 1) まずスピナーを出す
   $("#eventsBox").innerHTML  = `読み込み中… <span class="spinner"></span>`;
@@ -3845,10 +3846,18 @@ async function refreshData(){
   $("#btnPrimary").disabled = true;
   $("#btnEditNames").style.display = "none";
 
+  const lineId = state.lineId || "";
+  if (!lineId) {
+    // さすがに lineId が無いとどうしようもないので早期リターン
+    $("#eventsBox").innerHTML  = `<span class="em-red">LINE ID が取得できませんでした</span>`;
+    $("#answersBox").innerHTML = "";
+    return;
+  }
+
   // 2) キャッシュがあれば“即表示”
   const cachedEvents  = cacheGet("events");
-  const cachedMembers = cacheGet(`whoami:${state.lineId}`);
-  const cachedAnswers = cacheGet(`answers:${state.lineId}`);
+  const cachedMembers = cacheGet(`whoami:${lineId}`);
+  const cachedAnswers = cacheGet(`answers:${lineId}`);
 
   if (cachedEvents){
     state.events = cachedEvents;
@@ -3858,18 +3867,200 @@ async function refreshData(){
     bootHomeQuickRender();
   }
 
-  // 3) サーバから最新の homeInit を取得
+  // 3) D1 を直接叩いて homeInit 相当のデータを組み立てる
   let home = null;
-  try{
-    home = await fetchJsonWithTimeout(
-      `?homeInit=1&id=${esc(state.lineId)}`,
-      15000
-    );
-  }catch(_){
-    // 通信エラーなど：キャッシュだけで表示しているので致命傷にはしない
+
+  // D1 ベース URL（末尾の / は削る）
+  const d1Base = (typeof D1_API_BASE_URL === "string"
+    ? D1_API_BASE_URL
+    : ""
+  ).replace(/\/+$/, "");
+
+  try {
+    if (!d1Base) {
+      throw new Error("D1_API_BASE_URL が未設定です");
+    }
+
+    // --- 3-1) /line/home-summary で members + events を取得 ---
+    const ctl1 = new AbortController();
+    const t1 = setTimeout(() => ctl1.abort(), 15000);
+    let res1;
+    try {
+      res1 = await fetch(
+        `${d1Base}/line/home-summary?lineId=${encodeURIComponent(lineId)}`,
+        { method: "GET", signal: ctl1.signal }
+      );
+    } finally {
+      clearTimeout(t1);
+    }
+    if (!res1.ok) {
+      throw new Error("home-summary http error: " + res1.status);
+    }
+    const json1 = await res1.json();
+
+    if (!json1 || !json1.ok) {
+      throw new Error("home-summary error: " + (json1 && json1.message || ""));
+    }
+
+    // ---- D1.members → 旧 whoami 形式に変換 ----
+    const perfRows = (json1.member && Array.isArray(json1.member.performers))
+      ? json1.member.performers
+      : [];
+
+    let whoami;
+    if (perfRows.length === 0) {
+      // 1行も無い → 旧仕様だと "new"
+      whoami = {
+        status: "new",
+        members: [],
+        notify: true,
+        viewerOnly: true,
+      };
+    } else {
+      // members: 実演奏者だけ（viewerOnly 行は除外）
+      const members = perfRows
+        .map(r => ({
+          performerName: String(r.performerName || "").trim(),
+          segment      : String(r.segment || "子どもの部").trim(),
+        }))
+        .filter(x => x.performerName !== "");
+
+      const anyPerf = members.length > 0;
+
+      // notify: performers の notify カラムをざっくり統合
+      //  - どれか1件でも N/0/FALSE があれば false
+      //  - それ以外（空 or Y）は true 扱い
+      let notify = true;
+      for (const r of perfRows) {
+        const v = String(r.notify || "").toUpperCase();
+        if (v === "N" || v === "0" || v === "FALSE") {
+          notify = false;
+          break;
+        }
+      }
+
+      const viewerOnly = !anyPerf;
+
+      whoami = {
+        status    : "ok",
+        members   : members,
+        notify    : notify,
+        viewerOnly: viewerOnly,
+      };
+    }
+
+    // ---- events: フロントが期待する形にマップ ----
+    const rawEvents = Array.isArray(json1.events) ? json1.events : [];
+
+    // 「出欠対象でない or 非公開 or inactive」はここで除外しておく
+    const filteredEvents = rawEvents.filter(ev => {
+      const need = String(ev.need_attendance ?? ev.needAttendance ?? "").toUpperCase();
+      const st   = String(ev.status ?? "").toLowerCase();
+      const pub  = String(ev.publish_flag ?? ev.publishFlag ?? "").toLowerCase();
+
+      // need_attendance が Y 以外は出欠対象外
+      if (need && need !== "Y") return false;
+      if (st && st !== "active") return false;
+      if (pub && pub !== "yes") return false;
+      return true;
+    });
+
+    const events = filteredEvents.map(ev => ({
+      eventId       : String(ev.event_key || ev.eventKey || ev.id || "").trim(),
+      date          : ev.date || ev.ymd || "",
+      time          : ev.time || ev.hm || "",
+      place         : ev.place || "",
+      deadline      : ev.deadline_date || ev.deadlineDate || "",
+      segment       : ev.target_group || ev.targetGroup || ev.segment || "",
+      title         : ev.name || ev.title || "",
+      kind          : ev.kind || "",                       // 将来用に一応持っておく
+      needAttendance: ev.need_attendance || ev.needAttendance || "",
+      status        : ev.status || "",
+      publishFlag   : ev.publish_flag || ev.publishFlag || "",
+    }));
+
+    // --- 3-2) /line/attendance/all から answers を取得 ---
+    const eventIds = events
+      .map(ev => ev.eventId)
+      .filter(id => !!id);
+
+    let answersMap = {};
+    if (eventIds.length > 0) {
+      const ctl2 = new AbortController();
+      const t2 = setTimeout(() => ctl2.abort(), 15000);
+      let res2;
+      try {
+        res2 = await fetch(`${d1Base}/line/attendance/all`, {
+          method: "POST",
+          signal: ctl2.signal,
+          headers: { "content-type": "application/json; charset=utf-8" },
+          body: JSON.stringify({ lineId: lineId, eventIds: eventIds }),
+        });
+      } finally {
+        clearTimeout(t2);
+      }
+      if (!res2.ok) {
+        throw new Error("attendance/all http error: " + res2.status);
+      }
+
+      const json2 = await res2.json();
+      if (json2.status !== "ok" || !json2.map || typeof json2.map !== "object") {
+        throw new Error("attendance/all bad response: " + (json2.message || ""));
+      }
+      answersMap = json2.map; // { [eventId]: [ {performerName, attend, comment, answeredAt} ] }
+    }
+
+    // --- 3-3) HomeEventsUI v7 用 openList / myFamilyAnswers を組み立て ---
+    const openList = events.map(ev => ({
+      id      : ev.eventId,
+      ymd     : ev.date,
+      hm      : ev.time,
+      place   : ev.place,
+      deadline: ev.deadline,
+      isNew   : false,          // 必要なら D1 にフラグ追加してここで使う
+      segment : ev.segment,
+    }));
+
+    const myFamilyAnswers = [];
+    Object.keys(answersMap).forEach(eid => {
+      (answersMap[eid] || []).forEach(a => {
+        myFamilyAnswers.push({
+          eventId: eid,
+          name   : a.performerName || a.name || "",
+          answer : (a.attend || a.answer || "").trim() || "未回答",
+        });
+      });
+    });
+
+    // --- 3-4) homeInit 互換オブジェクトとしてまとめる ---
+    home = {
+      status        : "ok",
+      whoami        : whoami,
+      events        : events,
+      answers       : answersMap,
+      openList      : openList,
+      myFamilyAnswers: myFamilyAnswers,
+    };
+
+    // --- 3-5) isAdmin は軽いので従来どおり GAS 経由で取得 ---
+    try {
+      const adminRes = await fetchJsonWithTimeout(
+        `?isAdmin=1&id=${esc(lineId)}`,
+        8000
+      );
+      if (adminRes && adminRes.status === "ok" && typeof adminRes.isAdmin === "boolean") {
+        home.isAdmin = adminRes.isAdmin;
+      }
+    } catch (_ignore) {
+      // isAdmin 取得失敗は致命傷ではないので握りつぶす
+    }
+
+  } catch (err) {
+    // D1 側のエラー時はキャッシュ表示だけで粘る
+    console.error("refreshData D1 error:", err);
   }
 
-  // 4) 取得できたら state に反映
+  // 4) 取得できたら state に反映（従来ロジックをそのまま使う）
   if (home && home.status === "ok"){
     // events
     if (Array.isArray(home.events)) {
@@ -3888,6 +4079,11 @@ async function refreshData(){
       state.viewerOnly = (typeof home.whoami.viewerOnly === "boolean")
         ? home.whoami.viewerOnly
         : !!state.viewerOnly;
+    } else if (home.whoami && home.whoami.status === "new") {
+      // D1 的に「未登録」状態
+      state.members    = [];
+      state.viewerOnly = true;
+      state.notify     = true;
     }
 
     // isAdmin（必要ならどこかで使う用に保持）
@@ -3904,7 +4100,6 @@ async function refreshData(){
     updateSegFilterUI();
 
     // ★ 4-α) HomeEventsUI v7 に直接データを渡す
-    //   openList / myFamilyAnswers があればそれを優先利用
     if (Array.isArray(home.openList) && Array.isArray(home.myFamilyAnswers)) {
       window.renderHomeFromRaw(
         home.openList,
@@ -3920,7 +4115,7 @@ async function refreshData(){
         place   : ev.place || "",
         deadline: ev.deadline || "",
         isNew   : !!(ev.isNew || ev.is_new || ev.new),
-        segment : ev.segment || ev.segmentCode || ""
+        segment : ev.segment || ev.segmentCode || "",
       }));
       const myFamilyAnswersLegacy = [];
       Object.keys(state.answers || {}).forEach(eid => {
@@ -3928,7 +4123,7 @@ async function refreshData(){
           myFamilyAnswersLegacy.push({
             eventId: eid,
             name   : a.performerName || a.name || "",
-            answer : (a.attend || a.answer || "").trim() || "未回答"
+            answer : (a.attend || a.answer || "").trim() || "未回答",
           });
         });
       });
@@ -3947,10 +4142,10 @@ async function refreshData(){
     cacheSet("events", state.events);
   }
   if (state.members){
-    cacheSet(`whoami:${state.lineId}`, state.members);
+    cacheSet(`whoami:${lineId}`, state.members);
   }
   if (state.answers){
-    cacheSet(`answers:${state.lineId}`, state.answers);
+    cacheSet(`answers:${lineId}`, state.answers);
   }
 
   // 6) ボタンの復帰
