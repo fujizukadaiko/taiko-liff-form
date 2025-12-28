@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v5.0.3";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v5.0.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4278,11 +4278,25 @@ function renderAttendSelectHTML(evId, name, current){
   // 1件分のフォームカードHTMLを返す（バッジは1段上に独立行で表示）
   window.renderAttendEvent = function(ev, ctx){
     // ctx: { uniqueNamesAll, ansMap, nameSegMap, userSegSet }
-    const dateDisp = ymdDow(parseYmdStrict(ev.date));
-    const timeDisp = hmFromTimeCell(ev.time);
-    const place    = ev.place || "";
+  
+    // ★ ここを修正：D1/GAS 両対応で生値を拾う
+    const rawDate = ev.date   || ev.ymd || "";
+    const rawTime = ev.time   || ev.hm  || ev.performAt || ev["時間"] || "";
+    const place   = ev.place  || "";
+  
+    // 表示用（yyyy/mm/dd（曜） と hh:mm）
+    const dateDisp = fmtYmd(rawDate);      // 例: "2026/01/11（日）"
+    const timeDisp = fmtTime(rawTime);     // 例: "14:00"
+  
+    // ★ 追加：締切（yyyy/mm/dd）
+    const rawDeadline = ev.deadline || ev.limit || ev.deadlineYmd || "";
+    const deadlineDisp = fmtYmdNoWeekday(rawDeadline);  // 例: "2026/01/11"
+  
     // ★ 追加：タイトルを安全に取得（API差異の吸収）
-    const titleStr = String(ev.title ?? ev.name ?? ev.eventName ?? ev.subject ?? "").trim();
+    const titleStr = String(
+      ev.title ?? ev.name ?? ev.eventName ?? ev.subject ?? ""
+    ).trim();
+  
     const evSegNorm = normSeg(ev.segment || ev.targetSegment || ev.attendSegment || "");
     const segBadgeLabel = dispSeg(evSegNorm);
     const segBadgeCls = evSegNorm==="adult" ? "seg-adult" : evSegNorm==="child" ? "seg-child" : "seg-both";
@@ -4341,19 +4355,21 @@ function renderAttendSelectHTML(evId, name, current){
               ${hasUnsaved ? `<span class="badge-unsaved" style="margin-left:8px;">未保存</span>` : ``}
               ${segBadgeLabel ? `<span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span>` : ``}
             </div>
-    
+  
             <!-- 2行目：タイトル ＠場所 -->
             <div class="fRow2" title="${titleStr}${place?` @ ${place}`:''}">
-            <span class="t-title">${titleStr || '（無題）'}</span>
+              <span class="t-title">${titleStr || '（無題）'}</span>
               ${place ? `<span class="t-place">@ ${place}</span>` : ``}
             </div>
           </div>
-    
-          <!-- ↓ここ以降は変更なし（回答チップ行・締切） -->
+  
+          <!-- 回答チップ行 -->
           <div class="fStatusRow">${pills}</div>
-          <div class="fSub">${ev.deadline ? `締切：${ev.deadline}` : "締切：—"}</div>
+  
+          <!-- ★ ここを修正：締切もフォーマット済みを使用 -->
+          <div class="fSub">締切：${deadlineDisp || "—"}</div>
         </div>
-    
+  
         <div class="fBody">
           ${rows}
           <div class="line"></div>
