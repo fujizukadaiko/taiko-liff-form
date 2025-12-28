@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v5.0.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v5.0.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -34,6 +34,10 @@
       body: "アプリ内の変更点を確認できるようになりました。右上「vX.X.X」から開けます。未読マークも表示されます。"
     }
   ];
+  const D1_BASE = (typeof D1_API_BASE_URL === "string"
+    ? D1_API_BASE_URL
+    : ""
+  ).replace(/\/+$/, "");
   
   const ENV_NS = (() => {
     const raw = [location.origin, LIFF_ID, API_ENDPOINT].join('|');
@@ -5137,54 +5141,112 @@ async function adminSubmit(){
   }
 }
  async function adminListFetch(){
-  try{
-    const top = document.getElementById('adminListBoxTop');
-    if (top) top.innerHTML = `読み込み中… <span class="spinner"></span>`;
+  try {
+    const top = document.getElementById("adminListBoxTop");
+    if (top) {
+      top.innerHTML = `読み込み中… <span class="spinner"></span>`;
+    }
 
     const days = Number($("#ad_days").value || 60);
-    const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
 
-    if (r.status !== "ok" || !Array.isArray(r.items)){
-      if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
+    let items = [];
+
+    // ★ まず D1 から取得（広めに 365 日分）
+    if (D1_BASE) {
+      const url = `${D1_BASE}/line/schedules?days=365`;
+      const res = await fetch(url, { method: "GET" });
+
+      if (!res.ok) {
+        throw new Error("schedules http error: " + res.status);
+      }
+
+      const json = await res.json();
+      if (!json || json.status !== "ok" || !Array.isArray(json.schedules)) {
+        throw new Error(json && json.message ? json.message : "schedules bad response");
+      }
+
+      items = json.schedules;
+    } else {
+      // ★ 保険：D1 が未設定なら従来の GAS API にフォールバック
+      const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
+      if (r.status !== "ok" || !Array.isArray(r.items)) {
+        if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
+        return;
+      }
+      items = r.items;
+    }
+
+    if (!items.length) {
+      if (top) {
+        top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+      }
+      // 生配列も一応空で初期化
+      state.adminItemsRaw = [];
+      adminItemsMap = {};
       return;
     }
-    if (r.items.length === 0){
-      if (top) top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
-      return;
-    }
 
-    // 正規化して「生配列」を保持（ここではフィルタしない）
-    const raw = r.items.map(raw => ({
-      id: raw.id || "",
-      type: raw.type || "",
-      title: raw.title || "",
-      ymd: raw.ymd || "",
-      hm: raw.hm || "",
-      place: raw.place || "",
-      meetAt: raw.meetAt || "",
-      meetPlace: raw.meetPlace || "",
-      attendTarget: raw.attendTarget || "N",
-      deadline: raw.deadline || "",
-      publish: raw.publish || "No",
-      status: raw.status || "archived",
-      flag: raw.flag || "N",
-      segment: raw.segment || raw.targetSegment || raw.attendSegment || ""
-    }));
-    // ... 一覧の innerHTML を更新した直後
-    window.setupAdminAccordion?.();
-    // ★ 生配列を保存（上書き禁止：この配列を常に基準にする）
+    // ★ D1 / GAS 両対応の正規化
+    const raw = items.map(ev => ({
+      id   : String(
+               ev.id ||
+               ev.eventId ||
+               ev.event_id ||
+               ev.event_key ||
+               ev.eventKey ||
+               ""
+             ).trim(),
+      type : ev.type || ev.kind || "",
+      title: ev.title || ev.name || "",
+      ymd  : ev.ymd || ev.date || "",
+      hm   : ev.hm || ev.time || "",
+      place: ev.place || "",
+      meetAt    : ev.meetAt    || ev.meet_at    || "",
+      meetPlace : ev.meetPlace || ev.meet_place || "",
+      attendTarget:
+        ev.attendTarget   ||
+        ev.attend_target  ||
+        ev.needAttendance ||
+        ev.need_attendance ||
+        "N",
+      deadline:
+        ev.deadline       ||
+        ev.deadlineDate   ||
+        ev.deadline_date  ||
+        "",
+      publish:
+        ev.publish        ||
+        ev.publishFlag    ||
+        ev.publish_flag   ||
+        "No",
+      status: ev.status || "archived",
+      flag  : ev.flag ||
+              ev.distributeFlag ||
+              ev.distribute_flag ||
+              "N",
+      segment:
+        ev.segment        ||
+        ev.targetSegment  ||
+        ev.target_segment ||
+        ev.attendSegment  ||
+        ""
+    })).filter(it => it.id); // id 無しは念のため除外
+
+    // ★ 生配列を保存（ここから先はローカルフィルタだけ）
     state.adminItemsRaw = raw;
 
-    // 編集用マップは「全件」から作る（ローカル絞り込み後も編集できるように）
+    // 編集用マップは全件から作成
     adminItemsMap = {};
-    raw.forEach(it => { adminItemsMap[String(it.id)] = it; });
+    raw.forEach(it => {
+      adminItemsMap[String(it.id)] = it;
+    });
 
-    // 現在のUI値でローカル描画
+    // UI の値（期間 / 区分フィルタ）でローカル描画
     adminListRenderLocal();
 
-  }catch(err){
-    const msg = `<span class="err">エラー：${err.message||err}</span>`;
-    const topEl = document.getElementById('adminListBoxTop');
+  } catch (err) {
+    const msg = `<span class="err">エラー：${err.message || err}</span>`;
+    const topEl = document.getElementById("adminListBoxTop");
     if (topEl) topEl.innerHTML = msg;
   }
 }
