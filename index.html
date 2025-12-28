@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.9.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v4.9.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw8XGfexRrVgcCixie5SXrN9Ql7SMl0Ey987jiVMCHlX6OEuoxkunrgp9uqdYRhoxnQ9Q/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3520,14 +3520,21 @@ async function init(){
     bindHandlers();
     resetRegisterForm();
 
-    // Admin 判定
-    try{
-      const j = await api(`?isAdmin=1&id=${esc(state.lineId)}`);
-      state.isAdmin = (j.status==="ok" && !!j.isAdmin);
-      // 管理カードの表示切替
-      $("#adminMenu").style.display = state.isAdmin ? "" : "none";
-    }catch(_){ state.isAdmin = false; $("#adminMenu").style.display="none"; }
+        // Admin 判定（ホーム表示は待たず、裏で実行）
+    (async () => {
+      try {
+        const tAdmin0 = performance.now();
+        const j = await api(`?isAdmin=1&id=${esc(state.lineId)}`);
+        console.log("[perf] isAdmin(init) –", (performance.now() - tAdmin0).toFixed(0), "ms");
+        state.isAdmin = (j.status === "ok" && !!j.isAdmin);
+        $("#adminMenu").style.display = state.isAdmin ? "" : "none";
+      } catch(_) {
+        state.isAdmin = false;
+        $("#adminMenu").style.display = "none";
+      }
+    })();
 
+    // こちらはすぐ実行してOK（D1は速い）
     await refreshData();
   }catch(err){
     $("#eventsBox").innerHTML = `<span class="err">初期化に失敗しました: ${err.message||err}</span>`;
@@ -4036,21 +4043,6 @@ async function refreshData(){
       openList       : openList,
       myFamilyAnswers: myFamilyAnswers,
     };
-
-    // --- 3-5) isAdmin は軽いので従来どおり GAS 経由で取得 ---
-    try {
-      const tFetchAdmin0 = performance.now();
-      const adminRes = await fetchJsonWithTimeout(
-        `?isAdmin=1&id=${esc(lineId)}`,
-        8000
-      );
-      console.log("[perf] fetch isAdmin(GAS)", (performance.now() - tFetchAdmin0).toFixed(0), "ms");
-      if (adminRes && adminRes.status === "ok" && typeof adminRes.isAdmin === "boolean") {
-        home.isAdmin = adminRes.isAdmin;
-      }
-    } catch (_ignore) {
-      console.warn("[perf] fetch isAdmin failed (ignored)");
-    }
 
   } catch (err) {
     console.error("refreshData D1 error:", err);
