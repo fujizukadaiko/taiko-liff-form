@@ -3841,6 +3841,7 @@ function mountHomeWithFilters(){
 async function refreshData(){
   const t0 = performance.now();
   console.log("[perf] refreshData start");
+
   // 1) まずスピナーを出す
   $("#eventsBox").innerHTML  = `読み込み中… <span class="spinner"></span>`;
   $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
@@ -3850,9 +3851,9 @@ async function refreshData(){
 
   const lineId = state.lineId || "";
   if (!lineId) {
-    // さすがに lineId が無いとどうしようもないので早期リターン
     $("#eventsBox").innerHTML  = `<span class="em-red">LINE ID が取得できませんでした</span>`;
     $("#answersBox").innerHTML = "";
+    console.log("[perf] refreshData abort: no lineId");
     return;
   }
 
@@ -3862,21 +3863,18 @@ async function refreshData(){
   const cachedAnswers = cacheGet(`answers:${lineId}`);
 
   if (cachedEvents){
+    const tQuick0 = performance.now();
     state.events = cachedEvents;
     if (cachedMembers) state.members = cachedMembers;
     if (cachedAnswers) state.answers = cachedAnswers;
-    // イベントと会員情報だけで一旦クイック描画
     bootHomeQuickRender();
+    console.log("[perf] quick render from cache", (performance.now() - tQuick0).toFixed(0), "ms");
   }
 
   // 3) D1 を直接叩いて homeInit 相当のデータを組み立てる
   let home = null;
 
-  // D1 ベース URL（末尾の / は削る）
-  const d1Base = (typeof D1_API_BASE_URL === "string"
-    ? D1_API_BASE_URL
-    : ""
-  ).replace(/\/+$/, "");
+  const d1Base = (typeof D1_API_BASE_URL === "string" ? D1_API_BASE_URL : "").replace(/\/+$/, "");
 
   try {
     if (!d1Base) {
@@ -3884,21 +3882,21 @@ async function refreshData(){
     }
 
     // --- 3-1) /line/home-summary で members + events を取得 ---
+    const urlSummary = `${d1Base}/line/home-summary?lineId=${encodeURIComponent(lineId)}`;
     const ctl1 = new AbortController();
-    const t1 = setTimeout(() => ctl1.abort(), 15000);
+    const t1Timeout = setTimeout(() => ctl1.abort(), 15000);
     let res1;
+    const tFetchSummary0 = performance.now();
     try {
-      res1 = await fetch(
-        `${d1Base}/line/home-summary?lineId=${encodeURIComponent(lineId)}`,
-        { method: "GET", signal: ctl1.signal }
-      );
+      res1 = await fetch(urlSummary, { method: "GET", signal: ctl1.signal });
     } finally {
-      clearTimeout(t1);
+      clearTimeout(t1Timeout);
     }
     if (!res1.ok) {
       throw new Error("home-summary http error: " + res1.status);
     }
     const json1 = await res1.json();
+    console.log("[perf] fetch home-summary", (performance.now() - tFetchSummary0).toFixed(0), "ms");
 
     if (!json1 || !json1.ok) {
       throw new Error("home-summary error: " + (json1 && json1.message || ""));
@@ -3911,7 +3909,6 @@ async function refreshData(){
 
     let whoami;
     if (perfRows.length === 0) {
-      // 1行も無い → 旧仕様だと "new"
       whoami = {
         status: "new",
         members: [],
@@ -3919,7 +3916,6 @@ async function refreshData(){
         viewerOnly: true,
       };
     } else {
-      // members: 実演奏者だけ（viewerOnly 行は除外）
       const members = perfRows
         .map(r => ({
           performerName: String(r.performerName || "").trim(),
@@ -3929,9 +3925,6 @@ async function refreshData(){
 
       const anyPerf = members.length > 0;
 
-      // notify: performers の notify カラムをざっくり統合
-      //  - どれか1件でも N/0/FALSE があれば false
-      //  - それ以外（空 or Y）は true 扱い
       let notify = true;
       for (const r of perfRows) {
         const v = String(r.notify || "").toUpperCase();
@@ -3954,13 +3947,11 @@ async function refreshData(){
     // ---- events: フロントが期待する形にマップ ----
     const rawEvents = Array.isArray(json1.events) ? json1.events : [];
 
-    // 「出欠対象でない or 非公開 or inactive」はここで除外しておく
     const filteredEvents = rawEvents.filter(ev => {
       const need = String(ev.need_attendance ?? ev.needAttendance ?? "").toUpperCase();
       const st   = String(ev.status ?? "").toLowerCase();
       const pub  = String(ev.publish_flag ?? ev.publishFlag ?? "").toLowerCase();
 
-      // need_attendance が Y 以外は出欠対象外
       if (need && need !== "Y") return false;
       if (st && st !== "active") return false;
       if (pub && pub !== "yes") return false;
@@ -3975,22 +3966,21 @@ async function refreshData(){
       deadline      : ev.deadline_date || ev.deadlineDate || "",
       segment       : ev.target_group || ev.targetGroup || ev.segment || "",
       title         : ev.name || ev.title || "",
-      kind          : ev.kind || "",                       // 将来用に一応持っておく
+      kind          : ev.kind || "",
       needAttendance: ev.need_attendance || ev.needAttendance || "",
       status        : ev.status || "",
       publishFlag   : ev.publish_flag || ev.publishFlag || "",
     }));
 
     // --- 3-2) /line/attendance/all から answers を取得 ---
-    const eventIds = events
-      .map(ev => ev.eventId)
-      .filter(id => !!id);
+    const eventIds = events.map(ev => ev.eventId).filter(id => !!id);
 
     let answersMap = {};
     if (eventIds.length > 0) {
       const ctl2 = new AbortController();
-      const t2 = setTimeout(() => ctl2.abort(), 15000);
+      const t2Timeout = setTimeout(() => ctl2.abort(), 15000);
       let res2;
+      const tFetchAtt0 = performance.now();
       try {
         res2 = await fetch(`${d1Base}/line/attendance/all`, {
           method: "POST",
@@ -3999,17 +3989,21 @@ async function refreshData(){
           body: JSON.stringify({ lineId: lineId, eventIds: eventIds }),
         });
       } finally {
-        clearTimeout(t2);
+        clearTimeout(t2Timeout);
       }
       if (!res2.ok) {
         throw new Error("attendance/all http error: " + res2.status);
       }
 
       const json2 = await res2.json();
+      console.log("[perf] fetch attendance/all", (performance.now() - tFetchAtt0).toFixed(0), "ms");
+
       if (json2.status !== "ok" || !json2.map || typeof json2.map !== "object") {
         throw new Error("attendance/all bad response: " + (json2.message || ""));
       }
-      answersMap = json2.map; // { [eventId]: [ {performerName, attend, comment, answeredAt} ] }
+      answersMap = json2.map;
+    } else {
+      console.log("[perf] fetch attendance/all skipped (no events)");
     }
 
     // --- 3-3) HomeEventsUI v7 用 openList / myFamilyAnswers を組み立て ---
@@ -4019,7 +4013,7 @@ async function refreshData(){
       hm      : ev.time,
       place   : ev.place,
       deadline: ev.deadline,
-      isNew   : false,          // 必要なら D1 にフラグ追加してここで使う
+      isNew   : false,
       segment : ev.segment,
     }));
 
@@ -4034,40 +4028,42 @@ async function refreshData(){
       });
     });
 
-    // --- 3-4) homeInit 互換オブジェクトとしてまとめる ---
     home = {
-      status        : "ok",
-      whoami        : whoami,
-      events        : events,
-      answers       : answersMap,
-      openList      : openList,
+      status         : "ok",
+      whoami         : whoami,
+      events         : events,
+      answers        : answersMap,
+      openList       : openList,
       myFamilyAnswers: myFamilyAnswers,
     };
 
     // --- 3-5) isAdmin は軽いので従来どおり GAS 経由で取得 ---
     try {
+      const tFetchAdmin0 = performance.now();
       const adminRes = await fetchJsonWithTimeout(
         `?isAdmin=1&id=${esc(lineId)}`,
         8000
       );
+      console.log("[perf] fetch isAdmin(GAS)", (performance.now() - tFetchAdmin0).toFixed(0), "ms");
       if (adminRes && adminRes.status === "ok" && typeof adminRes.isAdmin === "boolean") {
         home.isAdmin = adminRes.isAdmin;
       }
     } catch (_ignore) {
-      // isAdmin 取得失敗は致命傷ではないので握りつぶす
+      console.warn("[perf] fetch isAdmin failed (ignored)");
     }
 
   } catch (err) {
-    // D1 側のエラー時はキャッシュ表示だけで粘る
     console.error("refreshData D1 error:", err);
   }
 
-  // 4) 取得できたら state に反映（従来ロジックをそのまま使う）
+  // 4) 取得できたら state に反映
+  const tRenderState0 = performance.now();
+
   if (home && home.status === "ok"){
     // events
     if (Array.isArray(home.events)) {
       state.events = home.events;
-      pruneDraftAgainstCurrentEvents(); // 既存のドラフト剪定ロジックを維持
+      pruneDraftAgainstCurrentEvents();
     }
 
     // whoami
@@ -4082,26 +4078,23 @@ async function refreshData(){
         ? home.whoami.viewerOnly
         : !!state.viewerOnly;
     } else if (home.whoami && home.whoami.status === "new") {
-      // D1 的に「未登録」状態
       state.members    = [];
       state.viewerOnly = true;
       state.notify     = true;
     }
 
-    // isAdmin（必要ならどこかで使う用に保持）
     if (typeof home.isAdmin === "boolean"){
       state.isAdmin = home.isAdmin;
     }
 
-    // answers（イベントごとの回答マップ）
     if (home.answers && typeof home.answers === "object"){
       state.answers = home.answers;
     }
 
-    // 区分フィルタUIの更新
     updateSegFilterUI();
 
-    // ★ 4-α) HomeEventsUI v7 に直接データを渡す
+    // HomeEventsUI v7 へ
+    const tRenderHomeRaw0 = performance.now();
     if (Array.isArray(home.openList) && Array.isArray(home.myFamilyAnswers)) {
       window.renderHomeFromRaw(
         home.openList,
@@ -4109,7 +4102,6 @@ async function refreshData(){
         state.members
       );
     } else {
-      // 旧API互換: state の中身から openList / myFamilyAnswers を組み立てる fallback
       const openListLegacy = (state.events || []).map(ev => ({
         id      : ev.eventId ?? ev.id ?? "",
         ymd     : ev.date ?? ev.ymd ?? "",
@@ -4131,15 +4123,20 @@ async function refreshData(){
       });
       window.renderHomeFromRaw(openListLegacy, myFamilyAnswersLegacy, state.members);
     }
+    console.log("[perf] renderHomeFromRaw", (performance.now() - tRenderHomeRaw0).toFixed(0), "ms");
 
-    // 4-β) 既存のクイック描画（HOMEヘッダなど）
+    const tBoot0 = performance.now();
     bootHomeQuickRender();
+    console.log("[perf] bootHomeQuickRender", (performance.now() - tBoot0).toFixed(0), "ms");
 
-    // 4-γ) 回答込みで最終描画（フォーム側など）
+    const tMount0 = performance.now();
     mountHomeWithFilters();
+    console.log("[perf] mountHomeWithFilters", (performance.now() - tMount0).toFixed(0), "ms");
   }
 
-  // 5) キャッシュ保存（次回起動を高速に）
+  console.log("[perf] render+state part", (performance.now() - tRenderState0).toFixed(0), "ms");
+
+  // 5) キャッシュ保存
   if (state.events && state.events.length){
     cacheSet("events", state.events);
   }
@@ -4158,10 +4155,9 @@ async function refreshData(){
     : (hasPerf ? "出欠を入力 / 変更する" : "初回登録に進む");
   $("#btnPrimary").disabled = false;
 
-  // サブの「登録氏名の編集」は“閲覧者では出さない”
-  const showEditSubBtn = hasPerf && !viewer; // 演奏者が1件以上 かつ 閲覧者でない
+  const showEditSubBtn = hasPerf && !viewer;
   $("#btnEditNames").style.display = showEditSubBtn ? "" : "none";
-  
+
   console.log("[perf] refreshData done", (performance.now() - t0).toFixed(0), "ms");
 }
 
