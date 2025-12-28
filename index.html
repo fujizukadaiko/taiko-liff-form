@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.9.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v4.9.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4618,6 +4618,13 @@ async function onRegister(){
 (() => {
   if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 6) return;
   window.__SchedulesBlockV__ = 6;
+  
+  // ★ 追加：D1 ベース URL
+  const D1_BASE = (typeof D1_API_BASE_URL === "string"
+    ? D1_API_BASE_URL
+    : ""
+  ).replace(/\/+$/, "");
+  
   const KIND_CLASS = { '発表':'badge--announce', '練習':'badge--practice', 'その他':'badge--other' };
   // --- フィルタ保存/復元（localStorage） ---
   const FILTER_KEY = 'sched:filters:v1';
@@ -4780,7 +4787,7 @@ async function onRegister(){
 }
 
   // ===== 初回 or 再取得時だけ API を叩く =====
-  window.renderSchedules = async function(initial=false){
+   window.renderSchedules = async function(initial=false){
     const box = $("#schedulesBox");
 
     try{
@@ -4789,19 +4796,31 @@ async function onRegister(){
         exposeSegFilterIfNeeded();
         loadFilters();
 
-        // API から最新を1回取得して、生の配列を保持
-        const daysSel = Number($("#selDays").value || 60);
-        const kindSel = $("#selKind").value || "";
-        // 初回は広めの日数で全件を取得（例: 180日）。種別も付けない
-        const url = `?schedules=1&days=180`;
-        const r = await api(url);
-        if (r.status !== "ok" || !Array.isArray(r.schedules)) {
+        // 初回は広めの日数で全件を取得（例: 180日）
+        // ★ D1 が使えれば /line/schedules を叩く
+        let r;
+        if (D1_BASE) {
+          const url = `${D1_BASE}/line/schedules?days=180`;
+          const resp = await fetch(url, { method: "GET" });
+          if (!resp.ok) {
+            throw new Error(`schedules http error: ${resp.status}`);
+          }
+          r = await resp.json();
+        } else {
+          // ★ 保険として従来の GAS API にフォールバック
+          const url = `?schedules=1&days=180`;
+          r = await api(url);
+        }
+
+        if (!r || r.status !== "ok" || !Array.isArray(r.schedules)) {
           box.innerHTML = `<span class="err">取得に失敗しました</span>`;
           return;
         }
+
         // ★ 生データを保持（以後はローカルでフィルタ）
         state.schedulesRaw = r.schedules.slice();
       }
+
       // 取得済みデータを UI 値でフィルタして描画
       renderSchedulesLocal();
 
