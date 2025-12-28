@@ -4623,12 +4623,6 @@ async function onRegister(){
   if (window.__SchedulesBlockV__ && window.__SchedulesBlockV__ >= 6) return;
   window.__SchedulesBlockV__ = 6;
   
-  // ★ 追加：D1 ベース URL
-  const D1_BASE = (typeof D1_API_BASE_URL === "string"
-    ? D1_API_BASE_URL
-    : ""
-  ).replace(/\/+$/, "");
-  
   const KIND_CLASS = { '発表':'badge--announce', '練習':'badge--practice', 'その他':'badge--other' };
   // --- フィルタ保存/復元（localStorage） ---
   const FILTER_KEY = 'sched:filters:v1';
@@ -5336,12 +5330,6 @@ function adminEdit(obj){
   state.reportMeta = [];          // 軽量一覧（rows無し）
   state.reportCache = {};         // id -> 詳細キャッシュ
   state.reportDetailMap = {};     // 既存 renderReport() 互換キャッシュ
-
-  // ★ 追加：D1 ベース URL
-  const D1_BASE = (typeof D1_API_BASE_URL === "string"
-    ? D1_API_BASE_URL
-    : ""
-  ).replace(/\/+$/, "");
   
   const adminReport = {
     mounted: false,
