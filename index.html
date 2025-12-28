@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.9.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v4.9.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4027,6 +4027,7 @@ async function refreshData(){
       });
     });
 
+    // --- 3-4) home オブジェクトに isAdmin も同梱（★ここがポイント） ---
     home = {
       status         : "ok",
       whoami         : whoami,
@@ -4034,33 +4035,11 @@ async function refreshData(){
       answers        : answersMap,
       openList       : openList,
       myFamilyAnswers: myFamilyAnswers,
+      isAdmin        : !!json1.isAdmin,   // ★ D1 /line/home-summary の isAdmin をそのまま使う
     };
 
-    // --- 3-4) isAdmin も D1 から取得 ---
-    try {
-      const urlIsAdmin = `${d1Base}/line/is-admin?lineId=${encodeURIComponent(lineId)}`;
-      const ctl3 = new AbortController();
-      const t3Timeout = setTimeout(() => ctl3.abort(), 8000);
-      const tFetchAdmin0 = performance.now();
-      let res3;
-      try {
-        res3 = await fetch(urlIsAdmin, { method: "GET", signal: ctl3.signal });
-      } finally {
-        clearTimeout(t3Timeout);
-      }
-      if (res3.ok) {
-        const json3 = await res3.json();
-        console.log("[perf] fetch is-admin", (performance.now() - tFetchAdmin0).toFixed(0), "ms");
-
-        if (json3 && json3.ok && typeof json3.isAdmin === "boolean") {
-          home.isAdmin = json3.isAdmin;
-        }
-      } else {
-        console.warn("is-admin http error:", res3.status);
-      }
-    } catch (eAdmin) {
-      console.warn("is-admin fetch failed:", eAdmin);
-    }
+    // ★ ここまでで完結させるので、
+    //     下にあった「/line/is-admin を叩く 3-4) ブロック」は削除してOK
 
   } catch (err) {
     console.error("refreshData D1 error:", err);
@@ -4100,7 +4079,7 @@ async function refreshData(){
     if ($("#adminMenu")) {
       $("#adminMenu").style.display = state.isAdmin ? "" : "none";
     }
-    
+
     // answers
     if (home.answers && typeof home.answers === "object"){
       state.answers = home.answers;
