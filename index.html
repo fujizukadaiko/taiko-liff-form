@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v5.0.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v5.0.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4737,26 +4737,37 @@ async function onRegister(){
       (it.meetPlace || "")
     ].filter(Boolean).join(" ");
     const placeTxt = it.place ? `@${it.place}` : "";
-
-    // ★ D1 が返す "Sat Dec 30 1899 ..." もここで HH:MM 化
+  
+    // ★ D1 が返す "Sat Dec 30 1899 ..." もここで HH:MM 化（ローカルヘルパー）
     const rawHm = it.performAt || it.time || it.hm || it["時間"] || "";
-    const hm    = fmtTime(rawHm);
-
-    const timeForHeader = _hm
-      ? (kindText === '発表' ? `演奏開始 ${_hm}` : _hm)
-      : '';
-    const timeForPanel = _hm
-      ? (kindText === '発表'
-         ? `<span class="lbl">演奏開始</span> ${_hm}`
-         : `${_hm}`)
-      : '';
+    let hm = "";
+    (function(){
+      const m = String(rawHm || "").match(/^(\d{1,2}):(\d{2})/);
+      if (m) {
+        hm = `${String(+m[1]).padStart(2,"0")}:${m[2]}`;
+        return;
+      }
+      const d = new Date(rawHm || "");
+      if (!isNaN(d)) {
+        hm = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+      }
+    })();
+  
+    const timeForHeader = hm
+      ? (kindText === "発表" ? `演奏開始 ${hm}` : hm)
+      : "";
+    const timeForPanel = hm
+      ? (kindText === "発表"
+          ? `<span class="lbl">演奏開始</span> ${hm}`
+          : `${hm}`)
+      : "";
   
     // 折りたたみ内の中身（タイトルは出さない：演奏開始 / 集合 / @場所）
     const panelInner = `
-      ${[_hm, meetTxt, placeTxt].filter(Boolean).length ? `
+      ${[hm, meetTxt, placeTxt].filter(Boolean).length ? `
        <div class="scMeta">
          ${placeTxt ? `<div class="scLine">${placeTxt}</div>` : ``}
-         ${_hm     ? `<div class="scLine">${timeForPanel}</div>` : ``}
+         ${hm       ? `<div class="scLine">${timeForPanel}</div>` : ``}
          ${meetTxt  ? `<div class="scLine">${meetTxt}</div>` : ``}
          ${memoText ? `<div class="scLine scMemo">${memoText}</div>` : ``}
        </div>
