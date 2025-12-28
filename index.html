@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v4.9.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v4.9.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -5275,40 +5275,80 @@ function adminEdit(obj){
   state.reportCache = {};         // id -> 詳細キャッシュ
   state.reportDetailMap = {};     // 既存 renderReport() 互換キャッシュ
 
+  // ★ 追加：D1 ベース URL
+  const D1_BASE = (typeof D1_API_BASE_URL === "string"
+    ? D1_API_BASE_URL
+    : ""
+  ).replace(/\/+$/, "");
+  
   const adminReport = {
     mounted: false,
 
     // ① メタを取得してセレクトに流し込む
+        // ① メタを取得してセレクトに流し込む（D1 直版）
     async loadMeta(){
       const sel = document.querySelector("#repEvent");
+      const box = document.querySelector("#repBox");
       if (!sel) return;
+
       sel.disabled = true;
       sel.innerHTML = `<option value="">（読み込み中…）</option>`;
+
       try {
-        // ← 認可用に id を付ける（必要なら admin=1 も）
-        const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}&admin=1`);
-    
-        if (r?.status === "ok" && Array.isArray(r.list)) {
-          state.reportMeta = r.list;
-          sel.innerHTML = `<option value="">（選択してください）</option>` +
-            r.list.map(e=>{
-              const label = `${e.ymd || ""}${e.time ? " " + e.time : ""}  ${e.title || ""}`;
-              return `<option value="${e.id}">${label}</option>`;
-            }).join("");
+        let list = [];
+
+        if (D1_BASE) {
+          // ★ D1 の今後の予定 API を利用（365日分）
+          const url  = `${D1_BASE}/line/schedules?days=365`;
+          const resp = await fetch(url, { method: "GET" });
+          if (!resp.ok) {
+            throw new Error("schedules http error: " + resp.status);
+          }
+          const json = await resp.json();
+          if (json.status !== "ok" || !Array.isArray(json.schedules)) {
+            throw new Error("schedules bad response");
+          }
+
+          // 必要な項目だけ軽量化して保持
+          list = json.schedules.map(ev => ({
+            id    : String(ev.id || ev.eventId || ev.event_key || ev.eventKey || "").trim(),
+            ymd   : ev.ymd || ev.date || "",
+            time  : ev.time || ev.hm || "",
+            title : ev.title || ev.name || "",
+          })).filter(e => e.id);
         } else {
-          const msg = r?.message || "サーバーがエラーを返しました";
-          console.error("meta error:", r);
-          sel.innerHTML = `<option value="">取得エラー</option>`;
-          document.querySelector("#repBox")?.replaceChildren(
-            document.createTextNode(`エラー: ${msg}`)
-          );
+          // ★ 保険：D1_BASE 未設定なら従来の GAS API にフォールバック
+          const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}&admin=1`);
+          if (r?.status !== "ok" || !Array.isArray(r.list)) {
+            const msg = r?.message || "サーバーがエラーを返しました";
+            console.error("meta error:", r);
+            sel.innerHTML = `<option value="">取得エラー</option>`;
+            if (box) box.textContent = `エラー: ${msg}`;
+            sel.disabled = false;
+            return;
+          }
+          list = r.list;
+        }
+
+        state.reportMeta = list;
+
+        sel.innerHTML =
+          `<option value="">（選択してください）</option>` +
+          list.map(e => {
+            const ymd  = e.ymd || e.date || "";
+            const time = e.time || e.hm || "";
+            const title= e.title || e.name || "";
+            const label = `${ymd}${time ? " " + time : ""}  ${title}`;
+            return `<option value="${e.id}">${label}</option>`;
+          }).join("");
+
+        if (box && !sel.value) {
+          box.textContent = "公演を選択してください";
         }
       } catch (e) {
         console.error(e);
         sel.innerHTML = `<option value="">取得エラー</option>`;
-        document.querySelector("#repBox")?.replaceChildren(
-          document.createTextNode(`通信エラー: ${e.message || e}`)
-        );
+        if (box) box.textContent = `通信エラー: ${e.message || e}`;
       } finally {
         sel.disabled = false;
       }
@@ -5363,41 +5403,30 @@ function adminEdit(obj){
   };
 
   // 画面を開いたときに呼ぶ
-  // 管理レポート初期化（公演メタ一覧の取得＆セレクト更新）
-    async function initAdminReportPage(){
-      if (!state.isAdmin){
-        document.getElementById('repBox').textContent = '権限がありません';
-        return;
-      }
-      const repBox = document.getElementById('repBox');
-      const sel    = document.getElementById('repEvent');
-      repBox.textContent = '公演一覧を取得中…';
-    
-      try{
-        const meta = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}&admin=1`);
-        if (meta?.status !== 'ok') throw new Error(meta?.message || '取得に失敗しました');
-    
-        const list = Array.isArray(meta.list) ? meta.list :
-                     Array.isArray(meta.meta) ? meta.meta : [];
-        state.reportMeta = list;
-    
-        const prev = sel?.value || '';
-        sel.innerHTML = '<option value="">（選択してください）</option>' + list.map(e => {
-          const id    = String(e.id || e.eventId || e.eid || '');
-          const date  = e.ymd || e.date || '';
-          const time  = e.hm || e.time || '';
-          const title = e.title || e.name || '';
-          return `<option value="${id}">${date}${time ? ` ${time}`:''}｜${title}</option>`;
-        }).join('');
-    
-        if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
-    
-        repBox.textContent = sel.value ? '読み込み中…' : '公演を選択してください';
-        if (sel.value) renderReport();  // 直前の選択が残っていれば自動描画
-      }catch(e){
-        repBox.textContent = e.message || String(e);
-      }
+    // 管理レポート初期化（公演メタ一覧の取得＆セレクト更新）
+  async function initAdminReportPage(){
+    if (!state.isAdmin){
+      const box = document.getElementById('repBox');
+      if (box) box.textContent = '権限がありません';
+      return;
     }
+
+    const repBox = document.getElementById('repBox');
+    if (repBox) repBox.textContent = '公演一覧を取得中…';
+
+    // イベントリスナーがまだなら張る
+    adminReport.mount();
+
+    // ★ D1 版 loadMeta を使用
+    await adminReport.loadMeta();
+
+    const sel = document.getElementById('repEvent');
+    if (repBox) {
+      repBox.textContent = sel && sel.value
+        ? '読み込み中…'
+        : '公演を選択してください';
+    }
+  }
 <!-- ここまで置き換え -->
   
 // ===== 管理レポート再読込（互換エイリアス） =====
@@ -5486,7 +5515,7 @@ window.reportReload = function(){ initAdminReportPage(); };
 (function(){
   if (window.__AdminReportV__ >= 2) return;
   window.__AdminReportV__ = 2;
-
+  
   // 配列抽出：rows/list/answers/data/…のどれか最初に見つかった配列を返す
   function pickRows(p){
     if (!p) return [];
@@ -5705,60 +5734,9 @@ window.reportReload = function(){ initAdminReportPage(); };
   const s = String(p?.seg||"");
   return s.includes("大人") ? `【大人の部】${nm}` : nm;
 }
-  
-  // 公演メタ（セレクトの選択肢）を取得して #repEvent を埋める
-  async function loadReportMeta(){
-    const sel = document.getElementById('repEvent');
-    const box = document.getElementById('repBox');
-    if (!sel) return;
-  
-    // 古いメタを一旦クリア（失敗時の取り違え防止）
-    window.state = window.state || {};
-    window.state.reportMeta = [];
-  
-    sel.disabled = true;
-    sel.innerHTML = `<option value="">（読み込み中…）</option>`;
-    try{
-      // 認可の都合で lineId/admin を付けて取得
-      const lid = encodeURIComponent(((window.state && window.state.lineId) || ""));
-      const r = await api(`?attendanceReport=1&meta=1&lineId=${lid}&admin=1`);
-      if (r?.status === 'ok' && Array.isArray(r.list)){
-        // ★ ここで保存
-        state.reportMeta = r.list;
-  
-        const opts = r.list.map(e=>{
-          // value は eventId を最優先（なければ id/eid）
-          const id = String(e.eventId ?? e.eventID ?? e.event_id ?? e.id ?? e.eid ?? '');
-          const label = `${e.ymd || e.date || ''}${e.time ? ' ' + e.time : ''}  ${e.title || e.name || ''}`;
-          return `<option value="${id}">${label}</option>`;
-        }).join('');
-        sel.innerHTML = `<option value="">（選択してください）</option>` + opts;
-      }else{
-        const msg = r?.message || 'サーバーがエラーを返しました';
-        console.error('meta error:', r);
-        sel.innerHTML = `<option value="">取得エラー</option>`;
-        if (box) box.textContent = `エラー: ${msg}`;
-      }
-    }catch(e){
-      console.error(e);
-      sel.innerHTML = `<option value="">取得エラー</option>`;
-      if (box) box.textContent = `通信エラー: ${e.message || e}`;
-    }finally{
-      sel.disabled = false;
-    }
-  }
-
-  // 画面を開いた直後/再取得ボタンから呼ぶ
-  async function initAdminReportPage(){
-    await loadReportMeta();
-    const box = document.getElementById('repBox');
-    if (box) box.textContent = '公演を選択してください';
-  }
 
   // 既存ハンドラとつながるように公開
   window.renderReport = renderReport;
-  window.initAdminReportPage = initAdminReportPage;
-  window.reportReload = function(){ initAdminReportPage(); };
 })();
 
   // ❶ lineId が確定するまで待つ
