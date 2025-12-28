@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v5.0.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v5.0.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4722,7 +4722,20 @@ async function onRegister(){
     return isNaN(d) ? null : d;
   }
   function addDays(d, n){ const x = new Date(d.getTime()); x.setDate(x.getDate()+n); x.setHours(0,0,0,0); return x; }
-
+  function toHmFromAny(raw){
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    // すでに "9:15" / "09:15" 形式ならそのまま正規化
+    const m = s.match(/^(\d{1,2}):(\d{2})/);
+    if (m){
+      return `${String(+m[1]).padStart(2, "0")}:${m[2]}`;
+    }
+    // "Sat Dec 30 1899 ..." など Date で解釈できるものは HH:MM に
+    const d = new Date(s);
+    if (isNaN(d)) return "";
+    const z = n => String(n).padStart(2, "0");
+    return `${z(d.getHours())}:${z(d.getMinutes())}`;
+  }
   // ===== カード描画 =====
   function renderScheduleCard(it){
     const segNorm = normSeg(it.segment || it.segmentCode || it.targetSegment || it.attendSegment || "");
@@ -4730,28 +4743,20 @@ async function onRegister(){
     const dateText = ymdDow(parseYmdStrictLocal(it.ymd || it.date)) || (it.date || "");
     const kindText = String(it.kind || "").trim();
     const kindCls  = KIND_CLASS[kindText] || ""; 
-    const memoText = String(it.memo || "").trim();
-  
-    const meetTxt  = [
-      (it.meetAt ? `集合 ${it.meetAt}` : ""),
-      (it.meetPlace || "")
-    ].filter(Boolean).join(" ");
-    const placeTxt = it.place ? `@${it.place}` : "";
-  
-    // ★ D1 が返す "Sat Dec 30 1899 ..." もここで HH:MM 化（ローカルヘルパー）
-    const rawHm = it.performAt || it.time || it.hm || it["時間"] || "";
-    let hm = "";
-    (function(){
-      const m = String(rawHm || "").match(/^(\d{1,2}):(\d{2})/);
-      if (m) {
-        hm = `${String(+m[1]).padStart(2,"0")}:${m[2]}`;
-        return;
-      }
-      const d = new Date(rawHm || "");
-      if (!isNaN(d)) {
-        hm = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
-      }
-    })();
+      const memoText = String(it.memo || "").trim();
+
+  // 本番会場（@若竹苑 など）
+  const placeTxt = it.place ? `@${it.place}` : "";
+
+  // ★ 時刻はどんな形式でも HH:MM に揃える
+  const hm        = toHmFromAny(it.performAt || it.time || it.hm || it["時間"] || "");
+  const meetAtHHM = toHmFromAny(it.meetAt || "");
+
+  // 集合 行きのテキスト：「集合 HH:MM 場所」
+  const meetTxt  = [
+    (meetAtHHM ? `集合 ${meetAtHHM}` : ""),
+    (it.meetPlace || "")
+  ].filter(Boolean).join(" ");
   
     const timeForHeader = hm
       ? (kindText === "発表" ? `演奏開始 ${hm}` : hm)
