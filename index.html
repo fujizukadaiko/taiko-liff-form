@@ -8,7 +8,7 @@
 <!-- ===== 設定（共通） v1：ページ先頭に固定 ===== -->
 <script>
   /* ===== 設定 ===== */
-  const FRONT_VERSION = "Front v5.0.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+  const FRONT_VERSION = "Front v5.0.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
   const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
   const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
   const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4679,7 +4679,11 @@ async function onRegister(){
       (it.meetPlace || "")
     ].filter(Boolean).join(" ");
     const placeTxt = it.place ? `@${it.place}` : "";
-    const _hm = it.performAt || it.time || it.hm || it['時間'] || "";
+
+    // ★ D1 が返す "Sat Dec 30 1899 ..." もここで HH:MM 化
+    const rawHm = it.performAt || it.time || it.hm || it["時間"] || "";
+    const hm    = fmtTime(rawHm);
+
     const timeForHeader = _hm
       ? (kindText === '発表' ? `演奏開始 ${_hm}` : _hm)
       : '';
@@ -5262,11 +5266,30 @@ async function adminSubmit(){
   const today = new Date(); today.setHours(0,0,0,0);
   const until = new Date(today.getTime()); until.setDate(until.getDate()+days);
 
-  const ymdToDate = (s)=>{
-    const m = String(s||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-    if (!m) return null;
-    const d = new Date(+m[1], +m[2]-1, +m[3]); d.setHours(0,0,0,0);
-    return isNaN(d) ? null : d;
+    const ymdToDate = (s) => {
+    const str = String(s || "").trim();
+    if (!str) return null;
+
+    let y, m, d;
+
+    // 1) 8桁数字 20260111
+    const m8 = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (m8) {
+      y = +m8[1];
+      m = +m8[2];
+      d = +m8[3];
+    } else {
+      // 2) 2026-01-11 / 2026/01/11
+      const m2 = str.replace(/-/g, "/").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+      if (!m2) return null;
+      y = +m2[1];
+      m = +m2[2];
+      d = +m2[3];
+    }
+
+    const dt = new Date(y, m - 1, d);
+    dt.setHours(0, 0, 0, 0);
+    return isNaN(dt) ? null : dt;
   };
 
   // ★ base を元にローカル絞り込み
@@ -5280,14 +5303,18 @@ async function adminSubmit(){
   }
 
   // 並び順（現行と同じキー）
-  const ymdKey = (s) => {
-    const t = String(s || "").replace(/-/g, "/");
-    const m = t.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-    return m ? `${m[1]}${m[2]}${m[3]}` : "99999999";
+    const ymdKey = (s) => {
+    const d = ymdToDate(s);
+    if (!d) return "99999999";
+    const z = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${z(d.getMonth()+1)}${z(d.getDate())}`;
   };
+
   const hmKey = (s) => {
-    const m = String(s || "").match(/^(\d{1,2}):(\d{2})$/);
-    return m ? `${String(m[1]).padStart(2,'0')}${m[2]}` : "9999";
+    // D1 が変な Date 文字列を返しても fmtTime 経由で HH:MM に揃える
+    const hhmm = fmtTime(s);
+    const m = hhmm.match(/^(\d{1,2}):(\d{2})$/);
+    return m ? `${String(m[1]).padStart(2, "0")}${m[2]}` : "9999";
   };
   viewItems.sort((a,b)=>
     ymdKey(a.ymd).localeCompare(ymdKey(b.ymd)) ||
@@ -5297,18 +5324,31 @@ async function adminSubmit(){
   );
 
   // HTML（adminItemsMap は全件分が入っているのでそのまま使える）
-  const html = viewItems.length
-    ? viewItems.map(it => `
-      <div class="card" data-seg="${normSeg(it.segment||'')||'both'}">
-        <div><b>${it.ymd}${it.hm?` ${it.hm}`:""}</b> @ ${it.place||""}</div>
-        <div class="small">${dispSeg(normSeg(it.segment||""))}｜${it.type||""}：${it.title||""}</div>
-        <div class="small muted">出欠対象:${it.attendTarget||"N"} / 期限:${it.deadline||"(なし)"} / 公開:${it.publish||"No"} / 状態:${it.status||"archived"} / 配信:${it.flag||"N"}</div>
+   const html = viewItems.length
+    ? viewItems.map(it => {
+        const ymdDisp      = fmtYmd(it.ymd);
+        const hmDisp       = fmtTime(it.hm);
+        const deadlineDisp = it.deadline ? fmtYmd(it.deadline) : "(なし)";
+        const segNorm      = normSeg(it.segment || "");
+
+        return `
+      <div class="card" data-seg="${segNorm || "both"}">
+        <div><b>${ymdDisp}${hmDisp ? ` ${hmDisp}` : ""}</b> @ ${it.place || ""}</div>
+        <div class="small">${dispSeg(segNorm)}｜${it.type || ""}：${it.title || ""}</div>
+        <div class="small muted">
+          出欠対象:${it.attendTarget || "N"}
+          / 期限:${deadlineDisp}
+          / 公開:${it.publish || "No"}
+          / 状態:${it.status || "archived"}
+          / 配信:${it.flag || "N"}
+        </div>
         <div class="row" style="margin-top:8px; justify-content:flex-end;">
           <button class="btn btn-ghost btn-sm btn-compact btn-edit" type="button"
                   onclick="adminEdit(adminItemsMap['${String(it.id)}'])">編集</button>
         </div>
       </div>
-    `).join("")
+      `;
+      }).join("")
     : `<div class="listEmpty">該当する予定はありません</div>`;
 
   top.innerHTML = html;
@@ -5473,11 +5513,32 @@ window.reportReload = function(){ initAdminReportPage(); };
 
     /* ===== 出欠結果一覧（管理者） 1枚カード版 ===== */
     function fmtYmd(s){
-      const m = String(s||'').match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
-      if (!m) return String(s||'');
-      const d = new Date(+m[1], +m[2]-1, +m[3]);
-      const yo = '日月火水木金土'[d.getDay()];
-      return `${m[1]}/${m[2]}/${m[3]}（${yo}）`;
+      const str = String(s || "").trim();
+      if (!str) return "";
+    
+      let y, m, d;
+    
+      // ① 8桁数字（20260111）の場合
+      const m8 = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+      if (m8) {
+        y = +m8[1];
+        m = +m8[2];
+        d = +m8[3];
+      } else {
+        // ② 2026-01-11 / 2026/01/11 の場合
+        const m2 = str.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
+        if (!m2) return str; // それ以外はそのまま返す
+        y = +m2[1];
+        m = +m2[2];
+        d = +m2[3];
+      }
+    
+      const dt = new Date(y, m - 1, d);
+      if (isNaN(dt)) return str;
+    
+      const yo = "日月火水木金土"[dt.getDay()];
+      const z = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}/${z(dt.getMonth()+1)}/${z(dt.getDate())}（${yo}）`;
     }
     function fmtTime(s){
       const m = String(s||'').match(/^(\d{1,2}):(\d{2})/);
@@ -5755,10 +5816,10 @@ window.reportReload = function(){ initAdminReportPage(); };
     // console.log("report counts:", cnt);
 
     // ヘッダ情報
-    const title = payload.title || payload.eventTitle || payload.name || "";
-    const date  = payload.ymd   || payload.date || "";
-    const time  = payload.hm    || payload.time || "";
-    const place = payload.place || payload.venue || "";
+    const title = payload.title || payload.eventTitle || payload.name || '';
+    const date  = fmtYmd(payload.ymd   || payload.date || '');
+    const time  = fmtTime(payload.hm   || payload.time || '');
+    const place = payload.place || payload.venue || '';
 
     // accepting が来ていればそれを優先（'closed' なら締切）
     const open =
