@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.2.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.2.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1119,17 +1119,12 @@
             flex:0 0 auto;
         }
 
-        /* ===== 管理レポート：公演セレクトの幅調整 ===== */
-        #repEvent.selectBtn,
-        #repEvent {
-        width: 100%;
-        max-width: 100%;
-        }
-
-        /* label + select を横並びにしている .row-space の中なら、右側を広げる */
-        #repEvent.selectBtn {
-        flex: 1 1 auto;
-        min-width: 0;
+        /* 管理レポート：公演セレクトの幅をカード内いっぱいに */
+        #repEvent{
+        display:block;        /* 念のため block にしておく */
+        width:100%;
+        max-width:100%;
+        box-sizing:border-box;
         }
     /* ===== Custom Push ===== */ 
         #view-custom-push .card{
@@ -1786,7 +1781,7 @@
         @keyframes fbsp{
         to{ transform: rotate(360deg); }
         }
-    /* ==== Changelog modal ==== */
+    /* ===== Changelog modal ===== */
         /* 初期は非表示 */
         #changelogModal[hidden]{
         display: none;
@@ -1901,7 +1896,7 @@
         background: #e11d48;
         border-radius: 9999px;
         }
-    /* ==== 回答受付中の公演リスト 専用 ==== */
+    /* ===== 回答受付中の公演リスト 専用 ===== */
         const css = document.createElement('style');
         css.textContent = `
         .evList { margin-top: 6px; }
