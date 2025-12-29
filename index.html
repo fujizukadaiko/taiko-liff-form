@@ -5465,6 +5465,8 @@
         }
 
             // ▼ 出欠対象フラグ y のイベントだけに絞る
+            console.log('[rep] raw list length =', list.length);
+            console.log('[rep] sample item =', list[0]);
             const filtered = list.filter(ev => {
             // D1: need_attendance / needAttendance を最優先で見る
             const flagRaw =
@@ -5487,7 +5489,8 @@
                 flag === "true"
             );
             });
-
+            console.log('[rep] filtered length =', filtered.length);
+            
         // 一覧としても絞り込んだものを保存
         state.reportMeta = filtered;
 
