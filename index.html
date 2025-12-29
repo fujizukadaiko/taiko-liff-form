@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.2.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.2.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1119,6 +1119,18 @@
             flex:0 0 auto;
         }
 
+        /* ===== 管理レポート：公演セレクトの幅調整 ===== */
+        #repEvent.selectBtn,
+        #repEvent {
+        width: 100%;
+        max-width: 100%;
+        }
+
+        /* label + select を横並びにしている .row-space の中なら、右側を広げる */
+        #repEvent.selectBtn {
+        flex: 1 1 auto;
+        min-width: 0;
+        }
     /* ===== Custom Push ===== */ 
         #view-custom-push .card{
         max-width: 720px;
@@ -5435,7 +5447,9 @@
             ymd   : ev.ymd || ev.date || "",
             time  : ev.time || ev.hm || "",
             title : ev.title || ev.name || "",
-          })).filter(e => e.id);
+            // ★ 出欠対象フラグ（need_attendance）
+            needAttendance: ev.need_attendance ?? ev.needAttendance ?? ""
+            })).filter(e => e.id);
         } else {
           // ★ 保険：D1_BASE 未設定なら従来の GAS API にフォールバック
           const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}&admin=1`);
@@ -5450,17 +5464,49 @@
           list = r.list;
         }
 
-        state.reportMeta = list;
+        // ▼ 出欠対象フラグ y のイベントだけに絞る
+        const filtered = list.filter(ev => {
+        const flag = String(
+            ev.attendTargetFlag ??
+            ev.attendTarget ??
+            ev.attend_target ??
+            ev.isAttendTarget ??
+            ev["出欠対象"] ??
+            ""
+        ).toLowerCase();
+        // 必要に応じて "1" や "true" も許可
+        return flag === "y";
+        });
+
+        // 一覧としても絞り込んだものを保存
+        state.reportMeta = filtered;
+
+        // ▼ セレクト用ラベル生成（fmtYmd / fmtTime を利用）
+        const opts = filtered.map(e => {
+        const rawDate  = e.ymd || e.date || "";
+        const rawTime  = e.time || e.hm  || "";
+        const dateDisp = fmtYmd(rawDate);     // 例: 2026/01/11（日）
+        const timeDisp = fmtTime(rawTime);    // 例: 14:00
+
+        const title = (e.title || e.name || "").trim() || "（無題）";
+
+        const label = `${dateDisp}${timeDisp ? ` ${timeDisp}` : ""}　${title}`;
+
+        const value = String(
+            e.id ??
+            e.eventId ??
+            e.event_key ??
+            e.eventKey ??
+            ""
+        ).trim();
+
+        if (!value) return ""; // value が無いものはスキップ
+        return `<option value="${value}">${label}</option>`;
+        }).filter(Boolean).join("");
 
         sel.innerHTML =
-          `<option value="">（選択してください）</option>` +
-          list.map(e => {
-            const ymd  = e.ymd || e.date || "";
-            const time = e.time || e.hm || "";
-            const title= e.title || e.name || "";
-            const label = `${ymd}${time ? " " + time : ""}  ${title}`;
-            return `<option value="${e.id}">${label}</option>`;
-          }).join("");
+        `<option value="">（選択してください）</option>` +
+        (opts || `<option value="" disabled>（出欠対象の公演がありません）</option>`);
 
         if (box && !sel.value) {
           box.textContent = "公演を選択してください";
@@ -5491,29 +5537,29 @@
   };
 
     // 管理レポート初期化（公演メタ一覧の取得＆セレクト更新）
-  async function initAdminReportPage(){
-    if (!state.isAdmin){
-      const box = document.getElementById('repBox');
-      if (box) box.textContent = '権限がありません';
-      return;
+    async function initAdminReportPage(){
+        if (!state.isAdmin){
+        const box = document.getElementById('repBox');
+        if (box) box.textContent = '権限がありません';
+        return;
+        }
+
+        const repBox = document.getElementById('repBox');
+        if (repBox) repBox.textContent = '公演一覧を取得中…';
+
+        // イベントリスナーがまだなら張る
+        adminReport.mount();
+
+        // ★ D1 版 loadMeta を使用
+        await adminReport.loadMeta();
+
+        const sel = document.getElementById('repEvent');
+        if (repBox) {
+        repBox.textContent = sel && sel.value
+            ? '読み込み中…'
+            : '公演を選択してください';
+        }
     }
-
-    const repBox = document.getElementById('repBox');
-    if (repBox) repBox.textContent = '公演一覧を取得中…';
-
-    // イベントリスナーがまだなら張る
-    adminReport.mount();
-
-    // ★ D1 版 loadMeta を使用
-    await adminReport.loadMeta();
-
-    const sel = document.getElementById('repEvent');
-    if (repBox) {
-      repBox.textContent = sel && sel.value
-        ? '読み込み中…'
-        : '公演を選択してください';
-    }
-  }
   
     // ===== 管理レポート再読込（互換エイリアス） =====
     // 旧コードから呼ばれても D1 版 initAdminReportPage に流すためのエイリアス
@@ -5544,93 +5590,93 @@
 /* ===== 出欠結果一覧（管理者） 共通フォーマッタ群 ===== */
     // 共通ゼロ埋め
     function pad2(n){
-    return String(n).padStart(2, "0");
-    }
+        return String(n).padStart(2, "0");
+        }
 
-    // 共通: 日付文字列 → Date or null
-    // 対応：20260111 / 2026-01-11 / 2026/01/11
-    function parseYmdFlexible(s){
-    const str = String(s || "").trim();
-    if (!str) return null;
+        // 共通: 日付文字列 → Date or null
+        // 対応：20260111 / 2026-01-11 / 2026/01/11
+        function parseYmdFlexible(s){
+        const str = String(s || "").trim();
+        if (!str) return null;
 
-    let y, m, d;
+        let y, m, d;
 
-    // 8桁数字 20260111
-    const m8 = str.match(/^(\d{4})(\d{2})(\d{2})$/);
-    if (m8) {
-        y = +m8[1]; m = +m8[2]; d = +m8[3];
-    } else {
-        // 2026-01-11 / 2026/01/11
-        const m2 = str.replace(/-/g, "/").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-        if (!m2) return null;
-        y = +m2[1]; m = +m2[2]; d = +m2[3];
-    }
+        // 8桁数字 20260111
+        const m8 = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+        if (m8) {
+            y = +m8[1]; m = +m8[2]; d = +m8[3];
+        } else {
+            // 2026-01-11 / 2026/01/11
+            const m2 = str.replace(/-/g, "/").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+            if (!m2) return null;
+            y = +m2[1]; m = +m2[2]; d = +m2[3];
+        }
 
-    const dt = new Date(y, m - 1, d);
-    return isNaN(dt) ? null : dt;
+        const dt = new Date(y, m - 1, d);
+        return isNaN(dt) ? null : dt;
     }
 
     // 日付文字列（20260111 / 2026-01-11 / 2026/01/11）→ "YYYY/MM/DD（曜）"
     function fmtYmd(s){
-    const str = String(s || "").trim();
-    if (!str) return "";
+        const str = String(s || "").trim();
+        if (!str) return "";
 
-    const dt = parseYmdFlexible(str);
-    if (!dt) return str;   // 既存仕様：パースできなければ元文字を返す
+        const dt = parseYmdFlexible(str);
+        if (!dt) return str;   // 既存仕様：パースできなければ元文字を返す
 
-    const yo = "日月火水木金土"[dt.getDay()];
-    return `${dt.getFullYear()}/${pad2(dt.getMonth()+1)}/${pad2(dt.getDate())}（${yo}）`;
+        const yo = "日月火水木金土"[dt.getDay()];
+        return `${dt.getFullYear()}/${pad2(dt.getMonth()+1)}/${pad2(dt.getDate())}（${yo}）`;
     }
 
     // 時刻文字列／Date 文字列 → "HH:MM"
     function fmtTime(s){
-    const m = String(s||"").match(/^(\d{1,2}):(\d{2})/);
-    if (m) return `${pad2(+m[1])}:${m[2]}`;
+        const m = String(s||"").match(/^(\d{1,2}):(\d{2})/);
+        if (m) return `${pad2(+m[1])}:${m[2]}`;
 
-    const d = new Date(s||"");
-    return isNaN(d)
-        ? ""
-        : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+        const d = new Date(s||"");
+        return isNaN(d)
+            ? ""
+            : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     }
 
     // dt オブジェクト（updatedAt などを含む）→ "YYYY/MM/DD HH:MM:SS"
     function fmtDateTime(dt){
-    if (!dt) return "";
-    // 期待されるキーに広く対応
-    const v = (dt.updatedAt || dt.answeredAt || dt.timestamp || dt.at || "").toString();
-    if (v && !isNaN(new Date(v))) {
-        const d = new Date(v);
-        return `${d.getFullYear()}/${pad2(d.getMonth()+1)}/${pad2(d.getDate())} `
-            + `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
-    }
-    return String(v || "");
+        if (!dt) return "";
+        // 期待されるキーに広く対応
+        const v = (dt.updatedAt || dt.answeredAt || dt.timestamp || dt.at || "").toString();
+        if (v && !isNaN(new Date(v))) {
+            const d = new Date(v);
+            return `${d.getFullYear()}/${pad2(d.getMonth()+1)}/${pad2(d.getDate())} `
+                + `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+        }
+        return String(v || "");
     }
 
     // "YYYY/MM/DD（曜）" → "YYYY/MM/DD" （曜日なし）
     function fmtYmdNoWeekday(s){
-    const full = fmtYmd(s);   // 例: "2026/01/11（日）"
-    if (!full) return "";
-    // 末尾の （…） を削る
-    return full.replace(/（[^）]*）$/, "");
+        const full = fmtYmd(s);   // 例: "2026/01/11（日）"
+        if (!full) return "";
+        // 末尾の （…） を削る
+        return full.replace(/（[^）]*）$/, "");
     }
 
     // 区分文字列 → CSSクラス / ラベル
     function mapSeg(raw){
-    const s = String(raw||"");
-    if (s.includes("大人")) return { cls:"seg-adult", label:"大人の部" };
-    if (s.includes("子"))   return { cls:"seg-child", label:"子どもの部" };
-    if (s.includes("両"))   return { cls:"seg-both",  label:"両方" };
-    return { cls:"", label:"" };
+        const s = String(raw||"");
+        if (s.includes("大人")) return { cls:"seg-adult", label:"大人の部" };
+        if (s.includes("子"))   return { cls:"seg-child", label:"子どもの部" };
+        if (s.includes("両"))   return { cls:"seg-both",  label:"両方" };
+        return { cls:"", label:"" };
     }
 
     // APIから返る受付状態 accepting → バッジHTML
     function acceptingBadge(accepting){
-    const v = String(accepting||"").toLowerCase();
-    if (v === "open"   || v === "受付中")   return `<span class="badge-status open">受付中</span>`;
-    if (v === "closed" || v === "締切" || v === "締め切り" || v === "締切済"){
-        return `<span class="badge-status closed">締切</span>`;
-    }
-    return "";
+        const v = String(accepting||"").toLowerCase();
+        if (v === "open"   || v === "受付中")   return `<span class="badge-status open">受付中</span>`;
+        if (v === "closed" || v === "締切" || v === "締め切り" || v === "締切済"){
+            return `<span class="badge-status closed">締切</span>`;
+        }
+        return "";
     }
 
     // 出欠ラベルの共通マップ
@@ -5643,42 +5689,42 @@
 
     // グループキー → 日本語ラベル
     function labelFor(k){
-    return ATTEND_LABEL[k] || ATTEND_LABEL.na;
+        return ATTEND_LABEL[k] || ATTEND_LABEL.na;
     }
 
     // detail オブジェクト → 出欠別グループ {yes,no,maybe,na}
     function groupByAttend(detail){
-    const groups = { yes:[], no:[], maybe:[], na:[] };
-    const push = (k, it) => { if (it) groups[k].push(it); };
+        const groups = { yes:[], no:[], maybe:[], na:[] };
+        const push = (k, it) => { if (it) groups[k].push(it); };
 
-    // detail が変な値なら空グループを返す
-    if (!detail || typeof detail !== "object") return groups;
+        // detail が変な値なら空グループを返す
+        if (!detail || typeof detail !== "object") return groups;
 
-    // 1) すでに yes/no/maybe/na プロパティがある場合
-    if (Array.isArray(detail.yes) || Array.isArray(detail.no)
-        || Array.isArray(detail.maybe) || Array.isArray(detail.na)){
-        ["yes","no","maybe","na"].forEach(k => (detail[k]||[]).forEach(x=>push(k,x)));
+        // 1) すでに yes/no/maybe/na プロパティがある場合
+        if (Array.isArray(detail.yes) || Array.isArray(detail.no)
+            || Array.isArray(detail.maybe) || Array.isArray(detail.na)){
+            ["yes","no","maybe","na"].forEach(k => (detail[k]||[]).forEach(x=>push(k,x)));
+            return groups;
+        }
+
+        // 2) flat list の場合（list / members / rows など）
+        const list = detail.list || detail.members || detail.rows || [];
+
+        // 日本語 → キー の逆マップ
+        const REV_ATTEND = {
+            [ATTEND_LABEL.yes]  : "yes",
+            [ATTEND_LABEL.no]   : "no",
+            [ATTEND_LABEL.maybe]: "maybe",
+            [ATTEND_LABEL.na]   : "na",
+        };
+
+        list.forEach(it=>{
+            const raw = (it.attend || it.answer || "").trim();
+            const key = REV_ATTEND[raw] || "na";
+            push(key, it);
+        });
+
         return groups;
-    }
-
-    // 2) flat list の場合（list / members / rows など）
-    const list = detail.list || detail.members || detail.rows || [];
-
-    // 日本語 → キー の逆マップ
-    const REV_ATTEND = {
-        [ATTEND_LABEL.yes]  : "yes",
-        [ATTEND_LABEL.no]   : "no",
-        [ATTEND_LABEL.maybe]: "maybe",
-        [ATTEND_LABEL.na]   : "na",
-    };
-
-    list.forEach(it=>{
-        const raw = (it.attend || it.answer || "").trim();
-        const key = REV_ATTEND[raw] || "na";
-        push(key, it);
-    });
-
-    return groups;
     }
 
 /* ===== 管理レポート：メタ取得 → 1件詳細 → 描画（堅牢版） ===== */
