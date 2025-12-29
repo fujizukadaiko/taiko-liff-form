@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.2.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.2.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1126,6 +1126,35 @@
             max-width:100%;
             box-sizing:border-box;
         }
+        /* 各ステータスグループの間に点線を入れる */
+        #view-admin-report .repGroup + .repGroup{
+        margin-top: 14px;              /* グループ同士の間隔 */
+        padding-top: 12px;
+        border-top: 1px dashed var(--c-border);
+        }
+
+        /* 「参加 / 未定 / 欠席 / 未回答」見出しまわりの余白 */
+        #view-admin-report .repGroupHead{
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        }
+
+        /* 1人分の行の上下に少し余白をつけて行間を広げる */
+        #view-admin-report .repPersonRow{
+        padding: 4px 0;
+        }
+
+        /* 名前とコメントの行間を気持ち広めに */
+        #view-admin-report .repName,
+        #view-admin-report .repComment{
+        line-height: 1.7;
+        }
+
+        /* グループ末尾と次の点線の間が詰まりすぎないように */
+        #view-admin-report .repGroup:last-child{
+        margin-bottom: 4px;
     /* ===== Custom Push ===== */ 
         #view-custom-push .card{
         max-width: 720px;
