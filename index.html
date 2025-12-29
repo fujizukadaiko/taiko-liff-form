@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.2.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.2.3";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -5464,19 +5464,29 @@
           list = r.list;
         }
 
-        // ▼ 出欠対象フラグ y のイベントだけに絞る
-        const filtered = list.filter(ev => {
-        const flag = String(
-            ev.attendTargetFlag ??
-            ev.attendTarget ??
-            ev.attend_target ??
-            ev.isAttendTarget ??
-            ev["出欠対象"] ??
-            ""
-        ).toLowerCase();
-        // 必要に応じて "1" や "true" も許可
-        return flag === "y";
-        });
+            // ▼ 出欠対象フラグ y のイベントだけに絞る
+            const filtered = list.filter(ev => {
+            // D1: need_attendance / needAttendance を最優先で見る
+            const flagRaw =
+                ev.needAttendance ??      // さっき map したフィールド
+                ev.need_attendance ??     // 直接来ている場合
+                ev.attendTargetFlag ??    // 旧GAS系の保険
+                ev.attendTarget ??
+                ev.attend_target ??
+                ev.isAttendTarget ??
+                ev["出欠対象"] ??
+                "";
+
+            const flag = String(flagRaw).toLowerCase().trim();
+
+            // "y" 以外に "yes" / "1" / "true" も一応許可しておく
+            return (
+                flag === "y"   ||
+                flag === "yes" ||
+                flag === "1"   ||
+                flag === "true"
+            );
+            });
 
         // 一覧としても絞り込んだものを保存
         state.reportMeta = filtered;
