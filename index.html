@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.1.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.1.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -82,11 +82,7 @@
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2
-            ?family=Noto+Sans+JP:wght@400;500;600;700
-            &family=Noto+Serif+JP:wght@500;600;700
-            &family=Shippori+Mincho:wght@500;700
-            &display=swap"
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&amp;family=Noto+Serif+JP:wght@500;600;700&amp;family=Shippori+Mincho:wght@500;700&amp;display=swap"
         />
 
         <!-- Tailwind 設定（preflight 無効・テーマ拡張） -->
@@ -6315,6 +6311,11 @@
     // （念のため）ホームセクションが data-view を持っているかチェック
     // <section id="view-home" data-view> ... </section> の形が必須です
   })();
+
+    // ===== 共通ミニヘルパー（テキスト書き換えなど） =====
+    function setText(el, s) {
+    if (el) el.textContent = s;
+    }
 
 /* ===== カスタム一斉通知：画面初期化 & イベント結線 ===== */
     (function(){
