@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.2.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.2.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1155,6 +1155,70 @@
         /* グループ末尾と次の点線の間が詰まりすぎないように */
         #view-admin-report .repGroup:last-child{
         margin-bottom: 4px;
+        }
+        /* ===== Admin Report：ヘッダーのレイアウト ===== */
+        #view-admin-report .repHeader{
+        margin-bottom: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px dashed var(--c-border); /* ← イベント情報の下に点線 */
+        }
+
+        #view-admin-report .repLine{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        }
+
+        #view-admin-report .repLeft{
+        flex: 1 1 auto;
+        min-width: 0;
+        }
+
+        #view-admin-report .repRight{
+        flex: 0 0 auto;
+        }
+
+        #view-admin-report .repTitle{
+        font-weight: 700;
+        font-size: 16px;
+        margin-bottom: 2px;
+        }
+
+        #view-admin-report .repMeta{
+        font-size: 13px;
+        color: var(--c-muted);
+        }
+
+        #view-admin-report .repPlace{
+        margin-left: .25em;
+        }
+
+        /* ===== Admin Report：受付中 / 締切 バッジ ===== */
+        #view-admin-report .badge-status{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 64px;
+        height: 24px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid transparent;
+        box-sizing: border-box;
+        }
+
+        #view-admin-report .badge-status.open{
+        color: #047857;
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+        }
+
+        #view-admin-report .badge-status.closed{
+        color: #b91c1c;
+        background: #fef2f2;
+        border-color: #fecaca;
         }
     /* ===== Custom Push ===== */ 
         #view-custom-push .card{
@@ -6032,20 +6096,23 @@
             ? true
             : false;
 
+        // ★ここからヘッダーHTML
         const head = `
         <div class="repHeader">
-            <!-- 1行目：タイトルのみ -->
+            <!-- 1行目：タイトルだけ -->
             <div class="repLine">
             <div class="repLeft">
                 <span class="repTitle">${title || "(無題)"}</span>
             </div>
             </div>
 
-            <!-- 2行目：日時・@場所（左）／受付中バッジ（右） -->
+            <!-- 2行目：日時・場所（左）／受付バッジ（右） -->
             <div class="repLine repHeadRow">
             <div class="repLeft">
-                <span>${date}${time ? ` ${time}` : ""}</span>
+                <span class="repMeta">
+                ${date}${time ? ` ${time}` : ""}
                 ${place ? `<span class="repPlace"> @${place}</span>` : ""}
+                </span>
             </div>
             <div class="repRight">
                 <span class="badge-status ${open ? "open" : "closed"}">
