@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.0.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.1.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1379,698 +1379,1104 @@
   <div class="ver" id="ver"></div>
 </header>
 
-  <main>
+<main>
     <!-- 友だち未追加アラート -->
-    <div id="friendAlert" class="card warnBox" style="display:none;">
-      このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
-    </div>
-
-    <!-- ===== HOME ===== -->
-    <section id="view-home" data-view class="show">
-      <div id="hello" class="muted"></div>
-
-      <!-- 管理メニュー（管理者のみ表示） -->
-     <div id="adminMenu" class="card" style="display:none;">
-      <div class="sectionTitle">管理用</div>
-      <div class="row" style="gap:8px;">
-        <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin">予定登録/編集</button>
-        <button id="btnAdminMenuReport"    class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin-report">出欠結果一覧</button>
-        <button id="btnAdminCustomPush" class="btn btn-outline btn-sm btn-compact" data-view-target="view-custom-push">カスタム通知</button>
-        <button id="btnSummary" class="btn btn-outline btn-sm btn-compact" data-view-target="view-summary">サマリ</button>
-        <button id="btnFeedback" class="btn btn-outline btn-sm btn-compact" data-view-target="view-feedback">ご意見BOX</button>
-      </div>
-      <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
-    </div>
-
-      <!-- ★ トップ操作ボタン -->
-      <div class="btnRow" aria-label="主操作">
-        <button id="btnPrimary" class="btn btn-primary btn-lg" data-view-target="view-form" disabled>読み込み中…</button>
-        <button id="btnSchedules" class="btn btn-outline btn-lg" data-view-target="view-schedules">今後の予定</button>
-        <button id="btnEditNames" class="btn btn-outline btn-lg" data-view-target="view-register" style="display:none;">登録氏名編集</button>
-      </div>
-
-      <!-- 互換性維持のためのダミー -->
-      <button id="btnReload" type="button" style="display:none;"></button>
-
-      <!-- 回答受付中の公演（密リスト＋バッジ） -->
-      <div class="card">
-        <div class="row-space">
-          <div class="sectionTitle">回答受付中の公演</div>
-          <label id="homeOnlyNALabel" style="margin-left:auto;">
-            <input type="checkbox" id="homeOnlyNA" checked>
-            未定/未回答のみ表示
-          </label>
-        </div>
-        <div id="eventsBox"><div class="muted">読み込み中… <span class="spinner"></span></div></div>
-      </div>
-
-      <!-- あなたの登録状況（トップでは非表示） -->
-      <div class="card" style="display:none;">
-        <div class="sectionTitle">あなたの登録状況</div>
-        <div id="answersBox" class="muted">会員情報照会中… <span class="spinner"></span></div>
-      </div>
-
-      <div id="homeLog" class="muted" style="margin-top:8px;"></div>
-    </section>
-    <!-- HOME end -->
-
-    <!-- ===== フォーム（出欠） ===== -->
-    <section id="view-form" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">出欠入力フォーム</div>
-        <button id="btnBackFromForm" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-      </div>
-
-      <div id="formEventsBox" class="muted guidePlain">公演読み込み中… <span class="spinner"></span></div>
-      <div id="formFields"></div>
-
-      <div class="line"></div>
-      <div class="row right">
-        <button id="btnSubmit" class="btn btn-primary" disabled>まとめて送信</button>
-      </div>
-      <div id="formLog" class="muted" style="margin-top:8px;"></div>
-    </section>
-
-    <!-- ===== 初回登録/氏名編集 ===== -->
-    <section id="view-register" data-view>
-      <div class="row-space">
-        <div class="sectionTitle" id="regTitle">初回登録（入力者 & 演奏者）</div>
-        <button id="btnBackFromReg" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-      </div>
-
-      <div class="card">
-        <label for="regInputName">入力者氏名（あなたの名前）</label>
-        <input type="text" id="regInputName" placeholder="例：山田 太郎"/>
-        <label class="row" style="gap:6px; align-items:center; margin-top:6px;">
-          <input type="checkbox" id="regNotify" />
-          <span class="small">このアカウント宛てに通知（配信・リマインド）を送る</span>
-        </label>
-        <div class="small muted" style="margin:2px 0 8px 24px;">
-        ※通知をオフにすると、配信・リマインドは届きません（予定の閲覧は可能です）
-        </div>
-        <div class="line"></div>
-        <div class="line"></div>
-
-        <!-- タイトル + 追加ボタン（余白をとるため regAddRow を付与） -->
-        <div class="row-space regAddRow">
-          <div class="sectionTitle" style="margin:0;">演奏者（家族も追加可）</div>
-          <button id="btnAddPerf" class="btn btn-ghost btn-sm" type="button">＋ 演奏者を追加</button>
-        </div>
-        
-        <!-- ※注意書き：タイトル直下へ移動 -->
-        <div id="regNote" class="small muted">
-          ※ あなた自身が演奏する場合は、演奏者としてあなたの名前も追加してください。
-        </div>
-        
-        <!-- 演奏者入力リスト -->
-        <div id="perfList"></div>
-      </div>
-
-      <div class="row right">
-        <button id="btnRegister" class="btn btn-primary">登録する</button>
-      </div>
-      <div id="regLog" class="muted" style="margin-top:8px;"></div>
-    </section>
-
-    <!-- ===== 今後の予定 ===== -->
-    <section id="view-schedules" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">今後の予定</div>
-        <div class="row" style="gap:8px;">
-          <button id="btnBackFromSchedules" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-        </div>
-      </div>
-
-     <div class="card">
-      <div class="schedControls">
-        <!-- 1行目：表示期間（日数） | プルダウン -->
-        <label for="selDays" class="scLabel">表示期間（日数）</label>
-        <select id="selDays" class="selectBtn schedSel short">
-          <option value="30">30日</option>
-          <option value="60" selected>60日</option>
-          <option value="90">90日</option>
-        </select>
-    
-        <!-- 2行目：種別フィルタ | プルダウン -->
-        <label for="selKind" class="scLabel">種別フィルタ</label>
-        <select id="selKind" class="selectBtn schedSel short">
-          <option value="">（すべて）</option>
-          <option value="発表">発表</option>
-          <option value="練習">練習</option>
-          <option value="その他">その他</option>
-        </select>
-        <!-- 2.5行目：★ 区分フィルタ（両方所属ユーザーのみ表示） -->
-          <label for="selSeg" class="scLabel" id="labSeg" style="display:none;">区分フィルタ</label>
-          <select id="selSeg" class="selectBtn schedSel short" style="display:none;">
-            <option value="">（すべて）</option>
-            <option value="adult">大人の部</option>
-            <option value="child">子どもの部</option>
-          </select>
-        <!-- 下段：再取得ボタン（2列ぶち抜き） -->
-        <div class="span2">
-          <button id="btnFetchSchedules" class="btn btn-ghost btn-sm">更新</button>
-        </div>
-      </div>
-    
-      <div id="schedulesBox" class="muted" style="margin-top:8px;">読み込み待機中</div>
-    </div>    
-    </section>
-
-    <!-- ===== 予定登録（管理者） ===== -->
-    <section id="view-admin" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">予定登録（管理者）</div>
-        <button id="btnAdminBack" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-      </div>
-     <!-- ★ 上段のアコーディオン：現在登録中のイベント一覧 -->
-    <div class="card fEvent" id="adminListAcc">
-      <div class="fHead" style="display:flex; align-items:center; justify-content:space-between;">
-        <div class="sectionTitle" style="margin:0;">現在登録中のイベント一覧</div>
-        <span class="small muted">タップで開閉</span>
-      </div>
-    
-      <div class="fBody">
-        <!-- コントロール：ラベル｜プルダウン ×2（下段に再取得） -->
-        <div class="adminControls">
-          <label for="ad_days" class="admLabel">一覧の表示期間（日数）</label>
-          <select id="ad_days" class="selectBtn schedSel short">
-            <option value="30">30日</option>
-            <option value="60" selected>60日</option>
-            <option value="90">90日</option>
-          </select>
-    
-          <label for="ad_seg_filter" class="admLabel">対象区分フィルタ</label>
-          <select id="ad_seg_filter" class="selectBtn schedSel short">
-            <option value="">（すべて）</option>
-            <option value="adult">大人</option>
-            <option value="child">子ども</option>
-            <option value="both">両方</option>
-          </select>
-    
-          <!-- 下段：2列ぶち抜き -->
-          <div class="span2">
-            <button id="btnAdminFetch" class="btn btn-ghost btn-sm btn-compact" type="button">再取得</button>
-          </div>
-        </div>
-    
-        <!-- ★ 一覧の描画先はアコーディオンの『中』 -->
-        <div id="adminListBoxTop" class="muted" style="margin-top:8px;">読み込み待機中</div>
-      </div>
-    </div>
-    <!-- ★ ここまでがアコーディオン -->
-      <div class="card">
-        <div class="row-space">
-          <div class="sectionTitle" id="adminFormTitle">新規登録</div>
-          <div class="small muted"><span id="adminEditingId" style="display:none;"></span></div>
+        <div
+        id="friendAlert"
+        class="card warnBox"
+        style="display:none;"
+        role="alert"
+        aria-live="assertive"
+        >
+        このLIFFのBotが「友だち追加」されていません。通知を受け取るには公式アカウントを友だち追加してください。
         </div>
 
-        <div class="adminGrid">
-          <div><label>タイトル *</label><input id="ad_title" type="text" placeholder="例：秋祭り演奏会"></div>
-         <!-- 種別 *： "(選択)" を削除し、プレースホルダに。クラス selectBtn を付与 -->
-        <div>
-          <label>種別 *</label>
-          <select id="ad_type" class="selectBtn" required>
-            <option value="" disabled hidden selected>（選択）</option>
-            <option value="発表">発表</option>
-            <option value="練習">練習</option>
-            <option value="その他">その他</option>
-          </select>
-        </div>
-          <div><label>日付 *</label><input id="ad_ymd" type="date"></div>
-          <div><label>時間（開始）</label><input id="ad_hm" type="time" placeholder="HH:mm"></div>
-          <div><label>場所</label><input id="ad_place" type="text" placeholder="例：藤塚小体育館"></div>
-          <div><label>集合時間（発表・その他のみ）</label><input id="ad_meetAt" type="time" placeholder="HH:mm"></div>
-          <div><label>集合場所</label><input id="ad_meetPlace" type="text" placeholder="例：藤塚小学校"></div>
-          <!-- フォームの対象項目追加 -->
-          <div>
-            <label>対象区分 *</label>
-            <select id="ad_segment" class="selectBtn" required>
-              <option value="子ども" selected>子ども</option>
-              <option value="大人">大人</option>
-              <option value="両方">両方</option>
-            </select>
-          </div>
-          <div>
-            <label>出欠対象（発表のみ）</label>
-            <select id="ad_attendTarget" class="selectBtn">
-              <option value="Y">Y</option>
-              <option value="N">N</option>
-            </select>
-          </div>
-          <div><label>締切日</label><input id="ad_deadline" type="date"></div>
-          <div>
-            <label>公開</label>
-            <select id="ad_publish" class="selectBtn">
-              <option value="Yes">Yes</option>
-              <option value="No">No</option>
-            </select>
-          </div>
-          <div>
-            <label>ステータス</label>
-            <select id="ad_status" class="selectBtn">
-              <option value="active" selected>active</option>
-              <option value="archived">archived</option>
-            </select>
-          </div>
-          <div>
-            <label>配信フラグ（必須：発表のみ）</label>
-            <select id="ad_flag" class="selectBtn"><!-- 動的に差し替え --></select>
-          </div>
-        </div>
+    <!-- ===== View: ホーム（メンバー用トップ画面） ===== -->
+        <section id="view-home" data-view class="show">
+            <div id="hello" class="muted"></div>
+            <!-- 管理メニュー（管理者のみ表示） -->
+                <div id="adminMenu" class="card" style="display:none;">
+                <div class="sectionTitle">管理用</div>
+                <div class="row" style="gap:8px;">
+                    <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin">
+                        予定登録/編集
+                    </button>
+                    <button id="btnAdminMenuReport" class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin-report">
+                        出欠結果一覧
+                    </button>
+                    <button id="btnAdminCustomPush" class="btn btn-outline btn-sm btn-compact" data-view-target="view-custom-push">
+                        カスタム通知
+                    </button>
+                    <button id="btnSummary" class="btn btn-outline btn-sm btn-compact" data-view-target="view-summary">
+                        サマリ
+                    </button>
+                    <button id="btnFeedback" class="btn btn-outline btn-sm btn-compact" data-view-target="view-feedback">
+                        ご意見BOX
+                    </button>
+                </div>
+                <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
+            </div>
 
-        <div class="hint" style="margin-top:6px;">
-          * 必須。IDは自動採番です。<br>
-          種別が「練習」の場合は集合時間/集合場所/締切日/配信フラグ無効化。<br>
-          種別が「発表」以外では「出欠対象」は自動で N 固定になります。<br>
-          「発表」の配信フラグは <b>新規登録時は Y/N のみ</b>、<b>編集時は Y/S/D/N</b> が選択可能です。
-        </div>
+            <!-- ★ トップ操作ボタン -->
+                <div class="btnRow" aria-label="主操作">
+                    <button id="btnPrimary" class="btn btn-primary btn-lg" data-view-target="view-form" disabled>
+                    読み込み中…
+                    </button>
+                    <button id="btnSchedules" class="btn btn-outline btn-lg" data-view-target="view-schedules">
+                    今後の予定
+                    </button>
+                    <button id="btnEditNames" class="btn btn-outline btn-lg" data-view-target="view-register" style="display:none;">
+                    登録氏名編集
+                    </button>
+                </div>
 
-        <div class="row right" style="margin-top:10px;">
-          <button id="btnAdminReset"  class="btn btn-ghost btn-sm" type="button">新規モードに戻す</button>
-          <button id="btnAdminSubmit" class="btn btn-primary">新規登録</button>
-        </div>
-        <div id="adminFormLog" class="muted" style="margin-top:8px;"></div>
-      </div>
-    </section>
+            <!-- 互換性維持のためのダミー -->
+                <button id="btnReload" type="button" style="display:none;"></button>
 
-    <!-- ===== 出欠結果一覧（管理者） ===== -->
-    <section id="view-admin-report" data-view>
-      <div class="row-space">
-        <div class="sectionTitle">出欠結果一覧（管理者）</div>
-        <!-- ① トップに戻るを右寄せ -->
-        <button id="btnReportBack" class="btn btn-ghost btn-sm" data-view-target="view-home">トップに戻る</button>
-      </div>
-    
-      <div class="card">
-        <!-- ラベル右にプルダウン -->
-        <div class="repControls">
-          <label for="repEvent" class="repLabel">公演を選択</label>
-          <select id="repEvent" class="selectBtn schedSel short">
-            <option value="">（選択してください）</option>
-          </select>
-    
-          <label for="repAttend" class="repLabel">出欠フィルタ</label>
-          <select id="repAttend" class="selectBtn schedSel short">
-            <option value="">（すべて）</option>
-            <option value="参加">参加</option>
-            <option value="欠席">欠席</option>
-            <option value="未定">未定</option>
-            <option value="未回答">未回答</option>
-          </select>
-    
-          <!-- ★ 左下に再取得ボタン（2列ぶち抜き） -->
-          <div class="span2">
-            <button id="btnReportReload" class="btn btn-ghost btn-sm" type="button">更新</button>
-          </div>
-        </div>
-      </div>
-    
-      <div id="repBox" class="muted">公演を選択してください</div>
-    </section>
-    <!-- ===== カスタム通知（管理者） ===== -->
-    <section id="view-custom-push" data-view>
-    
-      <!-- 見出し行：左=タイトル / 右=トップに戻る -->
-      <div class="row-space" style="align-items:center;">
-        <div class="sectionTitle">カスタム通知</div>
-        <button id="btnCustomBack" type="button" class="btn btn-ghost btn-sm">
-          トップに戻る
-        </button>
-      </div>
-    
-      <!-- ここからカード（※要望①：イベントもカード内に） -->
-      <div class="card">
-    
-        <!-- 宛先の選び方（ラベル左／セレクト右） -->
-        <div class="row-att" style="margin:6px 0 12px;">
-          <label for="cp_event" class="repLabel">宛先の選び方</label>
-          <select id="cp_event" class="selectBtn schedSel">
-            <option value="manual">手動のみで宛先を選ぶ</option>
-            <optgroup id="opt-events" label="イベントから選ぶ"></optgroup>
-          </select>
-          
-          <script>
-          (function(){
-            // 1) getLineId は必ずグローバルに一度だけ
-            window.getLineId = window.getLineId || (async function(){
-              try{
-                if (typeof window.getMyLineId_ === 'function'){
-                  const id = await window.getMyLineId_();
-                  if (id){ (window.state ||= {}).lineId = id; return id; }
-                }
-              }catch(_){}
-              const tryOnce = () => {
-                if (window.__ME__?.lineId) return window.__ME__.lineId;
-                if (window.state?.lineId)  return window.state.lineId;
-                try{ return window.liff?.getDecodedIDToken?.()?.sub || ''; }catch(_){ return ''; }
-              };
-              for (let i=0;i<40;i++){
-                const id = tryOnce();
-                if (id){ (window.state ||= {}).lineId = id; return id; }
-                await new Promise(r=>setTimeout(r,100));
-              }
-              return '';
-            });
-          
-            const sec      = document.getElementById('view-custom-push');
-            const selMode  = document.getElementById('cp_event');
-            const optGroup = document.getElementById('opt-events');
-          
-            function applyModeUI(){
-              const statWrap = document.getElementById('cp_stat_wrap');
-              const statLock = document.getElementById('cp_stat_lock');
-              const manual   = (selMode.value === 'manual' || !selMode.value);
-              sec.querySelectorAll('.cp_stat').forEach(cb => cb.disabled = manual);
-              statWrap?.classList.toggle('is-disabled', manual);
-              statWrap?.setAttribute('aria-disabled', manual ? 'true' : 'false');
-              if (statLock) statLock.hidden = !manual;
-            }
-          
-            async function fillEventChoices(){
-              // プレースホルダ（optgroup だけ差し替え）
-              if (optGroup) optGroup.innerHTML = `<option value="" disabled>読み込み中…</option>`;
-          
-              const lid = await getLineId();
-              const url = new URL(API_ENDPOINT);
-              url.searchParams.set('attendanceReport','1');
-              url.searchParams.set('meta','1');
-              url.searchParams.set('admin','1');
-              if (lid) url.searchParams.set('lineId', lid);
-          
-              let r;
-              try{ r = await fetch(url).then(x=>x.json()); }
-              catch(e){ r = {status:'error', message:String(e)}; }
-          
-              const listRaw = Array.isArray(r?.list) ? r.list :
-                              Array.isArray(r?.meta) ? r.meta :
-                              Array.isArray(r?.data) ? r.data : [];
-          
-              const isOpen   = e => (typeof e.open      !== 'undefined') ? !!e.open
-                                   : (typeof e.published !== 'undefined') ? !!e.published
-                                   : (typeof e.status    !== 'undefined') ? (e.status === '公開中') : true;
-              const isHappyo = e => (typeof e.kind !== 'undefined')
-                                    ? (e.kind === '発表' || /発表/.test(String(e.kind)))
-                                    : true;
-          
-              const list = listRaw.filter(e => isOpen(e) && isHappyo(e));
-          
-              // イベントIndex（集合時間/場所も拾う）
-              const idx = {};
-              list.forEach(e=>{
-                const id  = String(e.eventId ?? e.id ?? '');
-                const ymd = e.ymd || e.date || '';
-                const hm  = e.hm  || e.time || '';
-                const meet      = e.meet || e.meetTime || e['集合'] || '';
-                const meetPoint = e.meetPoint || e['集合場所'] || e.place || e.venue || '';
-                idx[id] = {
-                  id,
-                  title   : e.title || e.name || '',
-                  date    : ymd,
-                  time    : hm,
-                  datetime: [ymd, hm].filter(Boolean).join(' '),
-                  place   : e.place || e.venue || '',
-                  meet,
-                  meetPoint
-                };
-              });
-              window.__EVENT_INDEX__ = idx;
-          
-              const opts = list.map(e=>{
-                const id  = String(e.eventId ?? e.id ?? '');
-                const ymd = e.ymd || e.date || '';
-                const hm  = e.hm  || e.time || '';
-                const dt  = [ymd, hm].filter(Boolean).join(' ');
-                const tt  = e.title || e.name || '';
-                return `<option value="${id}">${dt} ｜ ${tt}</option>`;
-              }).join('') || `<option value="" disabled>（該当イベントなし）</option>`;
-          
-              // optgroup を中身だけ差し替え
-              if (optGroup) optGroup.innerHTML = opts;
-              applyModeUI();
-            }
-          
-            document.addEventListener('DOMContentLoaded', ()=>{
-              fillEventChoices();
-              applyModeUI();
-            });
-          })();  /* ← IIFE をきちんと閉じる */
-          </script>
-        </div>
-    
-        <!-- 対象ステータス（見出し＋チェック群） -->
-        <div id="cp_stat_wrap" class="statWrap">
-          <div class="repLabel">
-            対象ステータス
-            <span id="cp_stat_lock" class="lockTag" hidden>手動モード（選択不可）</span>
-          </div>
-        
-          <div class="row" style="gap:10px; margin-top:6px;">
-            <label><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
-            <label><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
-            <label><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
-            <label><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
-          </div>
-        </div>
-    
-        <!-- 宛先追加（手動） ラベル左 / セレクト右（※要望③：角丸） -->
-        <div class="row-att" id="cp_extra_row" style="margin:12px 0;">
-          <label for="cp_extra" class="repLabel">宛先追加（手動）</label>
-          <select id="cp_extra" class="selectBtn" multiple>
-            <option value="">選択してください</option>
-          </select>
-          <!-- 下段フル幅で表示 -->
-          <div class="row-att-note">
-            <span id="cp_extra_hint" class="loadingHint" hidden>（読み込み中…）</span>
-          </div>
-        </div>
-    
-        <!-- 自動選択 / 手動追加（表示のみ・薄紫） -->
-        <div class="cp-pill">
-          <div class="cp-pill-title">宛先（自動選択）</div>
-          <div class="cp-pill-body" id="cp_auto">（該当なし）</div>
-        </div>
-        <div class="cp-pill" id="cp_manual_wrap">
-          <div class="cp-pill-title">宛先（手動選択）</div>
-          <div class="cp-pill-body" id="cp_manual">（未選択）</div>
-        </div>
-    
-        <!-- ※要望④：手動追加とテンプレの間に1行分の空白 -->
-        <div class="cp-space-1line"></div>
-    
-        <!-- テンプレート -->
-        <div class="row-att" style="margin:6px 0 12px;">
-          <label for="cp_tpl" class="repLabel">テンプレート</label>
-          <select id="cp_tpl" class="selectBtn">
-            <option value="">なし</option>
-            <option value="雨天中止">雨天中止時</option>
-            <option value="時間変更">時間変更時</option>
-          </select>
+            <!-- 回答受付中の公演（密リスト＋バッジ） -->
+                <div class="card">
+                    <div class="row-space">
+                        <div class="sectionTitle">回答受付中の公演</div>
+                        <label id="homeOnlyNALabel" style="margin-left:auto;">
+                            <input type="checkbox" id="homeOnlyNA" checked>
+                            未定/未回答のみ表示
+                        </label>
+                        </div>
+                    <div id="eventsBox">
+                        <div class="muted">
+                            読み込み中… <span class="spinner"></span>
+                        </div>
+                    </div>
+                </div>
 
-          <script>
-          (function(){
-            function boot(){
-              const selTpl  = document.getElementById('cp_tpl');
-              const selMode = document.getElementById('cp_event');
-              const bodyEl  = document.getElementById('cp_body');
-              const cntEl   = document.getElementById('cp_count');
-              if (!selTpl || !selMode || !bodyEl) return;
-          
-              function pickEventCtx(){
-                const eid = selMode.value;
-                const ev = (eid && eid !== 'manual') ? (window.__EVENT_INDEX__?.[eid] || null) : null;
-                return ev || { title:'{TITLE}', date:'{DATE}', time:'{TIME}',
-                               datetime:'{DATETIME}', place:'{PLACE}',
-                               meet:'{MEET_OLD}', meetPoint:'{MEET_POINT}' };
-              }
-          
-              function applyTemplate(){
-                const kind = selTpl.value;
-                const ctx  = pickEventCtx();
-                let text = '';
-          
-                if (kind === '雨天中止'){
-                  text =
-          `【雨天中止のお知らせ】
-          ${ctx.datetime} 開催予定の「${ctx.title}」は、雨天のため中止となりました。
-          楽しみにしてくださっていた皆さまには申し訳ありません。
-          
-          どうぞよろしくお願いいたします。`;
-                } else if (kind === '時間変更'){
-                  text =
-          `【集合時間変更のお知らせ】
-          ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
-          集合場所：${ctx.meetPoint || '{MEET_POINT}'}
-          開始時間：${ctx.time || '{TIME}'}
-          場所：${ctx.place || '{PLACE}'}
-          
-          ご不便をおかけしますが、どうぞよろしくお願いいたします。`;
-                }
-          
-                bodyEl.value = text;
-                bodyEl.dispatchEvent(new Event('input'));
-                if (cntEl) cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
-              }
-          
-              selTpl.addEventListener('change', applyTemplate);
-              selMode.addEventListener('change', () => { if (selTpl.value) applyTemplate(); });
-          
-              // 文字数カウンタ
-              if (cntEl){
-                const upd = () => cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
-                bodyEl.addEventListener('input', upd); upd();
-              }
-          
-              bodyEl.style.whiteSpace = 'pre-wrap';
-              bodyEl.style.lineHeight = '1.6';
-            }
-          
-            // ← ここがポイント：DOM構築完了を待つ
-            if (document.readyState === 'loading'){
-              document.addEventListener('DOMContentLoaded', boot);
-            }else{
-              boot();
-            }
-          })();
-          </script>
-        </div>
-    
-        <!-- 本文 -->
-        <div class="cp-field">
-          <label for="cp_body" class="repLabel">本文（2000文字まで）</label>
-          <textarea id="cp_body" rows="7" maxlength="2000" class="cp-textarea"></textarea>
-          <div class="hint" id="cp_count">0 / 2000</div>
-        </div>
-    
-        <!-- アクション -->
-        <div class="row" style="gap:10px; justify-content:flex-end;">
-          <button id="cp_reset" class="btn btn-ghost">リセット</button>
-          <button id="cp_send" class="btn btn-primary">送信する</button>
-        </div>
-    
-      </div><!-- /card -->
-    </section>
+            <!-- あなたの登録状況（トップでは非表示） -->
+                <div class="card" style="display:none;">
+                    <div class="sectionTitle">あなたの登録状況</div>
+                    <div id="answersBox" class="muted">
+                    会員情報照会中… <span class="spinner"></span>
+                    </div>
+                </div>
 
-    <!-- ===== サマリ（管理者） ===== -->
-    <section id="view-summary" data-view class="view" hidden>
-     
-     <div class="summaryHeaderRow" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <div class="pageTitle" style="margin:0;">サマリ</div>
-      <button id="btnSummaryToTop" class="btn btn-outline btn-sm btn-compact">トップに戻る</button>
-    </div>
-    
-        <!-- タブ風ボタン -->
-      <div class="card">
-        <div class="row" style="gap:8px;margin-bottom:8px;">
-          <button id="btnSummaryFreeQuota" class="btn btn-primary btn-sm btn-compact">無料枠確認</button>
-          <button id="btnSummaryPushStats" class="btn btn-outline btn-sm btn-compact">配信履歴</button>
+            <div id="homeLog" class="muted" style="margin-top:8px;"></div>
+        </section>
+
+    <!-- ===== View: 出欠フォーム ===== -->
+        <section id="view-form" data-view>
+            <div class="row-space">
+                <div class="sectionTitle">出欠入力フォーム</div>
+                <button
+                id="btnBackFromForm"
+                class="btn btn-ghost btn-sm"
+                data-view-target="view-home"
+                type="button"
+                >
+                トップに戻る
+                </button>
+            </div>
+
+            <div id="formEventsBox" class="muted guidePlain">
+                公演読み込み中… <span class="spinner"></span>
+            </div>
+
+            <div id="formFields"></div>
+
+            <div class="line"></div>
+
+            <div class="row right">
+                <button id="btnSubmit" class="btn btn-primary" disabled>
+                まとめて送信
+                </button>
+            </div>
+
+            <div id="formLog" class="muted" style="margin-top:8px;"></div>
+        </section>
+
+    <!-- ===== View: 氏名登録・編集 ===== -->
+        <section id="view-register" data-view>
+            <div class="row-space">
+                <div class="sectionTitle" id="regTitle">初回登録（入力者 &amp; 演奏者）</div>
+                <button
+                id="btnBackFromReg"
+                class="btn btn-ghost btn-sm"
+                data-view-target="view-home"
+                type="button"
+                >
+                トップに戻る
+                </button>
+            </div>
+
+            <div class="card">
+                <label for="regInputName">入力者氏名（あなたの名前）</label>
+                <input
+                type="text"
+                id="regInputName"
+                placeholder="例：山田 太郎"
+                />
+
+                <label
+                class="row"
+                style="gap:6px; align-items:center; margin-top:6px;"
+                >
+                    <input type="checkbox" id="regNotify" />
+                    <span class="small">
+                        このアカウント宛てに通知（配信・リマインド）を送る
+                    </span>
+                </label>
+
+                <div class="small muted" style="margin:2px 0 8px 24px;">
+                ※通知をオフにすると、配信・リマインドは届きません（予定の閲覧は可能です）
+                </div>
+
+                <div class="line"></div>
+
+                <!-- タイトル + 追加ボタン（余白をとるため regAddRow を付与） -->
+                <div class="row-space regAddRow">
+                    <div class="sectionTitle" style="margin:0;">
+                        演奏者（家族も追加可）
+                    </div>
+                    <button
+                        id="btnAddPerf"
+                        class="btn btn-ghost btn-sm"
+                        type="button"
+                    >
+                        ＋ 演奏者を追加
+                    </button>
+                </div>
+
+                <!-- ※注意書き：タイトル直下へ移動 -->
+                <div id="regNote" class="small muted">
+                ※ あなた自身が演奏する場合は、演奏者としてあなたの名前も追加してください。
+                </div>
+
+                <!-- 演奏者入力リスト -->
+                <div id="perfList"></div>
+            </div>
+
+            <div class="row right">
+                <button id="btnRegister" class="btn btn-primary">
+                登録する
+                </button>
+            </div>
+
+            <div id="regLog" class="muted" style="margin-top:8px;"></div>
+        </section>
+
+    <!-- ===== View: 今後の予定一覧 ===== -->
+        <section id="view-schedules" data-view>
+            <div class="row-space">
+                <div class="sectionTitle">今後の予定</div>
+                <button
+                id="btnBackFromSchedules"
+                class="btn btn-ghost btn-sm"
+                data-view-target="view-home"
+                type="button"
+                >
+                トップに戻る
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="schedControls">
+                    <!-- 1行目：表示期間（日数） | プルダウン -->
+                    <label for="selDays" class="scLabel">表示期間（日数）</label>
+                    <select id="selDays" class="selectBtn schedSel short">
+                        <option value="30">30日</option>
+                        <option value="60" selected>60日</option>
+                        <option value="90">90日</option>
+                    </select>
+
+                    <!-- 2行目：種別フィルタ | プルダウン -->
+                    <label for="selKind" class="scLabel">種別フィルタ</label>
+                    <select id="selKind" class="selectBtn schedSel short">
+                        <option value="">（すべて）</option>
+                        <option value="発表">発表</option>
+                        <option value="練習">練習</option>
+                        <option value="その他">その他</option>
+                    </select>
+
+                    <!-- 3行目：区分フィルタ（両方所属ユーザーのみ表示） -->
+                    <label
+                        for="selSeg"
+                        class="scLabel"
+                        id="labSeg"
+                        style="display:none;"
+                    >
+                        区分フィルタ
+                    </label>
+                    <select
+                        id="selSeg"
+                        class="selectBtn schedSel short"
+                        style="display:none;"
+                    >
+                        <option value="">（すべて）</option>
+                        <option value="adult">大人の部</option>
+                        <option value="child">子どもの部</option>
+                    </select>
+
+                    <!-- 下段：再取得ボタン（2列ぶち抜き） -->
+                    <div class="span2">
+                        <button
+                        id="btnFetchSchedules"
+                        class="btn btn-ghost btn-sm"
+                        type="button"
+                        >
+                        更新
+                        </button>
+                    </div>
+                </div>
+
+                <div
+                id="schedulesBox"
+                class="muted"
+                style="margin-top:8px;"
+                >
+                読み込み待機中
+                </div>
+            </div>
+        </section>
+
+    <!-- ===== View: 予定登録（管理者） ===== -->
+        <section id="view-admin" data-view>
+            <div class="row-space">
+                <div class="sectionTitle">予定登録（管理者）</div>
+                <button
+                id="btnAdminBack"
+                class="btn btn-ghost btn-sm"
+                data-view-target="view-home"
+                type="button"
+                >
+                トップに戻る
+                </button>
+            </div>
+
+            <!-- 上段アコーディオン：現在登録中のイベント一覧 -->
+            <div class="card fEvent" id="adminListAcc">
+                <div
+                class="fHead"
+                style="display:flex; align-items:center; justify-content:space-between;"
+                >
+                <div class="sectionTitle" style="margin:0;">現在登録中のイベント一覧</div>
+                <span class="small muted">タップで開閉</span>
+                </div>
+
+                <div class="fBody">
+                    <!-- コントロール：ラベル｜プルダウン ×2（下段に再取得） -->
+                    <div class="adminControls">
+                        <label for="ad_days" class="admLabel">一覧の表示期間（日数）</label>
+                        <select id="ad_days" class="selectBtn schedSel short">
+                        <option value="30">30日</option>
+                        <option value="60" selected>60日</option>
+                        <option value="90">90日</option>
+                        </select>
+
+                        <label for="ad_seg_filter" class="admLabel">対象区分フィルタ</label>
+                        <select id="ad_seg_filter" class="selectBtn schedSel short">
+                        <option value="">（すべて）</option>
+                        <option value="adult">大人</option>
+                        <option value="child">子ども</option>
+                        <option value="both">両方</option>
+                        </select>
+
+                        <!-- 下段：2列ぶち抜き -->
+                        <div class="span2">
+                        <button
+                            id="btnAdminFetch"
+                            class="btn btn-ghost btn-sm btn-compact"
+                            type="button"
+                        >
+                            再取得
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 一覧の描画先（アコーディオン内部） -->
+                <div
+                    id="adminListBoxTop"
+                    class="muted"
+                    style="margin-top:8px;"
+                >
+                    読み込み待機中
+                </div>
+            </div>
         </div>
-    
-        <!-- 無料枠 -->
-        <div id="summaryFreeQuotaBox" class="summaryCard">
-          <div class="small muted">読み込み待機中…</div>
-        </div>
-    
-        <!-- 配信履歴 -->
-        <div id="summaryPushStatsBox" class="summaryCard" style="display:none;">
-          <div class="small muted">読み込み待機中…</div>
-        </div>
-    
-        <div class="row" style="gap:8px;margin-top:10px;">
-          <button id="btnSummaryReload" class="btn btn-outline btn-sm btn-compact">再取得</button>
-        </div>
-    
-        <div class="small muted" style="margin-top:6px;">
-          ※ 「無料枠確認」は<strong>このシステム（Messaging API経由）</strong>で送信した今月の利用状況を表示します。<br>
-          ※ Official Accountアプリからの手動配信や、あいさつ／自動応答メッセージは<strong>含まれません</strong>。<br>
-          ※ 「配信履歴」は Pushlog / PushDetail をもとに当月の集計を表示します。
-        </div>
-      </div>
-    </section>
-    <!-- ===== サマリ END ===== -->
-    <!-- ご意見BOX（管理者） -->
-      <section id="view-feedback" data-view class="view" hidden>
-        <div class="fbHeaderRow"
-             style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <div class="pageTitle" style="margin:0;">ご意見BOX</div>
-          <button id="btnFeedbackBack" class="btn btn-outline btn-sm btn-compact">
-            トップに戻る
-          </button>
-        </div>
-      
+        <!-- /上段アコーディオン -->
+
+        <!-- 登録フォーム本体 -->
         <div class="card">
-          <div class="row header">
-            <div class="sectionTitle">受信一覧（カテゴリ別）</div>
-            <button id="fbReload" class="btn btn-ghost btn-sm">再読込</button>
-          </div>
-      
-          <div id="feedbackListBox">読み込み中…</div>
+            <div class="row-space">
+                <div class="sectionTitle" id="adminFormTitle">新規登録</div>
+                <div class="small muted">
+                    <span id="adminEditingId" style="display:none;"></span>
+                </div>
+            </div>
+
+            <div class="adminGrid">
+                <div>
+                    <label for="ad_title">タイトル *</label>
+                    <input
+                    id="ad_title"
+                    type="text"
+                    placeholder="例：秋祭り演奏会"
+                    />
+                </div>
+
+                <!-- 種別 *：placeholder + selectBtn -->
+                <div>
+                    <label for="ad_type">種別 *</label>
+                    <select id="ad_type" class="selectBtn" required>
+                        <option value="" disabled hidden selected>（選択）</option>
+                        <option value="発表">発表</option>
+                        <option value="練習">練習</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="ad_ymd">日付 *</label>
+                    <input id="ad_ymd" type="date" />
+                </div>
+
+                <div>
+                    <label for="ad_hm">時間（開始）</label>
+                    <input
+                    id="ad_hm"
+                    type="time"
+                    placeholder="HH:mm"
+                    />
+                </div>
+
+                <div>
+                    <label for="ad_place">場所</label>
+                    <input
+                    id="ad_place"
+                    type="text"
+                    placeholder="例：藤塚小体育館"
+                    />
+                </div>
+
+                <div>
+                    <label for="ad_meetAt">集合時間（発表・その他のみ）</label>
+                    <input
+                    id="ad_meetAt"
+                    type="time"
+                    placeholder="HH:mm"
+                    />
+                </div>
+
+                <div>
+                    <label for="ad_meetPlace">集合場所</label>
+                    <input
+                    id="ad_meetPlace"
+                    type="text"
+                    placeholder="例：藤塚小学校"
+                    />
+                </div>
+
+                <!-- 対象区分 -->
+                <div>
+                    <label for="ad_segment">対象区分 *</label>
+                    <select id="ad_segment" class="selectBtn" required>
+                    <option value="子ども" selected>子ども</option>
+                    <option value="大人">大人</option>
+                    <option value="両方">両方</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="ad_attendTarget">出欠対象（発表のみ）</label>
+                    <select id="ad_attendTarget" class="selectBtn">
+                    <option value="Y">Y</option>
+                    <option value="N">N</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="ad_deadline">締切日</label>
+                    <input id="ad_deadline" type="date" />
+                </div>
+
+                <div>
+                    <label for="ad_publish">公開</label>
+                    <select id="ad_publish" class="selectBtn">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="ad_status">ステータス</label>
+                    <select id="ad_status" class="selectBtn">
+                    <option value="active" selected>active</option>
+                    <option value="archived">archived</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="ad_flag">配信フラグ（必須：発表のみ）</label>
+                    <select id="ad_flag" class="selectBtn">
+                    <!-- 動的に差し替え -->
+                    </select>
+                </div>
+            </div>
+
+            <div class="hint" style="margin-top:6px;">
+                * 必須。IDは自動採番です。<br />
+                種別が「練習」の場合は集合時間/集合場所/締切日/配信フラグ無効化。<br />
+                種別が「発表」以外では「出欠対象」は自動で N 固定になります。<br />
+                「発表」の配信フラグは <b>新規登録時は Y/N のみ</b>、
+                <b>編集時は Y/S/D/N</b> が選択可能です。
+            </div>
+
+            <div class="row right" style="margin-top:10px;">
+                <button
+                    id="btnAdminReset"
+                    class="btn btn-ghost btn-sm"
+                    type="button"
+                >
+                    新規モードに戻す
+                </button>
+                <button
+                    id="btnAdminSubmit"
+                    class="btn btn-primary"
+                    type="button"
+                >
+                    新規登録
+                </button>
+            </div>
+
+            <div
+                id="adminFormLog"
+                class="muted"
+                style="margin-top:8px;"
+            ></div>
         </div>
-      </section>
-  </main>
+        </section>
 
-  <footer id="legalFooter" class="legal-footer" aria-label="legal links">
-  <a href="https://fujizukadaiko.github.io/taiko-liff-form-prod/privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>
-  ・
-  <a href="https://fujizukadaiko.github.io/taiko-liff-form-prod/terms.html" target="_blank" rel="noopener">利用規約</a>
-</footer>
+    <!-- ===== View: 出欠結果一覧（管理者） ===== -->
+        <section id="view-admin-report" data-view>
+            <div class="row-space">
+                <div class="sectionTitle">出欠結果一覧（管理者）</div>
+                <button
+                id="btnReportBack"
+                class="btn btn-ghost btn-sm"
+                data-view-target="view-home"
+                type="button"
+                >
+                トップに戻る
+                </button>
+            </div>
 
-    <!-- ご意見ボタン -->
-    <button id="feedbackFab" class="fab" aria-label="ご意見BOX">
-      <img src="./assets/feedback.svg" alt="" />
-      <span class="sr-only">ご意見BOX</span>
+            <div class="card">
+                <!-- コントロール：ラベル右にプルダウン -->
+                <div class="repControls">
+                <label for="repEvent" class="repLabel">公演を選択</label>
+                <select id="repEvent" class="selectBtn schedSel short">
+                    <option value="">（選択してください）</option>
+                </select>
+
+                <label for="repAttend" class="repLabel">出欠フィルタ</label>
+                <select id="repAttend" class="selectBtn schedSel short">
+                    <option value="">（すべて）</option>
+                    <option value="参加">参加</option>
+                    <option value="欠席">欠席</option>
+                    <option value="未定">未定</option>
+                    <option value="未回答">未回答</option>
+                </select>
+
+                <!-- 下段：再取得ボタン（2列ぶち抜き） -->
+                <div class="span2">
+                    <button
+                    id="btnReportReload"
+                    class="btn btn-ghost btn-sm"
+                    type="button"
+                    >
+                    更新
+                    </button>
+                </div>
+            </div>
+        </div>
+
+            <div
+                id="repBox"
+                class="muted"
+                aria-live="polite"
+            >
+                公演を選択してください
+            </div>
+        </section>
+    <!-- ===== View: カスタム通知（管理者） ===== -->
+        <section id="view-custom-push" data-view>
+
+            <!-- 見出し行：左=タイトル / 右=トップに戻る -->
+            <div class="row-space" style="align-items:center;">
+                <div class="sectionTitle">カスタム通知</div>
+                <button
+                id="btnCustomBack"
+                type="button"
+                class="btn btn-ghost btn-sm"
+                data-view-target="view-home"
+                >
+                トップに戻る
+                </button>
+            </div>
+
+            <!-- カード本体：イベント選択〜本文入力まで -->
+            <div class="card">
+
+                <!-- 宛先の選び方（ラベル左／セレクト右） -->
+                <div class="row-att" style="margin:6px 0 12px;">
+                    <label for="cp_event" class="repLabel">宛先の選び方</label>
+                    <select id="cp_event" class="selectBtn schedSel">
+                        <option value="manual">手動のみで宛先を選ぶ</option>
+                        <optgroup id="opt-events" label="イベントから選ぶ"></optgroup>
+                    </select>
+                </div>
+
+                <!-- 対象ステータス（見出し＋チェック群） -->
+                <div id="cp_stat_wrap" class="statWrap">
+                    <div class="repLabel">
+                        対象ステータス
+                        <span id="cp_stat_lock" class="lockTag" hidden>手動モード（選択不可）</span>
+                    </div>
+
+                    <div class="row" style="gap:10px; margin-top:6px;">
+                        <label><input type="checkbox" class="cp_stat" value="参加"> 参加</label>
+                        <label><input type="checkbox" class="cp_stat" value="未定"> 未定</label>
+                        <label><input type="checkbox" class="cp_stat" value="未回答"> 未回答</label>
+                        <label><input type="checkbox" class="cp_stat" value="欠席"> 欠席</label>
+                    </div>
+                </div>
+
+                <!-- 宛先追加（手動） ラベル左 / セレクト右 -->
+                <div class="row-att" id="cp_extra_row" style="margin:12px 0;">
+                    <label for="cp_extra" class="repLabel">宛先追加（手動）</label>
+                    <select id="cp_extra" class="selectBtn" multiple>
+                        <option value="">選択してください</option>
+                    </select>
+                    <!-- 下段フル幅で表示 -->
+                    <div class="row-att-note">
+                        <span id="cp_extra_hint" class="loadingHint" hidden>（読み込み中…）</span>
+                    </div>
+                </div>
+
+                <!-- 自動選択 / 手動追加（表示のみ・薄紫） -->
+                <div class="cp-pill">
+                    <div class="cp-pill-title">宛先（自動選択）</div>
+                    <div class="cp-pill-body" id="cp_auto" aria-live="polite">（該当なし）</div>
+                </div>
+                <div class="cp-pill" id="cp_manual_wrap">
+                    <div class="cp-pill-title">宛先（手動選択）</div>
+                    <div class="cp-pill-body" id="cp_manual" aria-live="polite">（未選択）</div>
+                </div>
+
+                <!-- 手動追加とテンプレの間に1行分の空白 -->
+                <div class="cp-space-1line"></div>
+
+                <!-- テンプレート -->
+                <div class="row-att" style="margin:6px 0 12px;">
+                    <label for="cp_tpl" class="repLabel">テンプレート</label>
+                    <select id="cp_tpl" class="selectBtn">
+                        <option value="">なし</option>
+                        <option value="雨天中止">雨天中止時</option>
+                        <option value="時間変更">時間変更時</option>
+                    </select>
+                </div>
+
+                <!-- 本文 -->
+                <div class="cp-field">
+                    <label for="cp_body" class="repLabel">本文（2000文字まで）</label>
+                    <textarea
+                        id="cp_body"
+                        rows="7"
+                        maxlength="2000"
+                        class="cp-textarea"
+                    ></textarea>
+                    <div class="hint" id="cp_count">0 / 2000</div>
+                </div>
+
+                <!-- アクション -->
+                <div class="row" style="gap:10px; justify-content:flex-end;">
+                    <button id="cp_reset" class="btn btn-ghost" type="button">リセット</button>
+                    <button id="cp_send"  class="btn btn-primary" type="button">送信する</button>
+                </div>
+            </div><!-- /card -->
+        </section>
+
+<script>
+/* ===== 後で移動 ===== */
+/* ===== カスタム通知：イベント一覧 + 宛先ステータス制御 ===== */
+    (function(){
+    // 1) getLineId は必ずグローバルに一度だけ
+    window.getLineId = window.getLineId || (async function(){
+        try{
+        if (typeof window.getMyLineId_ === 'function'){
+            const id = await window.getMyLineId_();
+            if (id){
+            (window.state ||= {}).lineId = id;
+            return id;
+            }
+        }
+        }catch(_){}
+
+        const tryOnce = () => {
+        if (window.__ME__?.lineId) return window.__ME__.lineId;
+        if (window.state?.lineId)  return window.state.lineId;
+        try{
+            return window.liff?.getDecodedIDToken?.()?.sub || '';
+        }catch(_){
+            return '';
+        }
+        };
+
+        for (let i = 0; i < 40; i++){
+        const id = tryOnce();
+        if (id){
+            (window.state ||= {}).lineId = id;
+            return id;
+        }
+        await new Promise(r => setTimeout(r, 100));
+        }
+        return '';
+    });
+
+    const sec      = document.getElementById('view-custom-push');
+    const selMode  = document.getElementById('cp_event');
+    const optGroup = document.getElementById('opt-events');
+
+    function applyModeUI(){
+        const statWrap = document.getElementById('cp_stat_wrap');
+        const statLock = document.getElementById('cp_stat_lock');
+        const manual   = (selMode.value === 'manual' || !selMode.value);
+
+        sec.querySelectorAll('.cp_stat').forEach(cb => {
+        cb.disabled = manual;
+        });
+
+        if (statWrap){
+        statWrap.classList.toggle('is-disabled', manual);
+        statWrap.setAttribute('aria-disabled', manual ? 'true' : 'false');
+        }
+        if (statLock){
+        statLock.hidden = !manual;
+        }
+    }
+
+    async function fillEventChoices(){
+        // プレースホルダ（optgroup だけ差し替え）
+        if (optGroup){
+        optGroup.innerHTML = '<option value="" disabled>読み込み中…</option>';
+        }
+
+        const lid = await getLineId();
+        const url = new URL(API_ENDPOINT);
+        url.searchParams.set('attendanceReport', '1');
+        url.searchParams.set('meta', '1');
+        url.searchParams.set('admin', '1');
+        if (lid) url.searchParams.set('lineId', lid);
+
+        let r;
+        try{
+        r = await fetch(url).then(x => x.json());
+        }catch(e){
+        r = { status: 'error', message: String(e) };
+        }
+
+        const listRaw =
+        Array.isArray(r?.list) ? r.list :
+        Array.isArray(r?.meta) ? r.meta :
+        Array.isArray(r?.data) ? r.data : [];
+
+        const isOpen = e =>
+        (typeof e.open      !== 'undefined') ? !!e.open :
+        (typeof e.published !== 'undefined') ? !!e.published :
+        (typeof e.status    !== 'undefined') ? (e.status === '公開中') :
+        true;
+
+        const isHappyo = e =>
+        (typeof e.kind !== 'undefined')
+            ? (e.kind === '発表' || /発表/.test(String(e.kind)))
+            : true;
+
+        const list = listRaw.filter(e => isOpen(e) && isHappyo(e));
+
+        // イベントIndex（集合時間/場所も拾う）
+        const idx = {};
+        list.forEach(e => {
+        const id  = String(e.eventId ?? e.id ?? '');
+        const ymd = e.ymd || e.date || '';
+        const hm  = e.hm  || e.time || '';
+        const meet      = e.meet || e.meetTime || e['集合'] || '';
+        const meetPoint = e.meetPoint || e['集合場所'] || e.place || e.venue || '';
+        idx[id] = {
+            id,
+            title   : e.title || e.name || '',
+            date    : ymd,
+            time    : hm,
+            datetime: [ymd, hm].filter(Boolean).join(' '),
+            place   : e.place || e.venue || '',
+            meet,
+            meetPoint
+        };
+        });
+        window.__EVENT_INDEX__ = idx;
+
+        const opts = list.map(e => {
+        const id  = String(e.eventId ?? e.id ?? '');
+        const ymd = e.ymd || e.date || '';
+        const hm  = e.hm  || e.time || '';
+        const dt  = [ymd, hm].filter(Boolean).join(' ');
+        const tt  = e.title || e.name || '';
+        return `<option value="${id}">${dt} ｜ ${tt}</option>`;
+        }).join('') || '<option value="" disabled>（該当イベントなし）</option>';
+
+        if (optGroup){
+        optGroup.innerHTML = opts;
+        }
+        applyModeUI();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        fillEventChoices();
+        applyModeUI();
+
+        if (selMode){
+        selMode.addEventListener('change', applyModeUI);
+        }
+    });
+    })();
+
+    /* ===== カスタム通知：テンプレート適用 & 文字数カウント ===== */
+    (function(){
+    function boot(){
+        const selTpl  = document.getElementById('cp_tpl');
+        const selMode = document.getElementById('cp_event');
+        const bodyEl  = document.getElementById('cp_body');
+        const cntEl   = document.getElementById('cp_count');
+        if (!selTpl || !selMode || !bodyEl) return;
+
+        function pickEventCtx(){
+        const eid = selMode.value;
+        const ev  = (eid && eid !== 'manual')
+            ? (window.__EVENT_INDEX__?.[eid] || null)
+            : null;
+
+        return ev || {
+            title   : '{TITLE}',
+            date    : '{DATE}',
+            time    : '{TIME}',
+            datetime: '{DATETIME}',
+            place   : '{PLACE}',
+            meet    : '{MEET_OLD}',
+            meetPoint: '{MEET_POINT}'
+        };
+        }
+
+        function applyTemplate(){
+        const kind = selTpl.value;
+        const ctx  = pickEventCtx();
+        let text   = '';
+
+        if (kind === '雨天中止'){
+            text =
+    `【雨天中止のお知らせ】
+    ${ctx.datetime} 開催予定の「${ctx.title}」は、雨天のため中止となりました。
+    楽しみにしてくださっていた皆さまには申し訳ありません。
+
+    どうぞよろしくお願いいたします。`;
+        } else if (kind === '時間変更'){
+            text =
+    `【集合時間変更のお知らせ】
+    ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
+    集合場所：${ctx.meetPoint || '{MEET_POINT}'}
+    開始時間：${ctx.time || '{TIME}'}
+    場所：${ctx.place || '{PLACE}'}
+
+    ご不便をおかけしますが、どうぞよろしくお願いいたします。`;
+        }
+
+        bodyEl.value = text;
+        bodyEl.dispatchEvent(new Event('input'));
+
+        if (cntEl){
+            cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
+        }
+        }
+
+        selTpl.addEventListener('change', applyTemplate);
+        selMode.addEventListener('change', () => {
+        if (selTpl.value) applyTemplate();
+        });
+
+        // 文字数カウンタ
+        if (cntEl){
+        const upd = () => {
+            cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
+        };
+        bodyEl.addEventListener('input', upd);
+        upd();
+        }
+
+        bodyEl.style.whiteSpace = 'pre-wrap';
+        bodyEl.style.lineHeight = '1.6';
+    }
+
+    if (document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', boot);
+    }else{
+        boot();
+    }
+    })();
+</script>
+
+    <!-- ===== View: サマリ（管理者）===== -->
+        <section id="view-summary" data-view>
+            <!-- 見出し行：左=タイトル / 右=トップに戻る -->
+            <div
+                class="summaryHeaderRow"
+                style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"
+            >
+                <div class="pageTitle" style="margin:0;">サマリ</div>
+                <button
+                id="btnSummaryToTop"
+                class="btn btn-outline btn-sm btn-compact"
+                type="button"
+                data-view-target="view-home"
+                >
+                トップに戻る
+                </button>
+            </div>
+
+            <!-- タブ風ボタン + コンテンツ -->
+            <div class="card">
+                <!-- タブ風ボタン -->
+                <div class="row" style="gap:8px;margin-bottom:8px;">
+                <button
+                    id="btnSummaryFreeQuota"
+                    class="btn btn-primary btn-sm btn-compact"
+                    type="button"
+                >
+                    無料枠確認
+                </button>
+                <button
+                    id="btnSummaryPushStats"
+                    class="btn btn-outline btn-sm btn-compact"
+                    type="button"
+                >
+                    配信履歴
+                </button>
+            </div>
+
+            <!-- 無料枠 -->
+            <div id="summaryFreeQuotaBox" class="summaryCard">
+                <div class="small muted">読み込み待機中…</div>
+            </div>
+
+            <!-- 配信履歴 -->
+            <div id="summaryPushStatsBox" class="summaryCard" style="display:none;">
+                <div class="small muted">読み込み待機中…</div>
+            </div>
+
+            <!-- 再取得ボタン -->
+            <div class="row" style="gap:8px;margin-top:10px;">
+                <button
+                    id="btnSummaryReload"
+                    class="btn btn-outline btn-sm btn-compact"
+                    type="button"
+                >
+                    再取得
+                </button>
+            </div>
+
+            <!-- 説明文 -->
+            <div class="small muted" style="margin-top:6px;">
+                ※ 「無料枠確認」は<strong>このシステム（Messaging API経由）</strong>で送信した今月の利用状況を表示します。<br>
+                ※ Official Accountアプリからの手動配信や、あいさつ／自動応答メッセージは<strong>含まれません</strong>。<br>
+                ※ 「配信履歴」は Pushlog / PushDetail をもとに当月の集計を表示します。
+            </div>
+        </div>
+        </section>
+
+    <!-- View: ご意見BOX（管理者）） -->
+        <section id="view-feedback" data-view>
+            <div
+                class="fbHeaderRow"
+                style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"
+            >
+                <div class="pageTitle" style="margin:0;">ご意見BOX</div>
+                <button
+                id="btnFeedbackBack"
+                class="btn btn-outline btn-sm btn-compact"
+                type="button"
+                data-view-target="view-home"
+                >
+                トップに戻る
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="row header">
+                <div class="sectionTitle">受信一覧（カテゴリ別）</div>
+                <button
+                    id="fbReload"
+                    class="btn btn-ghost btn-sm"
+                    type="button"
+                >
+                    再読込
+                </button>
+                </div>
+
+                <div id="feedbackListBox">読み込み中…</div>
+            </div>
+        </section>
+</main>
+
+<!-- ===== Global: フッター（法的リンク） ===== -->
+  <footer
+        id="legalFooter"
+        class="siteFooter legal-footer"
+        aria-label="法的情報へのリンク"
+    >
+        <a
+            href="https://fujizukadaiko.github.io/taiko-liff-form-prod/privacy.html"
+            target="_blank"
+            rel="noopener"
+        >
+            プライバシーポリシー
+        </a>
+        <span class="dot">・</span>
+        <a
+            href="https://fujizukadaiko.github.io/taiko-liff-form-prod/terms.html"
+            target="_blank"
+            rel="noopener"
+        >
+            利用規約
+        </a>
+    </footer>
+
+<!-- ===== Global: ご意見ボタン（FAB） ===== -->
+    <button
+        id="feedbackFab"
+        class="fab"
+        type="button"
+        aria-label="ご意見BOX"
+        aria-haspopup="dialog"
+        aria-controls="feedbackModal"
+    >
+        <img src="./assets/feedback.svg" alt="" />
+        <span class="sr-only">ご意見BOX</span>
     </button>
     
-    <!-- ご意見モーダル -->
-    <div id="feedbackModal" class="modal" hidden>
-      <div class="modal-backdrop" data-close="1"></div>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="fbTitle">
-        <div class="modal-header">
-          <div id="fbTitle" class="modal-title">ご意見BOX</div>
-          <button class="icon-btn" data-close="1" aria-label="閉じる">×</button>
+<!-- ===== Global Modal: ご意見BOX ===== -->
+    <div
+        id="feedbackModal"
+        class="modal"
+        hidden
+    >
+        <div class="modal-backdrop" data-close="1"></div>
+
+        <div
+            class="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="fbTitle"
+        >
+            <div class="modal-header">
+                <div id="fbTitle" class="modal-title">ご意見BOX</div>
+                <button
+                    class="icon-btn"
+                    data-close="1"
+                    type="button"
+                    aria-label="閉じる"
+                >
+                    ×
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <label class="label">カテゴリ（任意）</label>
+                <select id="fbCategory" class="select">
+                    <option value="その他" selected>その他</option>
+                    <option value="要望">要望</option>
+                    <option value="不具合">不具合</option>
+                    <option value="デザイン">デザイン</option>
+                </select>
+
+                <label class="label" style="margin-top:10px;">メッセージ（必須）</label>
+                <textarea
+                    id="fbMessage"
+                    class="textarea"
+                    rows="5"
+                    maxlength="300"
+                    placeholder="ご意見・ご要望をお聞かせください"
+                ></textarea>
+
+                <div class="counter">
+                    <span id="fbCount">0</span> / 300
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button
+                    class="btn btn-outline"
+                    data-close="1"
+                    type="button"
+                >
+                    キャンセル
+                </button>
+                <button
+                    id="fbSendBtn"
+                    class="btn btn-primary"
+                    type="button"
+                >
+                    送信
+                </button>
+            </div>
         </div>
-    
-        <div class="modal-body">
-          <label class="label">カテゴリ（任意）</label>
-          <select id="fbCategory" class="select">
-            <option value="その他" selected>その他</option>
-            <option value="要望">要望</option>
-            <option value="不具合">不具合</option>
-            <option value="デザイン">デザイン</option>
-          </select>
-    
-          <label class="label" style="margin-top:10px;">メッセージ（必須）</label>
-          <textarea id="fbMessage" class="textarea" rows="5" maxlength="300" placeholder="ご意見・ご要望をお聞かせください"></textarea>
-          <div class="counter"><span id="fbCount">0</span> / 300</div>
-        </div>
-    
-        <div class="modal-footer">
-          <button class="btn btn-outline" data-close="1">キャンセル</button>
-          <button id="fbSendBtn" class="btn btn-primary">送信</button>
-        </div>
-      </div>
     </div>
     
-    <!-- スナックバー -->
-    <div id="snackbar" class="snackbar" role="status" aria-live="polite"></div>
+<!-- ===== Global: スナックバー ===== -->
+    <div
+        id="snackbar"
+        class="snackbar"
+        role="status"
+        aria-live="polite"
+    ></div>
   
-  <!-- 更新履歴モーダル -->
-  <div id="changelogModal" class="modal" hidden>
-    <div class="modal-backdrop" data-close="1"></div>
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="cgTitle">
-      <div class="modal-header">
-        <div id="cgTitle" class="modal-title">更新履歴</div>
-      </div>
-  
-      <div class="modal-body">
-        <div id="changelogList" class="cg-list"></div>
-      </div>
-  
-      <div class="modal-footer">
-        <button class="btn btn-outline" data-close="1">閉じる</button>
-      </div>
+<!-- ===== Global Modal: 更新履歴 ===== -->
+    <div
+        id="changelogModal"
+        class="modal"
+        hidden
+    >
+        <div class="modal-backdrop" data-close="1"></div>
+
+        <div
+            class="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cgTitle"
+        >
+            <div class="modal-header">
+                <div id="cgTitle" class="modal-title">更新履歴</div>
+            </div>
+
+            <div class="modal-body">
+                <div id="changelogList" class="cg-list"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button
+                    class="btn btn-outline"
+                    data-close="1"
+                    type="button"
+                >
+                    閉じる
+                </button>
+            </div>
+        </div>
     </div>
-  </div>
-  
+
+<!-- OLD STYLE START ...
   <style>
     /* ===== Custom Push UI style (scoped) ===== */
     #view-custom-push {
@@ -2702,7 +3108,8 @@
       background: #e11d48; /* 赤 */
     }
   </style>
-
+ --> 
+ 
   <!-- ===== HomeEventsUI v7 ===== -->
   <script>
   (function(){
