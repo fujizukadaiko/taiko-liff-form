@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.2.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.2.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1028,7 +1028,7 @@
         /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
         .repControls{
             display: grid;
-            grid-template-columns: auto max-content;
+            grid-template-columns: auto minmax(0, 1fr); 
             gap: 10px 14px;
             align-items: center;
             justify-content: start;
@@ -1119,12 +1119,12 @@
             flex:0 0 auto;
         }
 
-        /* 管理レポート：公演セレクトの幅をカード内いっぱいに */
-        #repEvent{
-        display:block;        /* 念のため block にしておく */
-        width:100%;
-        max-width:100%;
-        box-sizing:border-box;
+       /* 管理レポート内のセレクトをカード内いっぱいに */
+        #view-admin-report .repControls select{
+            display:block;
+            width:100%;
+            max-width:100%;
+            box-sizing:border-box;
         }
     /* ===== Custom Push ===== */ 
         #view-custom-push .card{
