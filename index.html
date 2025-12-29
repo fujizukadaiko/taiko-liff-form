@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.2.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.2.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6130,38 +6130,32 @@
         const order = f ? [f] : ["参加", "未定", "欠席", "未回答"];
 
         const body =
-        order
-            .map(k => {
-            const arr = by[k] || [];
-            if (!arr.length) return "";
-            return `
-                <div class="repGroup">
-                <div class="repGroupHead">
-                    <span class="badge-att ${badgeCls(k)}">${k}</span>
-                    <span class="repCount">${arr.length}名</span>
-                </div>
-                ${arr
-                    .map(
-                    p => `
-                        <div class="repPersonRow">
-                        <div class="repName">${h(p.name)}</div>
-                        <div class="repAt">${
-                            p.comment
-                            ? `<span class="repComment">${h(
-                                String(p.comment).trim()
-                                )}</span>`
-                            : repFormatAt(p.at)
-                                ? `<span class="repComment">${h(
-                                    repFormatAt(p.at)
-                                )}</span>`
+            order
+                .map(k => {
+                const arr = by[k] || [];
+                if (!arr.length) return "";
+                return `
+                    <div class="repGroup">
+                    <div class="repGroupHead">
+                        <span class="badge-att ${badgeCls(k)}">${k}</span>
+                        <span class="repCount">${arr.length}名</span>
+                    </div>
+                    ${arr
+                        .map(p => {
+                        const commentText = String(p.comment || "").trim();
+                        return `
+                            <div class="repPersonRow">
+                            <div class="repName">${h(p.name)}</div>
+                            <div class="repAt">${
+                                commentText
+                                ? `<span class="repComment">${h(commentText)}</span>`
                                 : ""
-                        }</div>
-                        </div>`
-                    )
-                    .join("")}
-                </div>`;
-            })
-            .join("") || `<div class="repNA">該当者がいません</div>`;
+                            }</div>
+                            </div>`;
+                        }).join("")}
+                    </div>`;
+                })
+                .join("") || `<div class="repNA">該当者がいません</div>`;
 
         if (box) {
         box.innerHTML = `<div class="repCard">${head}${body}</div>`;
