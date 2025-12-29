@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.0.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.0.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -118,6 +118,9 @@
         --c-primary:#7f6aa5; --c-primary-2:#6d5a93; --c-accent:#a678b0;
         --c-acc1:#d2e5b1; --c-acc2:#9ce78f; --c-acc2-dark:#6aa96a;
         --c-ok:#0a7; --c-err:#c33;
+        --seg-child-border:#f59e9e;
+        --seg-adult-border:#93c5fd;
+        --seg-both-border:#e8e2f0;
         }
         body{
         margin:0; color:var(--c-text);
@@ -343,12 +346,43 @@
             cursor: not-allowed;
             filter: saturate(.6);
             }
+
+            /* 汎用：コンパクトボタン */
+            .btn-compact{
+                min-height:30px;
+                padding:6px 10px;
+                font-size:13px;
+                border-radius:9px;
+            }     
         
         /* プレースホルダ行（value=""）の色 */
             .selectBtn option[value=""]{
                 color: #9aa;
             }
         
+        /* ===== Seg Badge（区分バッジ共通） ===== */
+        .seg-badge{
+        display:inline-flex; align-items:center; justify-content:center;
+        height:20px; padding:0 8px; border-radius:999px;
+        font-size:11px; font-weight:700; white-space:nowrap;
+        border:1.5px solid; margin-right:8px;
+        }
+        .seg-adult { 
+        color:#1d4ed8; background:#e6f0ff; border-color:#60a5fa; /* 青系(水色背景) */
+        }
+        .seg-child {
+        color:#b91c1c; background:#ffecec; border-color:#f59e9e; /* 落ち着いた赤 */
+        }
+        .seg-both  {
+        color:#6d5a93; background:#f1eaff; border-color:#bda8ea; /* 紫系 */
+        }
+
+        /* 「区分」セレクトを全幅 */
+        #view-register .selectBtn{
+        width: 100%;
+        min-width: 0;
+        }
+
         /* バッジの色設計 */
         .badge-att{
             display:inline-flex;
@@ -433,12 +467,6 @@
         background-clip: padding-box;     /* Safari等のにじみ対策 */
         }
 
-        /* ===== 区分別の枠色（カード/行を共通で） ===== */
-        :root{
-        --seg-child-border:#f59e9e;   /* 子ども=薄い赤 */
-        --seg-adult-border:#93c5fd;   /* 大人=薄い青  */
-        --seg-both-border:#e8e2f0;    /* 両方=薄い紫（既存） */
-        }
         /* イベントカード類（トップ/フォーム/予定/管理一覧） */
         .card[data-seg="child"], .fEvent[data-seg="child"], .eventRow[data-seg="child"]{
         border-color: var(--seg-child-border) !important;
@@ -517,6 +545,11 @@
             /* 既存の太字指定を新レイアウトにも適用（サイズ変更なし） */
             .fRow1 .t-date{ font-weight:700; }
 
+            /* ===== 出欠：セグメントを独立行にしたときの余白 ===== */
+            .fHead .seg-badge{
+                margin: 0 0 4px 0;
+            }
+            
             /* ===== ガイドの赤強調 ===== */
             .em-red{
                 color: var(--c-err);
@@ -636,6 +669,266 @@
         }
         }
     
+    /* ===== Schedules: カードレイアウト（ホーム） ===== */
+        /* === 今後の予定：新カードレイアウト === */
+        .scheduleCard{ position:relative; cursor:pointer; }
+
+        .scheduleCard .row1{
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin-bottom:4px;
+        }
+        .scheduleCard .row2{
+            font-weight:700;
+            margin:2px 0 0;
+            display:flex;
+            gap:8px;
+            flex-wrap:wrap;
+        }
+        .scheduleCard .row2 .date{ white-space:nowrap; }
+        .scheduleCard .row2 .title{ min-width:0; }
+
+        .scheduleCard .row3{
+            font-size:12px;
+            color:#444;
+            margin-top:4px;
+            display:flex;
+            align-items:baseline;
+            gap:8px;
+            flex-wrap:nowrap;
+        }
+        .scheduleCard .row3 .place{
+            flex:1 1 auto;
+            min-width:0;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+        }
+        .scheduleCard .row3 .meet{
+            flex:0 0 auto;
+            white-space:nowrap;
+            margin-left:auto;
+        }
+
+        .scheduleCard .row1 .kind-badge{
+            margin-left:auto;
+        }
+        
+        /* 折りたたみ付きカード */
+        .scTop{
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin-bottom:6px;
+        }
+        .scKind{
+            margin-left:auto;
+            display:inline-flex;
+            align-items:center;
+            height:22px;
+            padding:0 10px;
+            font-size:12px;
+            font-weight:700;
+            background:#f7f7fb;
+            border:1px solid var(--c-border);
+            border-radius:8px;
+            color:#444;
+        }
+
+        .scTitleBtn{
+            all:unset;
+            display:flex;
+            align-items:baseline;
+            gap:8px;
+            width:100%;
+            cursor:pointer;
+        }
+        .scTitleBtn .scDate{
+            flex:0 0 auto;
+            font-weight:700;
+            white-space:nowrap;
+        }
+        .scTitleBtn .scTitle{
+            flex:1 1 auto;
+            min-width:0;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+        .scTitleBtn[aria-expanded="true"] .scTitle{
+            white-space:normal;
+            overflow:hidden;
+            text-overflow:clip;
+            display:-webkit-box;
+            -webkit-box-orient:vertical;
+            -webkit-line-clamp:2;
+        }
+        .scTitleBtn .scTime{
+            margin-left:.6rem;
+            font-weight:600;
+            white-space:nowrap;
+            opacity:.9;
+        }
+        .scTitleBtn .scCaret{
+            flex:0 0 auto;
+            margin-left:8px;
+            font-size:16px;
+            line-height:1;
+            transition:transform .12s ease;
+        }
+        .scTitleBtn[aria-expanded="true"] .scCaret{
+            transform:rotate(180deg);
+        }
+
+        .scPanel{ margin-top:8px; }
+        .scFullTitle{ font-weight:700; margin-bottom:6px; }
+        .scMemo{
+            margin:6px 0 2px;
+            padding:0;
+            border:0;
+            background:transparent;
+            border-radius:0;
+            font-size:13px;
+            color:#444;
+        }
+        .scMeta{
+            font-size:13px;
+            color:var(--c-text);
+            margin-top:6px;
+            display:flex;
+            flex-direction:column;
+            gap:4px;
+        }
+        .scMeta .scLine{
+            display:flex;
+            align-items:baseline;
+            gap:.5em;
+            min-width:0;
+        }
+        .scMeta .lbl{
+            font-weight:700;
+            margin-right:6px;
+            white-space:nowrap;
+        }
+
+    /* ===== Admin（管理画面） ===== */
+        /* 管理アコーディオン：ラベル｜プルダウンの2列グリッド */
+        .adminControls{
+            display:grid;
+            grid-template-columns: auto max-content;
+            gap:10px 14px;
+            align-items:center;
+            justify-content:start;
+        }
+        .adminControls .span2{
+            grid-column:1 / -1;
+            display:flex;
+            justify-content:flex-start;
+            margin-top:4px;
+        }
+        .admLabel{
+            font-size:14px;
+            color:var(--c-text);
+            white-space:nowrap;
+        }
+
+        @media (max-width: 420px){
+            .adminControls{
+            grid-template-columns:1fr 1fr;
+            }
+            .adminControls select{
+            width:100%;
+            }
+        }
+
+        /* 管理アコーディオン：プルダウン幅をさらに半分くらいに */
+        #adminListAcc .adminControls .schedSel.short{
+            width:100px !important;
+            min-width:100px !important;
+            max-width:100%;
+        }
+        @media (max-width: 420px){
+            #adminListAcc .adminControls .schedSel.short{
+            width:100px !important;
+            min-width:100px !important;
+            }
+        }
+
+        /* 上部アコーディオンのヘッダーを常時うす紫、open時は少し濃く */
+        #adminListAcc .fHead{
+            background:#f5efff !important;
+            border-radius:10px;
+        }
+        #adminListAcc.open .fHead{
+            background:#efe7ff !important;
+        }
+
+        /* アコーディオン内の編集ボタンを小さめ＆薄めトーンに */
+        #adminListAcc .btn-edit{
+            min-height: 32px;
+            padding: 6px 10px;
+            font-size: 13px;
+            border-radius: 9px;
+            background:#fff !important;
+            color: color-mix(in srgb, var(--c-primary-2), #000 0%) !important;
+            border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 12%) !important;
+            box-shadow: 0 1px 3px rgba(127,106,165,0.08);
+        }
+        #adminListAcc .btn-edit:hover{
+            background:#f8f6ff !important;
+            border-color: color-mix(in srgb, var(--c-primary-2), #000 20%) !important;
+        }
+        
+        /* 管理アコーディオン：開閉をIDで強制表示 */
+        #adminListAcc .fBody{ display:none; }
+        #adminListAcc.open .fBody{ display:block; }
+
+        /* 管理アコーディオン：再取得ボタンもコンパクトに */
+        #adminListAcc #btnAdminFetch{
+            min-height:30px;
+            padding:6px 10px;
+            font-size:13px;
+            border-radius:9px;
+        }
+
+        /* 管理アコーディオン：中身の余白 */    
+        #adminListAcc .fBody{ padding-top:12px !important; }
+        #adminListAcc .adminControls{ margin-top:4px; }
+        
+        /* トップの未定/未回答のみ表示：シンプル表示 */
+        #homeOnlyNALabel{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            background:#fff !important;
+            border:0 !important;
+            padding:0 !important;
+            box-shadow:none !important;
+            font-size:13px;
+            color:var(--c-text);
+        }
+        #homeOnlyNALabel input{
+            width:16px;
+            height:16px;
+        }
+
+        /* 管理用カードの3ボタンを編集ボタンと同サイズに */
+        #adminMenu a.btn,
+        #adminMenu button.btn{
+            min-height:30px !important;
+            padding:6px 10px !important;
+            font-size:13px !important;
+            border-radius:9px !important;
+            box-shadow:0 1px 3px rgba(127,106,165,0.08);
+        }
+
+        /* 管理フォームのみ：注釈の文字をさらに小さく（10px） */
+        #view-admin .hint{
+            font-size: 10px !important;
+            line-height: 1.55;
+        }
+
     /* ===== Register（氏名編集） ===== */
         .regAddRow { 
         margin-top: 12px;               /* 上と詰まらないように余白を追加 */
@@ -686,31 +979,103 @@
         @media (max-width: 420px){
         .perfRow{ column-gap: 10px; }
         }
+    
+    /* ===== Admin Report（出欠レポート） ===== */
+        /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
+        .repControls{
+            display: grid;
+            grid-template-columns: auto max-content;
+            gap: 10px 14px;
+            align-items: center;
+            justify-content: start;
+        }
+        .repControls .span2{
+            grid-column: 1 / -1;
+            display: flex;
+            justify-content: flex-start;
+            margin-top: 4px;
+        }
+        .repLabel{
+            font-size: 14px;
+            color: var(--c-text);
+            white-space: nowrap;
+        }
 
-    /* ===== Seg Badge（区分バッジ共通） ===== */
-        .seg-badge{
-        display:inline-flex; align-items:center; justify-content:center;
-        height:20px; padding:0 8px; border-radius:999px;
-        font-size:11px; font-weight:700; white-space:nowrap;
-        border:1.5px solid; margin-right:8px;
+        /* ===== 出欠結果バッジ（管理レポート・旧レイアウト） ===== */
+        .repCard{
+            background:#fff;
+            border:1px solid var(--c-border);
+            border-radius:12px;
+            padding:12px;
         }
-        .seg-adult { 
-        color:#1d4ed8; background:#e6f0ff; border-color:#60a5fa; /* 青系(水色背景) */
+        .repHead{
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px;
+            align-items:center;
+            margin-bottom:8px;
         }
-        .seg-child {
-        color:#b91c1c; background:#ffecec; border-color:#f59e9e; /* 落ち着いた赤 */
+        .repTitle{ font-weight:700; }
+        .repSub  { font-size:12px; color:var(--c-muted); }
+
+        .repRow{
+            display:flex;
+            align-items:baseline;
+            gap:8px;
+            padding:6px 0;
+            border-top:1px dashed #eee;
         }
-        .seg-both  {
-        color:#6d5a93; background:#f1eaff; border-color:#bda8ea; /* 紫系 */
+        .repRow:first-child{ border-top:0; }
+
+        .repName{ font-weight:600; min-width:9em; }
+        .repAt  { font-size:12px; color:var(--c-muted); }
+
+        
+        .repNA{
+            margin-top:10px;
+            padding-top:8px;
+            border-top:1px solid var(--c-border);
+            font-size:13px;
+            color:#475569;
         }
 
-        /* 「区分」セレクトを全幅 */
-        #view-register .selectBtn{
-        width: 100%;
-        min-width: 0;
+        /* 管理レポート：名前⇔コメントの間を固定ギャップで */
+        #view-admin-report .repPersonRow{
+            display:flex;
+            align-items:flex-start;
+            gap:16px;
         }
+        #view-admin-report .repPersonRow .repName{
+            flex:0 0 auto;
+        }
+        #view-admin-report .repPersonRow .repAt{
+            flex:1 1 auto;
+            min-width:0;
+            display:flex;
+            align-items:baseline;
+            overflow-wrap:anywhere;
+            word-break:break-word;
+        }
+        #view-admin-report .repComment{
+            display:block;
+            flex:1 1 auto;
+            min-width:0;
+            white-space:normal !important;
+            overflow-wrap:anywhere;
+            word-break:break-word;
+        }
+        #view-admin-report .repPersonRow .repAt:empty{
+            display:none;
+        }
+        #view-admin-report .repComment::before{
+            content:"｜";
+            color:var(--c-muted);
+            margin-right:.5em;
+            opacity:.7;
+            flex:0 0 auto;
+        }
+
     /* ===== Custom Push ===== */ 
-    /* TODO: 後でまとめて移動する */ 
         #view-custom-push .card{
         max-width: 720px;
         margin: 12px auto;
@@ -719,6 +1084,139 @@
         box-shadow: 0 4px 16px rgba(0,0,0,.06);
         }
         #view-custom-push .sectionTitle{ margin-bottom: 8px; }
+
+         #view-custom-push .cp-checks{
+            display:flex;
+            flex-wrap:wrap;
+            gap:12px;
+            justify-content:flex-end;
+        }
+        #view-custom-push .cp-field{
+            margin:12px 0;
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+        }
+        #view-custom-push .cp-textarea{
+            width:100%;
+            border:1.5px solid var(--c-primary-2);
+            background:#fff;
+            border-radius:10px;
+            padding:10px 12px;
+            font-size:16px;
+            box-sizing:border-box;
+        }
+        #view-custom-push .hint{
+            color:var(--c-muted);
+            font-size:12px;
+        }
+
+        #view-custom-push .cp-stat-row{
+            display:flex;
+            flex-wrap:wrap;
+            gap:12px;
+            justify-content:flex-start;
+            margin-bottom:10px;
+        }
+
+        #view-custom-push .cp-pill{
+            border:1.5px dashed var(--c-primary-2);
+            background:#f7f5ff;
+            border-radius:10px;
+            padding:12px;
+            margin:10px 0;
+        }
+        #view-custom-push .cp-pill-title{
+            font-weight:700;
+            margin-bottom:4px;
+            color:var(--c-text);
+        }
+        #view-custom-push .cp-pill-body{
+            color:var(--c-muted);
+        }
+
+        #cp_extra{
+            font-size:14px;
+            line-height:1.4;
+            border-radius:10px !important;
+        }
+
+        #view-custom-push .cp-space-1line{
+            height:14px;
+        }
+
+        #view-custom-push .statWrap.is-disabled{
+            background:#f5efff !important;
+            border:1.5px dashed #d8cef1 !important;
+            border-radius:12px !important;
+            padding:10px !important;
+            opacity:.95 !important;
+        }
+        #view-custom-push .statWrap.is-disabled label{
+            color:#7a6fa6 !important;
+        }
+        #view-custom-push .statWrap .lockTag{
+            display:inline-flex !important;
+            align-items:center;
+            gap:6px;
+            font-size:12px;
+            color:#7f6aa5;
+            background:#efe7ff;
+            border:1px solid #e6e0f0;
+            border-radius:999px;
+            padding:2px 8px;
+            margin-left:8px;
+        }
+        #view-custom-push .statWrap .lockTag[hidden]{
+            display:none !important;
+        }
+
+        #view-custom-push #cp_event{
+            font-size:13px;
+        }
+        .loadingHint{
+            font-size:12px;
+            color:var(--c-muted);
+        }
+
+        /* タイトル周りの余白を他ページと合わせる */
+        #view-custom-push{
+            padding:0 !important;
+        }
+        #view-custom-push > .row-space{
+            margin:8px 0 8px !important;
+        }
+        #view-custom-push .card:first-of-type{
+            margin-top:8px !important;
+        }
+
+        /* cp_extra_row：固定幅に変更 */
+        #cp_extra_row{
+            display:grid;
+            grid-template-columns: 1fr 180px;
+            gap:8px;
+        }
+        #cp_extra_row .row-att-note{
+            grid-column:1 / -1;
+            margin-top:4px;
+        }
+
+        #cp_auto_targets, #cp_auto,
+        #cp_manual_targets, #cp_manual{
+            white-space:pre-line;
+            font-size:0.9rem;
+            line-height:1.6;
+        }
+
+        #view-custom-push #cp_stat_wrap label,
+        #view-custom-push #cp_stat_wrap .repLabel{
+            color:var(--c-text) !important;
+        }
+
+        #cp_body.cp-textarea{
+            font-size:13px !important;
+            line-height:1.7;
+        }
     
     /* ===== Summary ===== */
         #summaryFreeQuotaBox .kv { display: grid; gap: 6px; }
@@ -865,511 +1363,11 @@
         }
     
     </style>
-<!-- ===== Custom Overrides（最後に評価されるCSS） ===== -->
-    <style id="custom-overrides">
-    /* 上部アコーディオンのヘッダーを常時うす紫、open時は少し濃く */
-        #adminListAcc .fHead{
-            background:#f5efff !important;
-            border-radius:10px;
-        }
-        #adminListAcc.open .fHead{
-            background:#efe7ff !important;
-        }
-
-    /* アコーディオン内の編集ボタンを小さめ＆薄めトーンに */
-        #adminListAcc .btn-edit{
-            min-height: 32px;
-            padding: 6px 10px;
-            font-size: 13px;
-            border-radius: 9px;
-            background:#fff !important;
-            color: color-mix(in srgb, var(--c-primary-2), #000 0%) !important;
-            border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 12%) !important;
-            box-shadow: 0 1px 3px rgba(127,106,165,0.08);
-        }
-        #adminListAcc .btn-edit:hover{
-            background:#f8f6ff !important;
-            border-color: color-mix(in srgb, var(--c-primary-2), #000 20%) !important;
-        }
-
-    /* 管理フォームのみ：注釈の文字をさらに小さく（10px） */
-        #view-admin .hint{
-            font-size: 10px !important;
-            line-height: 1.55;
-        }
-
-    /* ===== 出欠結果一覧：プルダウンの行（ラベル右にセレクト） ===== */
-        .repControls{
-            display: grid;
-            grid-template-columns: auto max-content;
-            gap: 10px 14px;
-            align-items: center;
-            justify-content: start;
-        }
-        .repControls .span2{
-            grid-column: 1 / -1;
-            display: flex;
-            justify-content: flex-start;
-            margin-top: 4px;
-        }
-        .repLabel{
-            font-size: 14px;
-            color: var(--c-text);
-            white-space: nowrap;
-        }
-
-    /* ===== 出欠：セグメントを独立行にしたときの余白 ===== */
-        .fHead .seg-badge{
-            margin: 0 0 4px 0;
-        }
-
-    /* ===== 出欠結果バッジ（管理レポート・旧レイアウト） ===== */
-        .repCard{
-            background:#fff;
-            border:1px solid var(--c-border);
-            border-radius:12px;
-            padding:12px;
-        }
-        .repHead{
-            display:flex;
-            flex-wrap:wrap;
-            gap:8px;
-            align-items:center;
-            margin-bottom:8px;
-        }
-        .repTitle{ font-weight:700; }
-        .repSub  { font-size:12px; color:var(--c-muted); }
-
-        .repRow{
-            display:flex;
-            align-items:baseline;
-            gap:8px;
-            padding:6px 0;
-            border-top:1px dashed #eee;
-        }
-        .repRow:first-child{ border-top:0; }
-
-        .repName{ font-weight:600; min-width:9em; }
-        .repAt  { font-size:12px; color:var(--c-muted); }
-
-        
-        .repNA{
-            margin-top:10px;
-            padding-top:8px;
-            border-top:1px solid var(--c-border);
-            font-size:13px;
-            color:#475569;
-        }
-
-    /* === 今後の予定：新カードレイアウト === */
-        .scheduleCard{ position:relative; cursor:pointer; }
-
-        .scheduleCard .row1{
-            display:flex;
-            align-items:center;
-            gap:8px;
-            margin-bottom:4px;
-        }
-        .scheduleCard .row2{
-            font-weight:700;
-            margin:2px 0 0;
-            display:flex;
-            gap:8px;
-            flex-wrap:wrap;
-        }
-        .scheduleCard .row2 .date{ white-space:nowrap; }
-        .scheduleCard .row2 .title{ min-width:0; }
-
-        .scheduleCard .row3{
-            font-size:12px;
-            color:#444;
-            margin-top:4px;
-            display:flex;
-            align-items:baseline;
-            gap:8px;
-            flex-wrap:nowrap;
-        }
-        .scheduleCard .row3 .place{
-            flex:1 1 auto;
-            min-width:0;
-            overflow:hidden;
-            text-overflow:ellipsis;
-            white-space:nowrap;
-        }
-        .scheduleCard .row3 .meet{
-            flex:0 0 auto;
-            white-space:nowrap;
-            margin-left:auto;
-        }
-
-        .scheduleCard .row1 .kind-badge{
-            margin-left:auto;
-        }
-
-    /* 折りたたみ付きカード */
-        .scTop{
-            display:flex;
-            align-items:center;
-            gap:8px;
-            margin-bottom:6px;
-        }
-        .scKind{
-            margin-left:auto;
-            display:inline-flex;
-            align-items:center;
-            height:22px;
-            padding:0 10px;
-            font-size:12px;
-            font-weight:700;
-            background:#f7f7fb;
-            border:1px solid var(--c-border);
-            border-radius:8px;
-            color:#444;
-        }
-
-        .scTitleBtn{
-            all:unset;
-            display:flex;
-            align-items:baseline;
-            gap:8px;
-            width:100%;
-            cursor:pointer;
-        }
-        .scTitleBtn .scDate{
-            flex:0 0 auto;
-            font-weight:700;
-            white-space:nowrap;
-        }
-        .scTitleBtn .scTitle{
-            flex:1 1 auto;
-            min-width:0;
-            white-space:nowrap;
-            overflow:hidden;
-            text-overflow:ellipsis;
-        }
-        .scTitleBtn[aria-expanded="true"] .scTitle{
-            white-space:normal;
-            overflow:hidden;
-            text-overflow:clip;
-            display:-webkit-box;
-            -webkit-box-orient:vertical;
-            -webkit-line-clamp:2;
-        }
-        .scTitleBtn .scTime{
-            margin-left:.6rem;
-            font-weight:600;
-            white-space:nowrap;
-            opacity:.9;
-        }
-        .scTitleBtn .scCaret{
-            flex:0 0 auto;
-            margin-left:8px;
-            font-size:16px;
-            line-height:1;
-            transition:transform .12s ease;
-        }
-        .scTitleBtn[aria-expanded="true"] .scCaret{
-            transform:rotate(180deg);
-        }
-
-        .scPanel{ margin-top:8px; }
-        .scFullTitle{ font-weight:700; margin-bottom:6px; }
-        .scMemo{
-            margin:6px 0 2px;
-            padding:0;
-            border:0;
-            background:transparent;
-            border-radius:0;
-            font-size:13px;
-            color:#444;
-        }
-        .scMeta{
-            font-size:13px;
-            color:var(--c-text);
-            margin-top:6px;
-            display:flex;
-            flex-direction:column;
-            gap:4px;
-        }
-        .scMeta .scLine{
-            display:flex;
-            align-items:baseline;
-            gap:.5em;
-            min-width:0;
-        }
-        .scMeta .lbl{
-            font-weight:700;
-            margin-right:6px;
-            white-space:nowrap;
-        }
-
-    /* 管理アコーディオン：開閉をIDで強制表示 */
-        #adminListAcc .fBody{ display:none; }
-        #adminListAcc.open .fBody{ display:block; }
-
-    /* 管理アコーディオン：ラベル｜プルダウンの2列グリッド */
-        .adminControls{
-            display:grid;
-            grid-template-columns: auto max-content;
-            gap:10px 14px;
-            align-items:center;
-            justify-content:start;
-        }
-        .adminControls .span2{
-            grid-column:1 / -1;
-            display:flex;
-            justify-content:flex-start;
-            margin-top:4px;
-        }
-        .admLabel{
-            font-size:14px;
-            color:var(--c-text);
-            white-space:nowrap;
-        }
-
-        @media (max-width: 420px){
-            .adminControls{
-            grid-template-columns:1fr 1fr;
-            }
-            .adminControls select{
-            width:100%;
-            }
-        }
-
-    /* 管理アコーディオン：プルダウン幅をさらに半分くらいに */
-        #adminListAcc .adminControls .schedSel.short{
-            width:100px !important;
-            min-width:100px !important;
-            max-width:100%;
-        }
-        @media (max-width: 420px){
-            #adminListAcc .adminControls .schedSel.short{
-            width:100px !important;
-            min-width:100px !important;
-            }
-        }
-
-    /* 汎用：コンパクトボタン */
-        .btn-compact{
-            min-height:30px;
-            padding:6px 10px;
-            font-size:13px;
-            border-radius:9px;
-        }
-
-    /* 管理アコーディオン：再取得ボタンもコンパクトに */
-        #adminListAcc #btnAdminFetch{
-            min-height:30px;
-            padding:6px 10px;
-            font-size:13px;
-            border-radius:9px;
-        }
-
-    /* 管理アコーディオン：中身の余白 */
-        #adminListAcc .fBody{
-            padding-top:12px !important;
-        }
-        #adminListAcc .adminControls{
-            margin-top:4px;
-        }
-
-    /* トップの未定/未回答のみ表示：シンプル表示 */
-        #homeOnlyNALabel{
-            display:inline-flex;
-            align-items:center;
-            gap:6px;
-            background:#fff !important;
-            border:0 !important;
-            padding:0 !important;
-            box-shadow:none !important;
-            font-size:13px;
-            color:var(--c-text);
-        }
-        #homeOnlyNALabel input{
-            width:16px;
-            height:16px;
-        }
-
-    /* 管理用カードの3ボタンを編集ボタンと同サイズに */
-        #adminMenu a.btn,
-        #adminMenu button.btn{
-            min-height:30px !important;
-            padding:6px 10px !important;
-            font-size:13px !important;
-            border-radius:9px !important;
-            box-shadow:0 1px 3px rgba(127,106,165,0.08);
-        }
-
-    /* 管理レポート：名前⇔コメントの間を固定ギャップで */
-        #view-admin-report .repPersonRow{
-            display:flex;
-            align-items:flex-start;
-            gap:16px;
-        }
-        #view-admin-report .repPersonRow .repName{
-            flex:0 0 auto;
-        }
-        #view-admin-report .repPersonRow .repAt{
-            flex:1 1 auto;
-            min-width:0;
-            display:flex;
-            align-items:baseline;
-            overflow-wrap:anywhere;
-            word-break:break-word;
-        }
-        #view-admin-report .repComment{
-            display:block;
-            flex:1 1 auto;
-            min-width:0;
-            white-space:normal !important;
-            overflow-wrap:anywhere;
-            word-break:break-word;
-        }
-        #view-admin-report .repPersonRow .repAt:empty{
-            display:none;
-        }
-        #view-admin-report .repComment::before{
-            content:"｜";
-            color:var(--c-muted);
-            margin-right:.5em;
-            opacity:.7;
-            flex:0 0 auto;
-        }
-
-    /* カスタム通知（Custom Push）周り */
-        #view-custom-push .cp-checks{
-            display:flex;
-            flex-wrap:wrap;
-            gap:12px;
-            justify-content:flex-end;
-        }
-        #view-custom-push .cp-field{
-            margin:12px 0;
-            display:flex;
-            flex-direction:column;
-            gap:8px;
-        }
-        #view-custom-push .cp-textarea{
-            width:100%;
-            border:1.5px solid var(--c-primary-2);
-            background:#fff;
-            border-radius:10px;
-            padding:10px 12px;
-            font-size:16px;
-            box-sizing:border-box;
-        }
-        #view-custom-push .hint{
-            color:var(--c-muted);
-            font-size:12px;
-        }
-
-        #view-custom-push .cp-stat-row{
-            display:flex;
-            flex-wrap:wrap;
-            gap:12px;
-            justify-content:flex-start;
-            margin-bottom:10px;
-        }
-
-        #view-custom-push .cp-pill{
-            border:1.5px dashed var(--c-primary-2);
-            background:#f7f5ff;
-            border-radius:10px;
-            padding:12px;
-            margin:10px 0;
-        }
-        #view-custom-push .cp-pill-title{
-            font-weight:700;
-            margin-bottom:4px;
-            color:var(--c-text);
-        }
-        #view-custom-push .cp-pill-body{
-            color:var(--c-muted);
-        }
-
-        #cp_extra{
-            font-size:14px;
-            line-height:1.4;
-            border-radius:10px !important;
-        }
-
-        #view-custom-push .cp-space-1line{
-            height:14px;
-        }
-
-        #view-custom-push .statWrap.is-disabled{
-            background:#f5efff !important;
-            border:1.5px dashed #d8cef1 !important;
-            border-radius:12px !important;
-            padding:10px !important;
-            opacity:.95 !important;
-        }
-        #view-custom-push .statWrap.is-disabled label{
-            color:#7a6fa6 !important;
-        }
-        #view-custom-push .statWrap .lockTag{
-            display:inline-flex !important;
-            align-items:center;
-            gap:6px;
-            font-size:12px;
-            color:#7f6aa5;
-            background:#efe7ff;
-            border:1px solid #e6e0f0;
-            border-radius:999px;
-            padding:2px 8px;
-            margin-left:8px;
-        }
-        #view-custom-push .statWrap .lockTag[hidden]{
-            display:none !important;
-        }
-
-        #view-custom-push #cp_event{
-            font-size:13px;
-        }
-        .loadingHint{
-            font-size:12px;
-            color:var(--c-muted);
-        }
-
-    /* cp_extra_row：固定幅に変更 */
-        #cp_extra_row{
-            display:grid;
-            grid-template-columns: 1fr 180px;
-            gap:8px;
-        }
-        #cp_extra_row .row-att-note{
-            grid-column:1 / -1;
-            margin-top:4px;
-        }
-
-        #cp_auto_targets, #cp_auto,
-        #cp_manual_targets, #cp_manual{
-            white-space:pre-line;
-            font-size:0.9rem;
-            line-height:1.6;
-        }
-
-        #view-custom-push #cp_stat_wrap label,
-        #view-custom-push #cp_stat_wrap .repLabel{
-            color:var(--c-text) !important;
-        }
-
-        #cp_body.cp-textarea{
-            font-size:13px !important;
-            line-height:1.7;
-        }
-
-    /* カスタム通知：タイトル周りの余白を他ページと合わせる */
-        #view-custom-push{
-            padding:0 !important;
-        }
-        #view-custom-push > .row-space{
-            margin:8px 0 8px !important;
-        }
-        #view-custom-push .card:first-of-type{
-            margin-top:8px !important;
-        }
-    </style>
+    <!-- ===== Custom Overrides（最後に評価されるCSS） ===== -->
+        <style id="custom-overrides">
+        /* 本番用スタイルはすべて Base CSS に移管済み。
+        ここは一時的なホットフィックス・検証用に空で残しておく。 */
+        </style>
   
     <!-- LIFF SDK -->
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
