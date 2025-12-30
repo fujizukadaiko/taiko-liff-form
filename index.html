@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.2.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzxZvUkODk8kXAa8F3_SonR0kavKsAoJC68zT0Nvow9TQaf5BQk7Gx29YS2IBUAFVjqyw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -5964,6 +5964,87 @@
         });
     }
 
+    // ▼ 名前 → 並び順情報（sortGroup / birthYear）インデックス
+    function buildMemberSortIndex(payload){
+        const idx = {};
+        if (!payload || !Array.isArray(payload.members)) return idx;
+
+        payload.members.forEach(m => {
+        const nm = canonName(
+            m.displayName ??
+            m.name ??
+            m.member ??
+            m.performerName ??
+            ""
+        );
+        if (!nm) return;
+
+        const sortGroupRaw =
+            m.sortGroup ??
+            m.sort_group ??
+            null;
+
+        const birthYearRaw =
+            m.birthYear ??
+            m.birth_year ??
+            null;
+
+        idx[nm] = {
+            seg      : m.seg || m.segment || "",
+            sortGroup: sortGroupRaw,
+            birthYear: birthYearRaw,
+        };
+        });
+
+        return idx;
+    }
+
+    // ▼ 出欠行配列を「グループ → 生年 → 名前」でソート
+    function sortRowsByPriority(rows, payload){
+        const membersIdx = buildMemberSortIndex(payload);
+
+        function infoFor(name){
+        const key = canonName(name);
+        const m   = membersIdx[key] || {};
+
+        let g = m.sortGroup;
+        let gNum = (g === null || g === undefined || g === "") ? 5 : Number(g);
+        if (Number.isNaN(gNum)) gNum = 5; // デフォルトは真ん中くらい
+
+        let by = m.birthYear;
+        let byNum = (by === null || by === undefined || by === "") ? null : Number(by);
+        if (Number.isNaN(byNum)) byNum = null;
+
+        return { key, group: gNum, birthYear: byNum };
+        }
+
+        const arr = rows.slice(); // 元配列は壊さない
+
+        arr.sort((a, b) => {
+        const ia = infoFor(a.name);
+        const ib = infoFor(b.name);
+
+        // ① sortGroup 昇順（0 → 1 → 2 → ... → 9）
+        if (ia.group !== ib.group) {
+            return ia.group - ib.group;
+        }
+
+        // ② 生年が両方あれば昇順（古い年 = 年上 が先）
+        if (ia.birthYear !== null && ib.birthYear !== null && ia.birthYear !== ib.birthYear) {
+            return ia.birthYear - ib.birthYear;
+        }
+
+        // ③ 片方だけ生年がある場合：生年ありを優先
+        if (ia.birthYear !== null && ib.birthYear === null) return -1;
+        if (ia.birthYear === null && ib.birthYear !== null) return 1;
+
+        // ④ 最後に名前（正規化済み）でソート
+        return ia.key.localeCompare(ib.key, "ja");
+        });
+
+        return arr;
+    }
+
     // ▼ 出欠結果の描画（#repEvent の value を eventId とみなして取得→描画）
     async function renderReport(){
         const lidRaw = (window.state && window.state.lineId) || "";
@@ -6066,19 +6147,22 @@
         // rows を未回答で拡張
         const rowsAll = rows.concat(naRows);
 
+        // ★ 並び替え（sortGroup → birthYear → 名前）
+        const rowsAllSorted = sortRowsByPriority(rowsAll, payload);
+
         // フィルタ
         const f = document.getElementById("repAttend")?.value || "";
-        const view = rowsAll.filter(r =>
+        const view = rowsAllSorted.filter(r =>
         !f ? true : (f === "未回答" ? r.attend === "未回答" : r.attend === f)
         );
 
-        // 集計（今は表示してないけど、将来グラフ出したくなったとき用）
+        // 集計（カウントもソート後の配列を使えば OK）
         const cnt = {
-        yes  : rowsAll.filter(r => r.attend === "参加").length,
-        no   : rowsAll.filter(r => r.attend === "欠席").length,
-        maybe: rowsAll.filter(r => r.attend === "未定").length,
-        na   : rowsAll.filter(r => r.attend === "未回答").length,
-        all  : rowsAll.length,
+        yes  : rowsAllSorted.filter(r => r.attend === "参加").length,
+        no   : rowsAllSorted.filter(r => r.attend === "欠席").length,
+        maybe: rowsAllSorted.filter(r => r.attend === "未定").length,
+        na   : rowsAllSorted.filter(r => r.attend === "未回答").length,
+        all  : rowsAllSorted.length,
         };
         // console.log("report counts:", cnt);
 
