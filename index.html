@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.3";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQciw2hYmFAY2Pe3IKbLUAiYMdGS3uT_02HekriGksBs6ywr1ukEryHxBjuilv6e8vhA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6325,10 +6325,21 @@
     // <section id="view-home" data-view> ... </section> の形が必須です
   })();
 
+    // ===== カスタム通知ユーティリティ：チェックされたステータス取得 =====
+    window.getCheckedStats = window.getCheckedStats || function () {
+    const sec = document.getElementById('view-custom-push');
+    if (!sec) return [];
+    return Array.from(sec.querySelectorAll('.cp_stat:checked'))
+        .map(el => (el.value || '').trim())
+        .filter(Boolean);
+    };
+
     // ===== 共通ミニヘルパー（テキスト書き換えなど） =====
     function setText(el, s) {
     if (el) el.textContent = s;
     }
+
+
 
 /* ===== カスタム一斉通知：画面初期化 & イベント結線 ===== */
     (function(){
@@ -6732,7 +6743,8 @@
         let data = null;
         try {
             const lid = await getLineId();
-            const url = new URL('/line/attendance/report', location.origin);
+            const base = (typeof D1_ORIGIN === 'string' && D1_ORIGIN) ? D1_ORIGIN : location.origin;
+            const url = new URL('/line/attendance/report', base);
             url.searchParams.set('lineId', lid);
             url.searchParams.set('eventKey', selMode.value);
 
