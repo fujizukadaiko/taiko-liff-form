@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQciw2hYmFAY2Pe3IKbLUAiYMdGS3uT_02HekriGksBs6ywr1ukEryHxBjuilv6e8vhA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6428,32 +6428,30 @@
         }
     
         // ===== 手動モード：通知Yの名簿を取得 → selExtra に入れる =====
-        async function populateManualList(){
-        if (!selExtra) return;
-        loadingOnExtra(true);
+        async function populateManualList() {
+            if (!selExtra) return;
+            loadingOnExtra(true);
 
-        const lid = await getLineId();
-        const params = new URLSearchParams();
-        if (lid) params.set('lineId', lid);
+            let r = { status: 'error' };
+            try {
+                // ★ lineId は付けず、全入力者を取得
+                const url = new URL('/line/admin/members/notify-list', D1_ORIGIN);
+                const res = await fetch(url.toString());
+                r = await res.json();
+            } catch (e) {
+                console.error('populateManualList error:', e);
+            }
 
-        let r = { status: 'error' };
-        try {
-            const url = new URL('/line/admin/members/notify-list', D1_ORIGIN);
-            if (lid) url.searchParams.set('lineId', lid);
-            const res = await fetch(url.toString());
-            r = await res.json();
-        } catch (e) {
-            console.error('populateManualList error:', e);
-        }
+            const list = Array.isArray(r.list) ? r.list : [];
 
-        const list = Array.isArray(r.list) ? r.list : [];
-        selExtra.innerHTML = list.map(x =>
-            `<option value="${x.lineId}">${x.label || x.name}</option>`
-        ).join('') || `<option value="" disabled>オプションなし</option>`;
+            selExtra.innerHTML =
+                list
+                .map(x => `<option value="${x.lineId}">${x.label}</option>`)
+                .join('') || `<option value="" disabled>オプションなし</option>`;
 
-        selExtra.disabled = (list.length === 0);
-        loadingOnExtra(false);
-        renderManualBox();
+            selExtra.disabled = (list.length === 0);
+            loadingOnExtra(false);
+            renderManualBox();
         }
     
         // ===== 手動の選択を表示枠に反映 =====
