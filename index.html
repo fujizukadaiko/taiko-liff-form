@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQciw2hYmFAY2Pe3IKbLUAiYMdGS3uT_02HekriGksBs6ywr1ukEryHxBjuilv6e8vhA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1363,6 +1363,72 @@
         #cp_body.cp-textarea{
             font-size:13px !important;
             line-height:1.7;
+        }
+
+        /* ===== カスタム通知：送信プレビューモーダル ===== */
+        .cpModalOverlay {
+        position: fixed;
+        inset: 0;                        /* top:0; right:0; bottom:0; left:0 と同じ */
+        background: rgba(0, 0, 0, 0.35); /* 背景の黒半透明 */
+        z-index: 9999;                   /* ほぼ最前面に */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        box-sizing: border-box;
+        }
+
+        .cpModal {
+        max-width: 480px;
+        width: 100%;
+        max-height: 80vh;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
+        padding: 16px 18px 14px;
+        box-sizing: border-box;
+        overflow: auto;
+        font-size: 14px;
+        line-height: 1.6;
+        }
+
+        .cpModal h3 {
+        margin: 0 0 6px;
+        font-size: 16px;
+        font-weight: 600;
+        }
+
+        .cpModal .meta {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 8px;
+        }
+
+        .cpModal pre {
+        margin: 4px 0 0;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: #f7f5ff;
+        font-family: inherit;
+        font-size: 14px;
+        line-height: 1.6;
+        white-space: pre-wrap;  /* 折り返し */
+        }
+
+        .cpModal .muted {
+        font-size: 12px;
+        color: #777;
+        }
+
+        .cpModal .pill.sm {
+        font-size: 11px;
+        }
+
+        .cpModal .actions {
+        margin-top: 14px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
         }
     
     /* ===== Summary ===== */
