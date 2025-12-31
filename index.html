@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQciw2hYmFAY2Pe3IKbLUAiYMdGS3uT_02HekriGksBs6ywr1ukEryHxBjuilv6e8vhA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6373,77 +6373,72 @@
     
         // ===== イベント一覧をプルダウンへ（先頭は「手動で選ぶ」） =====
         async function fillEventOptions(){
-          if (!selMode) return;
-    
-          // 一旦ローディング
-          selMode.innerHTML = '<option value="" disabled>読み込み中…</option>';
-          selMode.disabled = true;
-    
-          const lid = await getLineId();
-          const url = new URL(API_ENDPOINT);
-          url.searchParams.set('attendanceReport','1');
-          url.searchParams.set('meta','1');
-          url.searchParams.set('admin','1');
-          if (lid) url.searchParams.set('lineId', lid);
-    
-          let r = {status:'error'};
-          try { r = await fetch(url).then(x=>x.json()); } catch(_){}
-    
-          const list = Array.isArray(r?.list) ? r.list
-                      : Array.isArray(r?.meta) ? r.meta
-                      : Array.isArray(r?.data) ? r.data : [];
-    
-          // 「公開中・発表」優先（GASは accepting:'open' を返す）
-          const filt = list.filter(e=>{
-            const open = (e.accepting === 'open');
-            const kind = (e.type === '発表' || e.kind === '発表');
-            return open && kind;
-          });
-          const useList = filt.length ? filt : list;
-    
-          const opts = [
+        if (!selMode) return;
+
+        // 一旦ローディング
+        selMode.innerHTML = '<option value="" disabled>読み込み中…</option>';
+        selMode.disabled = true;
+
+        let resp;
+        try {
+            const url = new URL('/line/schedules', location.origin);
+            url.searchParams.set('days', '365');     // 1年分くらい
+            url.searchParams.set('kind', '発表');    // 発表のみ
+            const res = await fetch(url.toString());
+            resp = await res.json();
+        } catch (e) {
+            console.error('fillEventOptions error:', e);
+            resp = null;
+        }
+
+        const list = Array.isArray(resp?.schedules) ? resp.schedules : [];
+
+        const opts = [
             `<option value="manual">手動のみで選ぶ</option>`,
-            ...useList.map(e=>{
-              const id = String(e.eventId ?? e.id ?? '');
-              const dt = [e.ymd||e.date||'', e.time||e.hm||''].filter(Boolean).join(' ');
-              const tt = e.title || e.name || '';
-              return `<option value="${id}">${dt}　${tt}</option>`;
+            ...list.map(e => {
+            const id = String(e.id || e.eventKey || '');
+            const dt = [e.ymd || e.date || '', e.hm || e.time || '']
+                .filter(Boolean)
+                .join(' ');
+            const tt = e.title || '';
+            return `<option value="${id}">${dt}　${tt}</option>`;
             })
-          ].join('');
-    
-          selMode.innerHTML = opts || `<option value="manual">手動のみで選ぶ</option>`;
-          selMode.disabled = false;
-          selMode.value = 'manual';       // 既定＝手動
-          applyModeLock();
-    
-          // 手動の候補を初回取得
-          await populateManualList();
+        ].join('');
+
+        selMode.innerHTML = opts || `<option value="manual">手動のみで選ぶ</option>`;
+        selMode.disabled = false;
+        selMode.value = 'manual';       // 既定＝手動
+        applyModeLock();
+
+        // 手動の候補を初回取得
+        await populateManualList();
         }
     
         // ===== 手動モード：通知Yの名簿を取得 → selExtra に入れる =====
         async function populateManualList(){
-          if (!selExtra) return;
-          loadingOnExtra(true);
-    
-          const lid = await getLineId();
-          const url = new URL(API_ENDPOINT);
-          url.searchParams.set('listInputers','1');          // ★ 新API
-          url.searchParams.set('deliverableOnly','1');
-          url.searchParams.set('notifyOnly','1');
-          if (lid) url.searchParams.set('lineId', lid);
-    
-          let r = {status:'error'};
-          try { r = await fetch(url).then(x=>x.json()); } catch(_){}
-    
-          // ★ GAS側パッチで返す配列（[{lineId,name}]）
-          const list = Array.isArray(r.list) ? r.list : [];
-          selExtra.innerHTML = list.map(x =>
+        if (!selExtra) return;
+        loadingOnExtra(true);
+
+        const lid = await getLineId();
+        const params = new URLSearchParams();
+        if (lid) params.set('lineId', lid);
+
+        let r = { status: 'error' };
+        try {
+            const res = await fetch(`/line/admin/members/notify-list?${params.toString()}`);
+            r = await res.json();
+        } catch (e) {
+            console.error('populateManualList error:', e);
+        }
+
+        const list = Array.isArray(r.list) ? r.list : [];
+        selExtra.innerHTML = list.map(x =>
             `<option value="${x.lineId}">${x.label || x.name}</option>`
-          ).join('') || `<option value="" disabled>オプションなし</option>`;
-    
-          selExtra.disabled = (list.length === 0);
-          loadingOnExtra(false);
-          renderManualBox();
+        ).join('') || `<option value="" disabled>オプションなし</option>`;
+
+        selExtra.disabled = (list.length === 0);
+        loadingOnExtra(false);
+        renderManualBox();
         }
     
         // ===== 手動の選択を表示枠に反映 =====
@@ -6566,78 +6561,58 @@
     }
 
     async function fillEventChoices(){
-        // プレースホルダ（optgroup だけ差し替え）
         if (optGroup){
-        optGroup.innerHTML = '<option value="" disabled>読み込み中…</option>';
+            optGroup.innerHTML = '<option value="" disabled>読み込み中…</option>';
         }
 
-        const lid = await getLineId();
-        const url = new URL(API_ENDPOINT);
-        url.searchParams.set('attendanceReport', '1');
-        url.searchParams.set('meta', '1');
-        url.searchParams.set('admin', '1');
-        if (lid) url.searchParams.set('lineId', lid);
-
-        let r;
-        try{
-        r = await fetch(url).then(x => x.json());
-        }catch(e){
-        r = { status: 'error', message: String(e) };
+        let resp;
+        try {
+            const url = new URL('/line/schedules', location.origin);
+            url.searchParams.set('days', '365');
+            url.searchParams.set('kind', '発表');
+            const res = await fetch(url.toString());
+            resp = await res.json();
+        } catch (e) {
+            console.error('fillEventChoices error:', e);
+            resp = null;
         }
 
-        const listRaw =
-        Array.isArray(r?.list) ? r.list :
-        Array.isArray(r?.meta) ? r.meta :
-        Array.isArray(r?.data) ? r.data : [];
+        const list = Array.isArray(resp?.schedules) ? resp.schedules : [];
 
-        const isOpen = e =>
-        (typeof e.open      !== 'undefined') ? !!e.open :
-        (typeof e.published !== 'undefined') ? !!e.published :
-        (typeof e.status    !== 'undefined') ? (e.status === '公開中') :
-        true;
-
-        const isHappyo = e =>
-        (typeof e.kind !== 'undefined')
-            ? (e.kind === '発表' || /発表/.test(String(e.kind)))
-            : true;
-
-        const list = listRaw.filter(e => isOpen(e) && isHappyo(e));
-
-        // イベントIndex（集合時間/場所も拾う）
+        // イベントIndex（テンプレ置換用）
         const idx = {};
         list.forEach(e => {
-        const id  = String(e.eventId ?? e.id ?? '');
-        const ymd = e.ymd || e.date || '';
-        const hm  = e.hm  || e.time || '';
-        const meet      = e.meet || e.meetTime || e['集合'] || '';
-        const meetPoint = e.meetPoint || e['集合場所'] || e.place || e.venue || '';
-        idx[id] = {
+            const id  = String(e.id || e.eventKey || '');
+            const ymd = e.ymd || e.date || '';
+            const hm  = e.hm  || e.time || '';
+
+            idx[id] = {
             id,
-            title   : e.title || e.name || '',
-            date    : ymd,
-            time    : hm,
-            datetime: [ymd, hm].filter(Boolean).join(' '),
-            place   : e.place || e.venue || '',
-            meet,
-            meetPoint
-        };
+            title    : e.title || '',
+            date     : ymd,
+            time     : hm,
+            datetime : [ymd, hm].filter(Boolean).join(' '),
+            place    : e.place || '',
+            meet     : e.meetAt || '',
+            meetPoint: e.meetPlace || e.place || '',
+            };
         });
         window.__EVENT_INDEX__ = idx;
 
         const opts = list.map(e => {
-        const id  = String(e.eventId ?? e.id ?? '');
-        const ymd = e.ymd || e.date || '';
-        const hm  = e.hm  || e.time || '';
-        const dt  = [ymd, hm].filter(Boolean).join(' ');
-        const tt  = e.title || e.name || '';
-        return `<option value="${id}">${dt} ｜ ${tt}</option>`;
+            const id  = String(e.id || e.eventKey || '');
+            const ymd = e.ymd || e.date || '';
+            const hm  = e.hm  || e.time || '';
+            const dt  = [ymd, hm].filter(Boolean).join(' ');
+            const tt  = e.title || '';
+            return `<option value="${id}">${dt} ｜ ${tt}</option>`;
         }).join('') || '<option value="" disabled>（該当イベントなし）</option>';
 
         if (optGroup){
-        optGroup.innerHTML = opts;
+            optGroup.innerHTML = opts;
         }
         applyModeUI();
-    }
+        }
 
     document.addEventListener('DOMContentLoaded', () => {
         fillEventChoices();
@@ -6659,51 +6634,51 @@
         if (!selTpl || !selMode || !bodyEl) return;
 
         function pickEventCtx(){
-        const eid = selMode.value;
-        const ev  = (eid && eid !== 'manual')
-            ? (window.__EVENT_INDEX__?.[eid] || null)
-            : null;
+            const eid = selMode.value;
+            const ev  = (eid && eid !== 'manual')
+                ? (window.__EVENT_INDEX__?.[eid] || null)
+                : null;
 
-        return ev || {
-            title   : '{TITLE}',
-            date    : '{DATE}',
-            time    : '{TIME}',
-            datetime: '{DATETIME}',
-            place   : '{PLACE}',
-            meet    : '{MEET_OLD}',
-            meetPoint: '{MEET_POINT}'
-        };
+            return ev || {
+                title   : '{TITLE}',
+                date    : '{DATE}',
+                time    : '{TIME}',
+                datetime: '{DATETIME}',
+                place   : '{PLACE}',
+                meet    : '{MEET_OLD}',
+                meetPoint: '{MEET_POINT}'
+            };
         }
 
         function applyTemplate(){
-        const kind = selTpl.value;
-        const ctx  = pickEventCtx();
-        let text   = '';
+            const kind = selTpl.value;
+            const ctx  = pickEventCtx();
+            let text   = '';
 
-        if (kind === '雨天中止'){
-            text =
-    `【雨天中止のお知らせ】
-    ${ctx.datetime} 開催予定の「${ctx.title}」は、雨天のため中止となりました。
-    楽しみにしてくださっていた皆さまには申し訳ありません。
+            if (kind === '雨天中止'){
+                text =
+                `【雨天中止のお知らせ】
+                ${ctx.datetime} 開催予定の「${ctx.title}」は、雨天のため中止となりました。
+                楽しみにしてくださっていた皆さまには申し訳ありません。
 
-    どうぞよろしくお願いいたします。`;
-        } else if (kind === '時間変更'){
-            text =
-    `【集合時間変更のお知らせ】
-    ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
-    集合場所：${ctx.meetPoint || '{MEET_POINT}'}
-    開始時間：${ctx.time || '{TIME}'}
-    場所：${ctx.place || '{PLACE}'}
+                どうぞよろしくお願いいたします。`;
+            } else if (kind === '時間変更'){
+                text =
+                `【集合時間変更のお知らせ】
+                ${ctx.date} の「${ctx.title}」は、集合時間を ${ctx.meet || '{MEET_OLD}'} → {MEET_NEW} に変更します。
+                集合場所：${ctx.meetPoint || '{MEET_POINT}'}
+                開始時間：${ctx.time || '{TIME}'}
+                場所：${ctx.place || '{PLACE}'}
 
-    ご不便をおかけしますが、どうぞよろしくお願いいたします。`;
-        }
+                ご不便をおかけしますが、どうぞよろしくお願いいたします。`;
+            }
 
-        bodyEl.value = text;
-        bodyEl.dispatchEvent(new Event('input'));
+            bodyEl.value = text;
+            bodyEl.dispatchEvent(new Event('input'));
 
-        if (cntEl){
-            cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
-        }
+            if (cntEl){
+                cntEl.textContent = `${bodyEl.value.length} / ${bodyEl.maxLength || 2000}`;
+            }
         }
 
         selTpl.addEventListener('change', applyTemplate);
@@ -6731,8 +6706,8 @@
     }
     })();
 
-/* ===== カスタム一斉通知：自動宛先プレビュー API 呼び出し ===== */
-    async function refreshAutoByPreview(){
+    /* ===== カスタム一斉通知：自動宛先プレビュー API 呼び出し（D1版） ===== */
+        async function refreshAutoByPreview(){
         const sec     = window.cpSec;
         const selMode = window.selMode;
         const boxAuto = window.boxAuto;
@@ -6750,42 +6725,107 @@
         sec.__loadingAuto = true;
         setText(boxAuto, '（読込中…）');
 
-        let r = { status:'error' };
-
+        let data = null;
         try {
-            const lid = await getLineId();          // ★ Admin 判定用
-            const url = new URL(API_ENDPOINT);
-            url.searchParams.set('attendanceReport','1');
-            url.searchParams.set('customPushPreview','1');
-            url.searchParams.set('eventId', selMode.value);
-            url.searchParams.set('statuses', JSON.stringify(statuses));
-            if (lid){
-            url.searchParams.set('lineId', lid);       // ★ Admin 判定
-            url.searchParams.set('senderLineId', lid); // （任意）ログ/テンプレ側で利用可
-            }
+            const lid = await getLineId();
+            const url = new URL('/line/attendance/report', location.origin);
+            url.searchParams.set('lineId', lid);
+            url.searchParams.set('eventKey', selMode.value);
 
-            r = await fetch(url).then(x=>x.json());
+            const res = await fetch(url.toString());
+            data = await res.json();
         } catch(e){
-            r = { status:'error', message:String(e) };
+            console.error('refreshAutoByPreview error:', e);
         } finally {
-            sec.__loadingAuto = false; // 成功・失敗に関わらず必ず解除
+            sec.__loadingAuto = false;
         }
 
-        console.log('customPushPreview resp:', r);   // ★ デバッグログ（必要なら残す）
-
-        if (r.status!=='ok'){
+        if (!data || data.status !== 'ok'){
             setText(boxAuto, '（取得エラー）');
             sec.__autoTargets = [];
             return;
         }
 
-        sec.__autoTargets = Array.isArray(r.autoTargets) ? r.autoTargets : [];
-        const labels = sec.__autoTargets
-            .map(x => x.label || x.name)
-            .filter(Boolean);
+        const rows    = Array.isArray(data.list)    ? data.list    : [];
+        const members = Array.isArray(data.members) ? data.members : [];
 
+        // lineId ベースで members を引けるようにしておく
+        const memberByLine = new Map();
+        members.forEach(m => {
+            const lid = m.lineId || m.line_id;
+            if (!lid) return;
+            memberByLine.set(lid, {
+            lineId      : lid,
+            performerName: m.performerName || m.performer_name || '',
+            segment     : m.segment || '',
+            notify      : m.notify || '',
+            viewerOnly  : m.viewerOnly || m.viewer_only || '',
+            });
+        });
+
+        function isDeliverable(mem){
+            if (!mem) return false;
+            const v = String(mem.viewerOnly || '').toUpperCase();
+            if (v === '1' || v === 'Y' || v === 'TRUE') return false;
+
+            const n = String(mem.notify || '').toUpperCase();
+            if (n === '0' || n === 'N' || n === 'FALSE') return false;
+            // notify 空なら OK 扱い
+            return true;
+        }
+
+        // attendance 行を lineId ごとにまとめる（最後に入ったもの優先で OK）
+        const attByLine = new Map();
+        rows.forEach(r => {
+            const lid = r.lineId || r.line_id;
+            if (!lid) return;
+            attByLine.set(lid, {
+            lineId       : lid,
+            performerName: r.performerName || r.performer_name || '',
+            attend       : r.attend || '',
+            });
+        });
+
+        const targetsMap = new Map();
+
+        // 1) 「回答済み」の人たち（attend がある人）
+        for (const [lid, row] of attByLine.entries()){
+            const mem = memberByLine.get(lid);
+            if (!isDeliverable(mem)) continue;
+
+            // ★ ここ重要：チェックボックスの value と attend の値がそのまま一致している前提
+            if (!statuses.includes(row.attend)) continue;
+
+            const label = row.performerName || mem.performerName || lid;
+            targetsMap.set(lid, { lineId: lid, label });
+        }
+
+        // 2) 「未回答」を含めたい場合
+        const UNANSWERED_CODES = ['未回答'];
+        const wantsUnanswered = statuses.some(s => UNANSWERED_CODES.includes(s));
+
+        if (wantsUnanswered){
+            members.forEach(m => {
+            const lid = m.lineId || m.line_id;
+            if (!lid) return;
+            if (attByLine.has(lid)) return; // すでに回答あり
+
+            const mem = memberByLine.get(lid);
+            if (!isDeliverable(mem)) return;
+
+            const label = mem.performerName || lid;
+            if (!targetsMap.has(lid)){
+                targetsMap.set(lid, { lineId: lid, label });
+            }
+            });
+        }
+
+        const autoTargets = Array.from(targetsMap.values());
+        sec.__autoTargets = autoTargets;
+
+        const labels = autoTargets.map(x => x.label).filter(Boolean);
         setText(boxAuto, labels.length ? labels.join('\n') : '（該当なし）');
-    }
+        }
 
 /* ===== カスタム一斉通知：送信UI（リセット・プレビュー・送信） ===== */
     (function(){
