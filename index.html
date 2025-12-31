@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQciw2hYmFAY2Pe3IKbLUAiYMdGS3uT_02HekriGksBs6ywr1ukEryHxBjuilv6e8vhA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -7261,50 +7261,52 @@
       
     // ===== サマリ：配信履歴（当月） =====
     window.loadSummaryPushStats = async function(){
-      const box = document.getElementById('summaryPushStatsBox');
-      if (!box) return;
-      box.innerHTML = `取得中… <span class="spinner"></span>`;
-    
-      try {
-        const r = await api(`?summary=1&pushStats=1`);
-        if (r?.status !== 'ok'){
-          box.innerHTML = `<div class="err">エラー: ${h(r?.message||'取得に失敗しました')}</div>`;
-          return;
-        }
-        if (r.empty){
-          box.innerHTML = `<div class="small muted">データがありません</div>`;
-          return;
-        }
-    
-        const fmtNum = n => (typeof n==='number' ? n.toLocaleString() : String(n||'0'));
-        const month  = h(r.month || '');
-        const logs   = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0};
-    
-        // KPI 4つ（スマホでも4列に）
-        const kpis = `
-          <div class="summaryKpis">
-            <div class="kpi"><div class="kpiLabel">ログ件数</div><div class="kpiValue">${fmtNum(logs.count)}</div></div>
-            <div class="kpi"><div class="kpiLabel">対象件数</div><div class="kpiValue">${fmtNum(logs.totalTargets)}</div></div>
-            <div class="kpi"><div class="kpiLabel">成功数</div><div class="kpiValue">${fmtNum(logs.totalSuccess)}</div></div>
-            <div class="kpi"><div class="kpiLabel">失敗数</div><div class="kpiValue">${fmtNum(logs.totalFail)}</div></div>
-          </div>`;
-    
-        // 履歴（対象列を削除し、成功/失敗だけ表示）
-        const recent = r.recent || [];
-        const recentRows = recent.map(x=>{
-          const isFail = Number(x.fail) > 0;
-          const resultLabel = isFail
-            ? `<span class="ng">失敗</span>`
-            : `<span class="ok">成功</span>`;
-          return `<tr>
-            <td class="nowrap">${h(x.at||'')}</td>
-            <td>${h(x.type||'')}</td>
-            <td class="mono">${h(x.eventId||'')}</td>
-            <td class="num">${resultLabel}</td>
-          </tr>`;
-        }).join('') || `<tr><td colspan="4" class="muted">直近20件なし</td></tr>`;
-    
-        box.innerHTML = `
+        const box = document.getElementById('summaryPushStatsBox');
+        if (!box) return;
+        box.innerHTML = `取得中… <span class="spinner"></span>`;
+
+        try {
+            // D1 Worker 直叩き
+            const url = new URL("/summary/push-stats", D1_BASE);
+            const res = await fetch(url.toString());
+            const r = await res.json();
+
+            if (r?.status !== 'ok'){
+            box.innerHTML = `<div class="err">エラー: ${h(r?.message||'取得に失敗しました')}</div>`;
+            return;
+            }
+            if (r.empty){
+            box.innerHTML = `<div class="small muted">データがありません</div>`;
+            return;
+            }
+
+            const fmtNum = n => (typeof n==='number' ? n.toLocaleString() : String(n||'0'));
+            const month  = h(r.month || '');
+            const logs   = r.logs || {count:0,totalTargets:0,totalSuccess:0,totalFail:0};
+
+            const kpis = `
+            <div class="summaryKpis">
+                <div class="kpi"><div class="kpiLabel">ログ件数</div><div class="kpiValue">${fmtNum(logs.count)}</div></div>
+                <div class="kpi"><div class="kpiLabel">対象件数</div><div class="kpiValue">${fmtNum(logs.totalTargets)}</div></div>
+                <div class="kpi"><div class="kpiLabel">成功数</div><div class="kpiValue">${fmtNum(logs.totalSuccess)}</div></div>
+                <div class="kpi"><div class="kpiLabel">失敗数</div><div class="kpiValue">${fmtNum(logs.totalFail)}</div></div>
+            </div>`;
+
+            const recent = r.recent || [];
+            const recentRows = recent.map(x=>{
+            const isFail = Number(x.fail) > 0;
+            const resultLabel = isFail
+                ? `<span class="ng">失敗</span>`
+                : `<span class="ok">成功</span>`;
+            return `<tr>
+                <td class="nowrap">${h(x.at||'')}</td>
+                <td>${h(x.type||'')}</td>
+                <td class="mono">${h(x.eventId||'')}</td>
+                <td class="num">${resultLabel}</td>
+            </tr>`;
+            }).join('') || `<tr><td colspan="4" class="muted">直近20件なし</td></tr>`;
+
+            box.innerHTML = `
             <div class="summaryBlock">
                 <div class="summaryHeader">当月配信サマリ（${month}）</div>
                 <div class="small muted" style="margin: -4px 0 8px;">
@@ -7323,11 +7325,11 @@
                 </table>
             </div>
             `;
-      } catch(err){
-        console.error(err);
-        box.innerHTML = `<div class="err">通信エラー: ${h(err?.message||err)}</div>`;
-      }
-    };
+        } catch(err){
+            console.error(err);
+            box.innerHTML = `<div class="err">通信エラー: ${h(err?.message||err)}</div>`;
+        }
+        };
 </script>
  
 <script>
