@@ -8,12 +8,17 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQciw2hYmFAY2Pe3IKbLUAiYMdGS3uT_02HekriGksBs6ywr1ukEryHxBjuilv6e8vhA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
-            
-            // D1 のベースURL（末尾スラッシュは削除しておく）
+           
+            // D1 Worker のベース（定義されてなければ location.origin を fallback に）
+            const D1_ORIGIN = (typeof D1_BASE === "string" && D1_BASE)
+            ? D1_BASE
+            : window.location.origin;
+           
+            // D1 のベースURL
             const D1_BASE = (typeof D1_API_BASE_URL === "string"
                 ? D1_API_BASE_URL
                 : ""
@@ -6381,7 +6386,7 @@
 
         let resp;
         try {
-            const url = new URL('/line/schedules', location.origin);
+            const url = new URL('/line/schedules', D1_ORIGIN);
             url.searchParams.set('days', '365');     // 1年分くらい
             url.searchParams.set('kind', '発表');    // 発表のみ
             const res = await fetch(url.toString());
@@ -6425,7 +6430,9 @@
 
         let r = { status: 'error' };
         try {
-            const res = await fetch(`/line/admin/members/notify-list?${params.toString()}`);
+            const url = new URL('/line/admin/members/notify-list', D1_ORIGIN);
+            if (lid) url.searchParams.set('lineId', lid);
+            const res = await fetch(url.toString());
             r = await res.json();
         } catch (e) {
             console.error('populateManualList error:', e);
