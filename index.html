@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQciw2hYmFAY2Pe3IKbLUAiYMdGS3uT_02HekriGksBs6ywr1ukEryHxBjuilv6e8vhA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6722,126 +6722,161 @@
     })();
 
     /* ===== カスタム一斉通知：自動宛先プレビュー API 呼び出し（D1版） ===== */
-        async function refreshAutoByPreview(){
-        const sec     = window.cpSec;
-        const selMode = window.selMode;
-        const boxAuto = window.boxAuto;
+    async function refreshAutoByPreview(){
+    const sec     = window.cpSec;
+    const selMode = window.selMode;
+    const boxAuto = window.boxAuto;
 
-        // 初期化前や手動モードなら何もしない
-        if (!sec || !selMode || !boxAuto) return;
-        if (selMode.value === 'manual') return;
+    // 初期化前や手動モードなら何もしない
+    if (!sec || !selMode || !boxAuto) return;
+    if (selMode.value === 'manual') return;
 
-        const statuses = getCheckedStats();
-        if (statuses.length === 0){
-            setText(boxAuto, '（対象ステータスを選択してください）');
-            return;
+    const statuses = getCheckedStats();         // ["参加","未定",...]
+    if (!statuses.length){
+        setText(boxAuto, '（対象ステータスを選択してください）');
+        return;
+    }
+
+    const wantsUnanswered      = statuses.includes('未回答');
+    const answeredStatusFilter = statuses.filter(s => s !== '未回答');
+
+    sec.__loadingAuto = true;
+    setText(boxAuto, '（読込中…）');
+
+    let data = null;
+    try {
+        const lid = await getLineId();
+        const url = new URL('/line/attendance/report', D1_ORIGIN);
+        url.searchParams.set('lineId',   lid || '');
+        url.searchParams.set('eventKey', selMode.value);
+
+        const res = await fetch(url.toString());
+        data = await res.json();
+    } catch(e){
+        console.error('refreshAutoByPreview error:', e);
+    } finally {
+        sec.__loadingAuto = false;
+    }
+
+    if (!data || data.status !== 'ok'){
+        setText(boxAuto, '（取得エラー）');
+        sec.__autoTargets = [];
+        return;
+    }
+
+    const rows    = Array.isArray(data.list)    ? data.list    : [];
+    const members = Array.isArray(data.members) ? data.members : [];
+
+    // 1) members を line_id 単位にまとめて「入力者情報」を作る
+    const membersByLine = new Map();
+
+    for (const m of members) {
+        const lid = m.lineId || m.line_id;
+        if (!lid) continue;
+
+        const inputName     = (m.inputName || m.input_name || '').trim();
+        const performerName = (m.performerName || m.performer_name || '').trim();
+        const notifyRaw     = String(m.notify || '').trim().toUpperCase();
+        const viewerRaw     = String(m.viewerOnly || m.viewer_only || '').trim().toUpperCase();
+
+        let mem = membersByLine.get(lid);
+        if (!mem) {
+        mem = {
+            lineId          : lid,
+            inputName       : '',
+            primaryPerformer: '',
+            anyNotifyY      : false,
+            hasNonViewer    : false,
+        };
         }
 
-        sec.__loadingAuto = true;
-        setText(boxAuto, '（読込中…）');
-
-        let data = null;
-        try {
-            const lid = await getLineId();
-            const base = (typeof D1_ORIGIN === 'string' && D1_ORIGIN) ? D1_ORIGIN : location.origin;
-            const url = new URL('/line/attendance/report', base);
-            url.searchParams.set('lineId', lid);
-            url.searchParams.set('eventKey', selMode.value);
-
-            const res = await fetch(url.toString());
-            data = await res.json();
-        } catch(e){
-            console.error('refreshAutoByPreview error:', e);
-        } finally {
-            sec.__loadingAuto = false;
+        if (!mem.inputName && inputName) {
+        mem.inputName = inputName;
+        }
+        if (!mem.primaryPerformer && performerName) {
+        mem.primaryPerformer = performerName;
         }
 
-        if (!data || data.status !== 'ok'){
-            setText(boxAuto, '（取得エラー）');
-            sec.__autoTargets = [];
-            return;
+        if (notifyRaw === 'Y' || notifyRaw === '1' || notifyRaw === 'TRUE') {
+        mem.anyNotifyY = true;
         }
 
-        const rows    = Array.isArray(data.list)    ? data.list    : [];
-        const members = Array.isArray(data.members) ? data.members : [];
-
-        // lineId ベースで members を引けるようにしておく
-        const memberByLine = new Map();
-        members.forEach(m => {
-            const lid = m.lineId || m.line_id;
-            if (!lid) return;
-            memberByLine.set(lid, {
-            lineId      : lid,
-            performerName: m.performerName || m.performer_name || '',
-            segment     : m.segment || '',
-            notify      : m.notify || '',
-            viewerOnly  : m.viewerOnly || m.viewer_only || '',
-            });
-        });
-
-        function isDeliverable(mem){
-            if (!mem) return false;
-            const v = String(mem.viewerOnly || '').toUpperCase();
-            if (v === '1' || v === 'Y' || v === 'TRUE') return false;
-
-            const n = String(mem.notify || '').toUpperCase();
-            if (n === '0' || n === 'N' || n === 'FALSE') return false;
-            // notify 空なら OK 扱い
-            return true;
+        const isViewerOnly = (viewerRaw === '1' || viewerRaw === 'Y' || viewerRaw === 'TRUE');
+        if (!isViewerOnly) {
+        mem.hasNonViewer = true;
         }
 
-        // attendance 行を lineId ごとにまとめる（最後に入ったもの優先で OK）
-        const attByLine = new Map();
-        rows.forEach(r => {
-            const lid = r.lineId || r.line_id;
-            if (!lid) return;
-            attByLine.set(lid, {
-            lineId       : lid,
-            performerName: r.performerName || r.performer_name || '',
-            attend       : r.attend || '',
-            });
-        });
+        membersByLine.set(lid, mem);
+    }
 
-        const targetsMap = new Map();
+    function isDeliverable(mem){
+        if (!mem) return false;
+        // 少なくとも1人は viewer_only ではなく、かつ notify=Y な人がいる
+        if (!mem.hasNonViewer) return false;
+        if (!mem.anyNotifyY)   return false;
+        return true;
+    }
 
-        // 1) 「回答済み」の人たち（attend がある人）
-        for (const [lid, row] of attByLine.entries()){
-            const mem = memberByLine.get(lid);
-            if (!isDeliverable(mem)) continue;
+    // 2) attendance rows を line_id → Set(status) にまとめる
+    const attStatusesByLine = new Map();
 
-            // ★ ここ重要：チェックボックスの value と attend の値がそのまま一致している前提
-            if (!statuses.includes(row.attend)) continue;
+    for (const r of rows) {
+        const lid = r.lineId || r.line_id;
+        if (!lid) continue;
 
-            const label = row.performerName || mem.performerName || lid;
-            targetsMap.set(lid, { lineId: lid, label });
+        const st = (r.attend || '').trim();
+        if (!st) continue;
+
+        let set = attStatusesByLine.get(lid);
+        if (!set) {
+        set = new Set();
+        attStatusesByLine.set(lid, set);
+        }
+        set.add(st);
+    }
+
+    // 3) line_id 単位で「今回の条件にマッチする household」を決める
+    const targetsMap = new Map();
+
+    for (const [lid, mem] of membersByLine.entries()) {
+        if (!isDeliverable(mem)) continue;
+
+        const set      = attStatusesByLine.get(lid) || new Set();
+        const hasAnswer = set.size > 0;
+
+        let hit = false;
+
+        // (a) 回答済み ＆ チェックされたステータスと一致するものがあるか
+        if (answeredStatusFilter.length > 0) {
+        hit = [...set].some(st => answeredStatusFilter.includes(st));
+        } else if (hasAnswer) {
+        // フィルタが空で回答だけある場合は「全部対象」とみなす
+        hit = true;
         }
 
-        // 2) 「未回答」を含めたい場合
-        const UNANSWERED_CODES = ['未回答'];
-        const wantsUnanswered = statuses.some(s => UNANSWERED_CODES.includes(s));
-
-        if (wantsUnanswered){
-            members.forEach(m => {
-            const lid = m.lineId || m.line_id;
-            if (!lid) return;
-            if (attByLine.has(lid)) return; // すでに回答あり
-
-            const mem = memberByLine.get(lid);
-            if (!isDeliverable(mem)) return;
-
-            const label = mem.performerName || lid;
-            if (!targetsMap.has(lid)){
-                targetsMap.set(lid, { lineId: lid, label });
-            }
-            });
+        // (b) 「未回答」が含まれていて、この household が未回答なら対象
+        if (!hit && !hasAnswer && wantsUnanswered) {
+        hit = true;
         }
 
-        const autoTargets = Array.from(targetsMap.values());
-        sec.__autoTargets = autoTargets;
+        if (!hit) continue;
 
-        const labels = autoTargets.map(x => x.label).filter(Boolean);
-        setText(boxAuto, labels.length ? labels.join('\n') : '（該当なし）');
-        }
+        const label =
+        mem.inputName ||
+        mem.primaryPerformer ||
+        lid;
+
+        targetsMap.set(lid, { lineId: lid, label });
+    }
+
+    const autoTargets = Array.from(targetsMap.values())
+        .sort((a, b) => a.label.localeCompare(b.label, 'ja'));
+
+    sec.__autoTargets = autoTargets;
+
+    const labels = autoTargets.map(x => x.label).filter(Boolean);
+    setText(boxAuto, labels.length ? labels.join('\n') : '（該当なし）');
+    }
 
 /* ===== カスタム一斉通知：送信UI（リセット・プレビュー・送信） ===== */
     (function(){
