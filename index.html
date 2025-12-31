@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.3.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyQciw2hYmFAY2Pe3IKbLUAiYMdGS3uT_02HekriGksBs6ywr1ukEryHxBjuilv6e8vhA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -7178,29 +7178,32 @@
         </div>`;
     };
     
-    // ========= サマリ：無料枠の取得＆描画 =========
+   // ========= サマリ：無料枠の取得＆描画 =========
     window.loadSummaryFreeQuota = async function () {
-      const box = document.getElementById('summaryFreeQuotaBox');
-      if (!box) {
+    const box = document.getElementById('summaryFreeQuotaBox');
+    if (!box) {
         console.warn('#summaryFreeQuotaBox が見つかりません');
         return;
-      }
-      box.innerHTML = '読み込み中… <span class="spinner"></span>';
-    
-      try {
-        const r = await api('?summary=1&freeQuota=1');
-        console.log('freeQuota resp:', r);
-    
+    }
+    box.innerHTML = '読み込み中… <span class="spinner"></span>';
+
+    try {
+        // ★ D1_ORIGIN を使って Worker 側の新エンドポイントを叩く
+        const url = new URL('/line/summary/free-quota', D1_ORIGIN);
+        const res = await fetch(url.toString());
+        const r = await res.json();
+        console.log('freeQuota resp (worker):', r);
+
         if (!r || r.status !== 'ok') {
-          box.innerHTML = `<div class="err">取得に失敗しました：${r?.message || 'unknown'}</div>`;
-          return;
+        box.innerHTML = `<div class="err">取得に失敗しました：${r?.message || 'unknown'}</div>`;
+        return;
         }
-        // 期待キーが欠けても描けるように防御
+
         box.innerHTML = window.renderFreeQuotaCard(r);
-      } catch (e) {
+    } catch (e) {
         console.error(e);
         box.innerHTML = `<div class="err">エラー：${e.message || e}</div>`;
-      }
+    }
     };
     
     // ===== サマリ：タブ切替共通 =====
