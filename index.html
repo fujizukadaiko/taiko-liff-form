@@ -7658,7 +7658,6 @@
     
         try {
             const lid = (window.state?.lineId || window.STATE?.lineId || '');
-            console.debug('[fb] lineId for feedback list =', lid);
             const j = await api(`/line/admin/feedback/list?lineId=${encodeURIComponent(lid)}`);
           console.debug('[fb] api response', j);
     
