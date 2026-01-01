@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.3.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.4.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzqL5f_ClVbwinAJMgRhfx_37mBcmOFQ55dmx6xro-8pbYPQ-uSSHu-Md8T4k5zA4mXgA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -7657,8 +7657,9 @@
         );
     
         try {
-          const lid = (window.state?.lineId || window.STATE?.lineId || '');
-          const j = await api(`?feedbackList=1&lineId=${encodeURIComponent(lid)}`);
+            const lid = (window.state?.lineId || window.STATE?.lineId || '');
+            console.debug('[fb] lineId for feedback list =', lid);
+            const j = await api(`/line/admin/feedback/list?lineId=${encodeURIComponent(lid)}`);
           console.debug('[fb] api response', j);
     
           if (j?.status !== 'ok' || !Array.isArray(j.items)) {
