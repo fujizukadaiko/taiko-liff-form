@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.4.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.4.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz6scFH1IxQ5yy7IVk13469xfgy2jYpeRLRkpsrYwNpn4FhPhpqErdVg7mtRy_u3e2d8A/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -7632,12 +7632,39 @@
       }
     
       // ご意見一覧（カテゴリ別表示）
-      window.loadFeedbackList = async function () {
+        window.loadFeedbackList = async function () {
         console.debug('[fb] loadFeedbackList invoked');
-    
+
         // 念のためビューを可視化
         document.querySelector('#view-feedback')?.removeAttribute('hidden');
+
+        const box = document.getElementById('feedbackListBox');
+        if (!box) return;
+        box.innerHTML = '読み込み中… <span class="spinner"></span>';
     
+        let lid = (window.state?.lineId || window.STATE?.lineId || '');
+
+        // state に無い場合は LIFF から直接取得する fallback
+        if (!lid && window.liff && typeof liff.getProfile === 'function') {
+            try {
+            const prof = await liff.getProfile();
+            lid = prof.userId || '';
+            console.debug('[fb] lineId from liff.getProfile:', lid);
+            } catch (e) {
+            console.warn('[fb] liff.getProfile fallback failed', e);
+            }
+        }
+
+        // それでも取れなかったら諦める
+        if (!lid) {
+            console.warn('[fb] lineId is empty, abort feedback load');
+            box.innerHTML = '<div class="err">LINE ID が取得できませんでした</div>';
+            return;
+        }
+
+        console.debug('[fb] using lineId =', lid);
+
+            
         // 日時整形
         const pad = n => String(n).padStart(2, '0');
         const fmtDate = (s) => {
@@ -7647,10 +7674,6 @@
           if (isNaN(d.getTime())) return String(s);
           return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
         };
-    
-        const box = document.getElementById('feedbackListBox');
-        if (!box) return;
-        box.innerHTML = '読み込み中… <span class="spinner"></span>';
     
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
           ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c])
