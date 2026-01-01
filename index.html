@@ -8,9 +8,9 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.4.3";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.4.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxbMXM2Y2BiTb_pwncoC4kMfFTs8SHrStOia4D0IDWcCW9GwRN6itfSq-lD8UjJTw7Ncw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwn6ff2xd1SGS8M6jxxB2TzibyKEBvhyTgVYj9H-SB2boda6bNAdyFBSiEyJ8cGXpnwmg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
            
             // D1 のベースURL
@@ -3599,18 +3599,22 @@
     }
 
 /* ===== API ===== */
-    async function api(path, { signal } = {}){
+    async function api(path, { signal } = {}) {
+    const url = API_ENDPOINT + path;
+    console.debug('[api] request url =', url);
+
     const ctrl = new AbortController();
-    const t = setTimeout(()=> ctrl.abort("timeout"), 15000); // 15s
-    try{
-        const r = await fetch(API_ENDPOINT + path, { signal: signal || ctrl.signal });
+    const t = setTimeout(() => ctrl.abort('timeout'), 15000); // 15s
+
+    try {
+        const r = await fetch(url, { signal: signal || ctrl.signal });
         clearTimeout(t);
         return await r.json();
-    }catch(e){
+    } catch (e) {
         clearTimeout(t);
         // 1回だけ即リトライ（短め）
         await new Promise(res => setTimeout(res, 400));
-        const r2 = await fetch(API_ENDPOINT + path);
+        const r2 = await fetch(url);
         return await r2.json();
     }
     }
