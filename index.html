@@ -7605,6 +7605,32 @@
 </script>
 
 <script>
+// LIFF / state から現在の lineId を取得（管理画面用）
+async function resolveAdminLineId() {
+  // 1) まず state / STATE を見る
+  const fromState = window.state?.lineId || window.STATE?.lineId;
+  if (fromState) {
+    console.debug('[fb] lineId from state:', fromState);
+    return fromState;
+  }
+
+  // 2) 取れなければ LIFF から直接取得を試みる
+  try {
+    if (window.liff && typeof window.liff.getProfile === 'function') {
+      const profile = await window.liff.getProfile();
+      if (profile?.userId) {
+        console.debug('[fb] lineId from liff.getProfile:', profile.userId);
+        return profile.userId;
+      }
+    }
+  } catch (e) {
+    console.warn('[fb] liff.getProfile failed', e);
+  }
+
+  // 3) それでもダメなら空
+  console.warn('[fb] cannot resolve lineId');
+  return '';
+}
 /* ===== フィードバック一覧ビュー（管理） ===== */
     (function () {
       // 戻る / 再読込ボタン
@@ -7657,14 +7683,21 @@
         );
     
         try {
-            const lid = (window.state?.lineId || window.STATE?.lineId || '');
+            const lid = await resolveAdminLineId();
+            if (!lid) {
+                // LIFF から開いていないか、初期化がうまく行っていない
+                console.warn('[fb] no lineId – LIFFから開かれていない可能性');
+                box.innerHTML = '<div class="err">管理者の識別情報が取得できません。LINEアプリからこの画面を開き直してください。</div>';
+                return;
+            }
+
             const j = await api(`/line/admin/feedback/list?lineId=${encodeURIComponent(lid)}`);
-          console.debug('[fb] api response', j);
-    
-          if (j?.status !== 'ok' || !Array.isArray(j.items)) {
-            box.innerHTML = '<div class="err">取得に失敗しました</div>';
-            return;
-          }
+            console.debug('[fb] api response', j);
+
+            if (j?.status !== 'ok' || !Array.isArray(j.items)) {
+                box.innerHTML = '<div class="err">取得に失敗しました</div>';
+                return;
+            }
     
           // 正規化
           const items = j.items.map(it => ({
