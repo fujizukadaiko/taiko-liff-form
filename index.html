@@ -6697,15 +6697,8 @@
         const segIndex   = buildSegIndex(payload);
         const candidates = buildCandidates(payload, segIndex);
 
-        // ▼ イベント自体の対象区分を取得（payload 内のそれっぽいフィールドを総当たり）
-        const eventSegNorm = normalizeSegmentLabel(
-        payload.segment ||
-        payload.targetSegment ||
-        payload.target_group ||
-        payload.targetGroup ||
-        payload.eventSegment ||
-        ""
-        );
+        // ▼ イベント自体の対象区分を取得（D1/GAS 両対応）
+        const eventSegNorm = getEventSegmentNorm(payload);
 
         // ▼ 回答済み rows にも seg を補完しておく（members 情報から）
         rows.forEach(r => {
