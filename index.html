@@ -6697,8 +6697,8 @@
         const segIndex   = buildSegIndex(payload);
         const candidates = buildCandidates(payload, segIndex);
 
-        // ▼ イベント自体の対象区分を取得（D1/GAS 両対応）
-        const eventSegNorm = getEventSegmentNorm(payload);
+        // ▼ イベント自体の対象区分を取得（D1/GAS + フロントのマスターからも検索）
+        const eventSegNorm = getEventSegmentNorm(payload, id);
 
         // ▼ 回答済み rows にも seg を補完しておく（members 情報から）
         rows.forEach(r => {
@@ -6841,25 +6841,25 @@
         return "";
         }
 
-        // ▼ payload から「イベントの対象区分」をいい感じに探して正規化
-        function getEventSegmentNorm(payload){
-        if (!payload) return "";
+        // ▼ payload + フロント側マスターから「イベントの対象区分」を探して正規化
+        function getEventSegmentNorm(payload, eventId){
+        if (!payload) payload = {};
 
-        const raw =
-            // まずトップレベル直下
+        // 1) まずは payload 内を総当たり（従来ロジック）
+        let raw =
             payload.segment ||
             payload.targetSegment ||
             payload.target_group ||
             payload.targetGroup ||
             payload.eventSegment ||
-            // event オブジェクト配下（D1 がこの形を返している可能性大）
+            // event オブジェクト配下
             (payload.event && (
             payload.event.segment ||
             payload.event.targetSegment ||
             payload.event.target_group ||
             payload.event.targetGroup
             )) ||
-            // meta 的な場所にある可能性も一応見る
+            // meta 的な場所
             (payload.meta && (
             payload.meta.segment ||
             payload.meta.targetSegment ||
@@ -6868,10 +6868,34 @@
             )) ||
             "";
 
-        const norm = normalizeSegmentLabel(raw);
-        console.debug("[report] event segment raw=", raw, "norm=", norm);
+        let norm = normalizeSegmentLabel(raw);
+        if (norm) {
+            console.debug("[report] event segment raw=", raw, "norm=", norm);
+            return norm;
+        }
+
+        // 2) フロント側の「イベント一覧」から fallback で探す
+        let raw2 = "";
+
+        // state.adminItemsRaw を優先（D1 から取った最新の一覧）
+        if (Array.isArray(window.state?.adminItemsRaw) && eventId) {
+            const hit = window.state.adminItemsRaw.find(ev => String(ev.id) === String(eventId));
+            if (hit && hit.segment) {
+            raw2 = hit.segment;
+            }
+        }
+
+        // それでも見つからず、adminItemsMap があればそちらも一応見る
+        if (!raw2 && window.adminItemsMap && eventId && window.adminItemsMap[eventId]) {
+            raw2 = window.adminItemsMap[eventId].segment || "";
+        }
+
+        norm = normalizeSegmentLabel(raw2);
+        console.debug("[report] event segment raw=", raw, "norm=", norm,
+                        "/ fallback raw=", raw2, "norm2=", norm);
+
         return norm;
-    }
+        }
 
     // ▼ 名前 + 区分から表示名を組み立て（大人の部の接頭辞を付ける）
     function nameWithSegPrefix(p){
