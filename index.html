@@ -8,9 +8,9 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.5.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.5.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycby8rirIS18wnl9RS3sBPgi0Kn6a8Q_qxm-L7E67FZhanF_ufMBEP8zGpcTvSDiRh86yyA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbySW2eeugLghSsprGc7jLylxNZsZybPtgJfFtRYQd1lcaI8LnkWkKB7fTlUBMIp5OyXkA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
            
             // D1 のベースURL
@@ -3829,6 +3829,60 @@
             el.setAttribute('aria-hidden', 'true');
         };
         })();
+
+        function showSavingModal(message) {
+        let ov = document.getElementById('adminSavingOverlay');
+        if (!ov) {
+            ov = document.createElement('div');
+            ov.id = 'adminSavingOverlay';
+            ov.style.position = 'fixed';
+            ov.style.inset = '0';
+            ov.style.background = 'rgba(0,0,0,0.35)';
+            ov.style.display = 'flex';
+            ov.style.alignItems = 'center';
+            ov.style.justifyContent = 'center';
+            ov.style.zIndex = '9999';
+            ov.innerHTML = `
+            <div style="
+                background:#fff;
+                padding:16px 24px;
+                border-radius:12px;
+                box-shadow:0 4px 16px rgba(0,0,0,.25);
+                text-align:center;
+                min-width:220px;
+            ">
+                <div class="spinner" style="
+                width:28px;
+                height:28px;
+                border-radius:50%;
+                border:3px solid #ccc;
+                border-top-color:#555;
+                margin:0 auto 8px;
+                animation: adminSpin 0.8s linear infinite;
+                "></div>
+                <div id="adminSavingText" style="font-size:14px;">保存中…</div>
+            </div>
+            `;
+            document.body.appendChild(ov);
+
+            // 簡易アニメーション
+            const style = document.createElement('style');
+            style.textContent = `
+            @keyframes adminSpin {
+                to { transform: rotate(360deg); }
+            }
+            `;
+            document.head.appendChild(style);
+        }
+        const label = ov.querySelector('#adminSavingText');
+        if (label) label.textContent = message || '保存中…';
+        ov.style.display = 'flex';
+        }
+
+        function hideSavingModal() {
+        const ov = document.getElementById('adminSavingOverlay');
+        if (ov) ov.style.display = 'none';
+        }
 /* ===== API ===== */
     async function api(path, { signal } = {}) {
     const url = API_ENDPOINT + path;
@@ -5487,135 +5541,154 @@
         logAdmin("");
     }
 
-    /* ▼ 管理フォームの入力値を検証し、API に投げて新規登録/更新する */
+   /* ▼ 管理フォームの入力値を検証し、API に投げて新規登録/更新する */
         async function adminSubmit(){
         if (!state.isAdmin){
             alert("管理者のみ利用できます");
             return;
         }
 
-        await withLoadingSnackbar(
-            (adminMode === "edit") ? "保存中…" : "登録中…",
-            (adminMode === "edit") ? "保存しました" : "登録しました",
+        const isEdit      = (adminMode === "edit");
+        const loadingMsg  = isEdit ? "保存中…" : "登録中…";
+        const successMsg  = isEdit ? "保存しました" : "登録しました";
+
+        // ★ ここでモーダルを出す（外側で try/finally）
+        showSavingModal(loadingMsg);
+
+        try {
+            await withLoadingSnackbar(
+            loadingMsg,
+            successMsg,
             async () => {
-            logAdmin("");
+                logAdmin("");
 
-            const type  = $("#ad_type").value.trim();
-            let   title = $("#ad_title").value.trim();
-            const ymdIn = $("#ad_ymd").value.trim();   // yyyy-mm-dd
-            const hm    = $("#ad_hm").value.trim();
-            const place = $("#ad_place").value.trim();
-            const meetAt= $("#ad_meetAt").value.trim();
-            const meetPl= $("#ad_meetPlace").value.trim();
-            const attT  = $("#ad_attendTarget").value.trim().toUpperCase();
-            const dlIn  = $("#ad_deadline").value.trim();
-            const pub   = $("#ad_publish").value.trim();
-            const st    = (adminMode === "create")
-                            ? "active"
-                            : $("#ad_status").value.trim();
-            const segRaw = $("#ad_segment").value.trim();
+                const type  = $("#ad_type").value.trim();
+                let   title = $("#ad_title").value.trim();
+                const ymdIn = $("#ad_ymd").value.trim();   // yyyy-mm-dd
+                const hm    = $("#ad_hm").value.trim();
+                const place = $("#ad_place").value.trim();
+                const meetAt= $("#ad_meetAt").value.trim();
+                const meetPl= $("#ad_meetPlace").value.trim();
+                const attT  = $("#ad_attendTarget").value.trim().toUpperCase();
+                const dlIn  = $("#ad_deadline").value.trim();
+                const pub   = $("#ad_publish").value.trim();
+                const st    = (adminMode === "create")
+                                ? "active"
+                                : $("#ad_status").value.trim();
+                const segRaw = $("#ad_segment").value.trim();
 
-            let seg = segRaw;
-            if (seg.includes("大人")) seg = "大人";
-            else if (seg.includes("子ども") || seg.includes("子供")) seg = "子ども";
-            else if (seg.includes("両方")) seg = "両方";
+                let seg = segRaw;
+                if (seg.includes("大人")) seg = "大人";
+                else if (seg.includes("子ども") || seg.includes("子供")) seg = "子ども";
+                else if (seg.includes("両方")) seg = "両方";
 
-            if (!title || !type || !ymdIn){
+                if (!title || !type || !ymdIn){
                 throw new Error("タイトル/種別/公演日は必須です");
-            }
+                }
 
-            if (type === "発表"){
-                const flag = $("#ad_flag").value.trim();
+                if (type === "発表"){
+                const flag    = $("#ad_flag").value.trim();
                 const allowed = (adminMode==="create") ? ["Y","N"] : ["Y","S","D","N"];
                 if (!flag || !allowed.includes(flag)){
-                throw new Error(
+                    throw new Error(
                     adminMode==="create"
-                    ? "配信フラグは Y または N を選択してください（発表/新規）"
-                    : "配信フラグは Y/S/D/N から選択してください（発表/編集）"
-                );
+                        ? "配信フラグは Y または N を選択してください（発表/新規）"
+                        : "配信フラグは Y/S/D/N から選択してください（発表/編集）"
+                    );
                 }
-            }
+                }
 
-            let meetAtSend = meetAt;
-            let meetPlSend = meetPl;
-            let attSend    = attT;
-            let dlSend     = dlIn;
+                let meetAtSend = meetAt;
+                let meetPlSend = meetPl;
+                let attSend    = attT;
+                let dlSend     = dlIn;
 
-            if (type==="練習"){
+                if (type==="練習"){
                 meetAtSend = "";
                 meetPlSend = "";
                 attSend    = "N";
                 dlSend     = "";
-            }
-            if (type!=="発表"){
+                }
+                if (type!=="発表"){
                 attSend = "N";
-            }
+                }
 
-            const ymd = toYmdSlashFromDateInput(ymdIn);
-            const dl  = dlSend ? toYmdSlashFromDateInput(dlSend) : "";
+                const ymd = toYmdSlashFromDateInput(ymdIn);
+                const dl  = dlSend ? toYmdSlashFromDateInput(dlSend) : "";
 
-            const btn = $("#btnAdminSubmit");
-            if (btn) btn.disabled = true;
+                const btn = $("#btnAdminSubmit");
+                if (btn) btn.disabled = true;
 
-            try{
+                try{
                 let urlBase =
-                `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}`
-                + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
-                + (hm?        `&hm=${esc(hm)}`                     : "")
-                + (place?     `&place=${esc(place)}`               : "")
-                + (meetAtSend?`&meetAt=${esc(meetAtSend)}`         : "")
-                + (meetPlSend?`&meetPlace=${esc(meetPlSend)}`      : "")
-                + `&attendTarget=${esc(attSend)}`
-                + (dl?        `&deadline=${esc(dl)}`               : "")
-                + `&publish=${esc(pub)}&status=${esc(st)}`
-                + `&segment=${esc(seg)}`;
+                    `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}`
+                    + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
+                    + (hm?        `&hm=${esc(hm)}`                     : "")
+                    + (place?     `&place=${esc(place)}`               : "")
+                    + (meetAtSend?`&meetAt=${esc(meetAtSend)}`         : "")
+                    + (meetPlSend?`&meetPlace=${esc(meetPlSend)}`      : "")
+                    + `&attendTarget=${esc(attSend)}`
+                    + (dl?        `&deadline=${esc(dl)}`               : "")
+                    + `&publish=${esc(pub)}&status=${esc(st)}`
+                    + `&segment=${esc(seg)}`;
+
+                $("#btnAdminSubmit").disabled = true;
+                $("#btnAdminSubmit").textContent = isEdit ? "保存中…" : "登録中…";
 
                 let res;
                 if (adminMode === "create"){
-                if (type==="発表"){
+                    if (type==="発表"){
                     const flag = $("#ad_flag").value.trim();
                     urlBase += `&flag=${esc(flag)}`;
-                } else {
+                    } else {
                     urlBase += `&flag=N`;
-                }
+                    }
 
-                res = await api(urlBase);
+                    res = await api(urlBase);
 
-                // CORS フォールバックで {status:'ok', note:'...'} が返るケースもある
-                if (res && res.status && res.status !== "ok"){
+                    // CORS フォールバックで {status:'ok', note:'...'} が返るケースもある
+                    if (res && res.status && res.status !== "ok"){
                     throw new Error(res.message || "登録に失敗しました");
-                }
+                    }
 
-                // スプレッドシート保存後の UI 更新
-                enterAdminCreateMode();
-                await adminListFetch();
+                    // スプレッドシート保存後の UI 更新
+                    enterAdminCreateMode();
+                    await adminListFetch();
 
                 } else {
-                if (!adminEditingId){
+                    if (!adminEditingId){
                     throw new Error("編集対象IDが不正です");
-                }
+                    }
 
-                const url =
+                    const url =
                     urlBase
                     + `&id=${esc(adminEditingId)}`
                     + (type==="発表"
                         ? `&flag=${esc($("#ad_flag").value.trim())}`
                         : `&flag=N`);
 
-                res = await api(url);
-                if (res && res.status && res.status !== "ok"){
+                    res = await api(url);
+                    if (res && res.status && res.status !== "ok"){
                     throw new Error(res.message || "保存に失敗しました");
+                    }
+
+                    await adminListFetch();
                 }
 
-                await adminListFetch();
+                // ここまでエラーが出なければ withLoadingSnackbar が
+                // successMsg（保存しました / 登録しました）を表示してくれる
+                } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = isEdit ? "保存" : "新規登録";
                 }
-
-                // ここまでエラーが出なければ withLoadingSnackbar が「保存しました」トーストを出してくれる
-            } finally {
-                if (btn) btn.disabled = false;
+                }
             }
-            }
-        );
+            );
+        } finally {
+            // ★ 成功・失敗に関わらずモーダルは閉じる
+            hideSavingModal();
+        }
         }
 
     /* ▼ 一覧タブの「予定一覧」を取得（D1優先・なければ GAS にフォールバック） */
