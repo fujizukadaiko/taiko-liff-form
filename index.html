@@ -5694,95 +5694,139 @@
         }
     }
 
-    /* ▼ 一覧タブの「予定一覧」を取得（D1優先・なければ GAS にフォールバック） */
-    async function adminListFetch(){
+    /* ▼ 一覧タブの「予定一覧」を取得（D1 優先・ダメなら GAS フォールバック） */
+    async function adminListFetch() {
+    try {
+        const top = document.getElementById("adminListBoxTop");
+        if (top) {
+        top.innerHTML = `読み込み中… <span class="spinner"></span>`;
+        }
+
+        const days = Number($("#ad_days").value || 60);
+        let items = [];
+
+        // 1) D1 から取得（速いルート）
+        if (D1_BASE && state.lineId) {
         try {
-            const top = document.getElementById("adminListBoxTop");
-            if (top) {
-            top.innerHTML = `読み込み中… <span class="spinner"></span>`;
+            const u = new URL("/admin/events/list", D1_BASE);
+            u.searchParams.set("lineId", state.lineId);
+            u.searchParams.set("days", String(days)); // 将来サーバ側で使いたくなったとき用
+
+            const res  = await fetch(u.toString());
+            const json = await res.json();
+
+            if (json && json.status === "ok" && Array.isArray(json.items)) {
+            items = json.items;
+            } else {
+            console.warn("[adminListFetch] D1 bad response:", json);
             }
+        } catch (e) {
+            console.warn("[adminListFetch] D1 fetch failed, fallback to GAS:", e);
+        }
+        }
 
-            const days = Number($("#ad_days").value || 60);
-
-            let items = [];
-
-            // ★ 管理画面の一覧は GAS から取得（公開/非公開・active/archived も全部見える）
-            const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
-            if (r.status !== "ok" || !Array.isArray(r.items)) {
+        // 2) D1 で取れなかったら GAS にフォールバック
+        if (!items.length) {
+        const r = await api(
+            `?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`
+        );
+        if (r.status !== "ok" || !Array.isArray(r.items)) {
             if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
             return;
-            }
-            items = r.items;
+        }
+        items = r.items;
+        }
 
-            if (!items.length) {
-            if (top) {
-                top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
-            }
-            state.adminItemsRaw = [];
-            adminItemsMap = {};
-            return;
-            }
+        if (!items.length) {
+        if (top) {
+            top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
+        }
+        state.adminItemsRaw = [];
+        adminItemsMap = {};
+        return;
+        }
 
-            // ★ 以下は今のまま（正規化～描画処理）
-            const raw = items.map(ev => ({
-            id   : String(
-                ev.id ||
-                ev.eventId ||
-                ev.event_id ||
-                ev.event_key ||
-                ev.eventKey ||
-                ""
+        // ★ D1 / GAS 両対応の正規化
+        const raw = items
+        .map(ev => ({
+            id: String(
+            ev.id ||
+            ev.eventId ||
+            ev.event_id ||
+            ev.event_key ||
+            ev.eventKey ||
+            ""
             ).trim(),
-            type : ev.type || ev.kind || "",
-            title: ev.title || ev.name || "",
-            ymd  : ev.ymd || ev.date || "",
-            hm   : ev.hm || ev.time || "",
+            type : ev.type  || ev.kind  || "",
+            title: ev.title || ev.name  || "",
+            ymd  : ev.ymd   || ev.date  || "",
+            hm   : ev.hm    || ev.time  || "",
             place: ev.place || "",
-            meetAt    : ev.meetAt    || ev.meet_at    || "",
-            meetPlace : ev.meetPlace || ev.meet_place || "",
+            meetAt:
+            ev.meetAt     ||
+            ev.meet_at    ||
+            ev.callTime   ||
+            ev.call_time  ||
+            "",
+            meetPlace:
+            ev.meetPlace  ||
+            ev.meet_place ||
+            ev.callPlace  ||
+            ev.call_place ||
+            "",
             attendTarget:
-                ev.attendTarget   ||
-                ev.attend_target  ||
-                ev.needAttendance ||
-                ev.need_attendance ||
-                "N",
+            ev.attendTarget    ||
+            ev.attend_target   ||
+            ev.needAttendance  ||
+            ev.need_attendance ||
+            "N",
             deadline:
-                ev.deadline       ||
-                ev.deadlineDate   ||
-                ev.deadline_date  ||
-                "",
+            ev.deadline      ||
+            ev.deadlineDate  ||
+            ev.deadline_date ||
+            "",
             publish:
-                ev.publish        ||
-                ev.publishFlag    ||
-                ev.publish_flag   ||
-                "No",
+            ev.publish      ||
+            ev.publishFlag  ||
+            ev.publish_flag ||
+            "",
             status: ev.status || "archived",
-            flag  : ev.flag ||
-                    ev.distributeFlag ||
-                    ev.distribute_flag ||
-                    "N",
+            flag:
+            ev.flag             ||
+            ev.distributeFlag   ||
+            ev.distribute_flag  ||
+            ev.pushFlag         ||
+            ev.push_flag        ||
+            "N",
             segment:
-                ev.segment        ||
-                ev.targetSegment  ||
-                ev.target_segment ||
-                ev.attendSegment  ||
-                ""
-            })).filter(it => it.id);
+            ev.segment        ||
+            ev.targetSegment  ||
+            ev.target_segment ||
+            ev.attendSegment  ||
+            ev.targetGroup    ||
+            ev.target_group   ||
+            "",
+        }))
+        .filter(it => it.id); // id 無しは念のため除外
 
-            state.adminItemsRaw = raw;
-            adminItemsMap = {};
-            raw.forEach(it => {
-            adminItemsMap[String(it.id)] = it;
-            });
+        // ★ 生配列を保存（ここから先はローカルフィルタだけ）
+        state.adminItemsRaw = raw;
 
-            adminListRenderLocal();
+        // 編集用マップは全件から作成
+        adminItemsMap = {};
+        raw.forEach(it => {
+        adminItemsMap[String(it.id)] = it;
+        });
 
-        } catch (err) {
-            const msg = `<span class="err">エラー：${err.message || err}</span>`;
-            const topEl = document.getElementById("adminListBoxTop");
-            if (topEl) topEl.innerHTML = msg;
+        // 既存のローカル描画（期間・区分フィルタ & status=active フィルタ）が走る
+        adminListRenderLocal();
+    } catch (err) {
+        const topEl = document.getElementById("adminListBoxTop");
+        if (topEl) {
+        topEl.innerHTML = `<span class="err">エラー：${h(err.message || String(err))}</span>`;
         }
-        }
+    }
+    }
 
     /* ▼ 取得済みの adminItemsRaw を期間/区分でローカルフィルタして一覧に描画 */
     function adminListRenderLocal(){
