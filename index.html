@@ -8,9 +8,9 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.5.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.5.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxZCmDi5Ac0f8C_66ZHumPdkwl7RkJ-K_IzwLdGtcwoJFfTLKjnTL7fM2b9U-j6K6izog/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxh4HKstAcVeai0T1D46gz3h00UAg67eCSGaOEPmlxPDMS8fmiUUsEkf0vPjKQwSdD4Pw/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
            
             // D1 のベースURL
@@ -467,6 +467,40 @@
         /* バッジの幅＋余白ぶん。必要に応じて調整 */
         .fEvent .fRow1{
             padding-right: 80px; /* 必要なら調整 */
+        }
+
+        /* ===== 保存中オーバーレイ ===== */
+        .saving-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        }
+
+        .saving-overlay.show {
+        display: flex;
+        }
+
+        .saving-dialog {
+        background: #fff;
+        border-radius: 12px;
+        padding: 16px 20px;
+        min-width: 220px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        text-align: center;
+        font-size: 14px;
+        }
+
+        .saving-dialog .spinner {
+        display: inline-block;
+        margin-bottom: 8px;
+        }
+
+        .saving-message {
+        white-space: nowrap;
         }
     /* ===== Attendance Form（出欠フォーム） ===== */
         .fEvent{ border:1px solid var(--c-border); border-radius:12px; background:#fff; margin:10px 0; }
@@ -2619,6 +2653,14 @@
                 style="margin-top:8px;"
             ></div>
         </div>
+
+        <!-- 保存中オーバーレイ -->
+        <div id="savingOverlay" class="saving-overlay" aria-hidden="true">
+        <div class="saving-dialog">
+            <div class="spinner"></div>
+            <div id="savingOverlayMsg" class="saving-message">保存中…</div>
+        </div>
+        </div>
         </section>
 
     <!-- ===== View: 出欠結果一覧（管理者） ===== -->
@@ -3760,6 +3802,31 @@
             showSnackbar('エラーが発生しました', { variant: 'error', duration: 4000 });
             throw e;
             }
+        };
+        })();
+
+  /* ===== 共通: 保存中オーバーレイ ===== */
+        (function () {
+        const ID = 'savingOverlay';
+        const MSG_ID = 'savingOverlayMsg';
+
+        function getEl()     { return document.getElementById(ID); }
+        function getMsgEl()  { return document.getElementById(MSG_ID); }
+
+        window.showSavingOverlay = function (message) {
+            const el = getEl();
+            if (!el) return;
+            const msgEl = getMsgEl();
+            if (msgEl && message) msgEl.textContent = message;
+            el.classList.add('show');
+            el.removeAttribute('aria-hidden');
+        };
+
+        window.hideSavingOverlay = function () {
+            const el = getEl();
+            if (!el) return;
+            el.classList.remove('show');
+            el.setAttribute('aria-hidden', 'true');
         };
         })();
 /* ===== API ===== */
@@ -5399,6 +5466,10 @@
             if (!state.isAdmin){ alert("管理者のみ利用できます"); return; }
             logAdmin("");
 
+            // ★ 保存中オーバーレイ表示
+            const overlayMsg = (adminMode === "edit") ? "保存中…" : "登録中…";
+            if (window.showSavingOverlay) showSavingOverlay(overlayMsg);
+
             const type  = $("#ad_type").value.trim();
             let   title = $("#ad_title").value.trim();
             const ymdIn = $("#ad_ymd").value.trim();   // yyyy-mm-dd
@@ -5481,6 +5552,7 @@
         }catch(err){
             logAdmin(err.message || String(err));
         }finally{
+            if (window.hideSavingOverlay) hideSavingOverlay();   // ★ 追加
             $("#btnAdminSubmit").disabled = false;
             $("#btnAdminSubmit").textContent = (adminMode==="edit" ? "保存" : "新規登録");
         }
