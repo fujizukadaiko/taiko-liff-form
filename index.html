@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.5.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.5.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxPvagSozYKSrhrs9YK6NmJUxQTbl6aGHtnEQt8E2F9yIQnQsuxXA6Ba8YzvoFEzpJ2jQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3918,7 +3918,10 @@
     } catch (e) {
         // ここに来るのは主に CORS ブロックやネットワークエラー
         if (timerId) clearTimeout(timerId);
-        console.warn('[api] first fetch failed, fallback to no-cors fire-and-forget:', e);
+        console.warn(
+        '[api] first fetch failed, fallback to no-cors fire-and-forget:',
+        e
+        );
 
         try {
         // no-cors で「投げっぱなし」。結果は読めないが、サーバには届く前提で OK 扱い
@@ -5542,7 +5545,7 @@
     }
 
    /* ▼ 管理フォームの入力値を検証し、API に投げて新規登録/更新する */
-        async function adminSubmit(){
+    async function adminSubmit(){
         if (!state.isAdmin){
             alert("管理者のみ利用できます");
             return;
@@ -5689,7 +5692,7 @@
             // ★ 成功・失敗に関わらずモーダルは閉じる
             hideSavingModal();
         }
-        }
+    }
 
     /* ▼ 一覧タブの「予定一覧」を取得（D1優先・なければ GAS にフォールバック） */
     async function adminListFetch(){
@@ -5848,11 +5851,16 @@
             return isNaN(dt) ? null : dt;
         };
 
-        // ★ base を元にローカル絞り込み
-        let viewItems = base.filter(it=>{
-            const d = ymdToDate(it.ymd);
-            return d && d >= today && d <= until;
-        });
+          // ★ base を元にローカル絞り込み
+            let viewItems = base.filter(it=>{
+                // ① アーカイブは除外
+                const status = String(it.status || "").toLowerCase();
+                if (status === "archived") return false;
+
+                // ② 期間フィルタ（今日〜days）
+                const d = ymdToDate(it.ymd);
+                return d && d >= today && d <= until;
+            });
 
         if (segFilter){
             viewItems = viewItems.filter(it => normSeg(it.segment) === segFilter);
