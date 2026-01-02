@@ -7563,6 +7563,45 @@
         };
     })();
     });
+
+    // ===== 共通スナックバー =====
+        window.showSnackbar = function (message, options = {}) {
+        const el = document.getElementById('snackbar');
+        if (!el) return;
+
+        const duration = options.duration != null ? options.duration : 2500; // ms
+
+        // メッセージ差し込み
+        el.textContent = message;
+
+        // 既存タイマーがあればクリア
+        if (el._snackbarTimer) {
+            clearTimeout(el._snackbarTimer);
+            el._snackbarTimer = null;
+        }
+
+        // 表示
+        el.classList.add('show');
+
+        // duration > 0 のときだけ自動で消す
+        if (duration > 0) {
+            el._snackbarTimer = setTimeout(() => {
+            el.classList.remove('show');
+            el._snackbarTimer = null;
+            }, duration);
+        }
+        };
+
+        window.hideSnackbar = function () {
+        const el = document.getElementById('snackbar');
+        if (!el) return;
+
+        if (el._snackbarTimer) {
+            clearTimeout(el._snackbarTimer);
+            el._snackbarTimer = null;
+        }
+        el.classList.remove('show');
+        };
 </script>
 
 <script>
