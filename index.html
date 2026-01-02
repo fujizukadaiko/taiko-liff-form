@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.5.3";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.5.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxZCmDi5Ac0f8C_66ZHumPdkwl7RkJ-K_IzwLdGtcwoJFfTLKjnTL7fM2b9U-j6K6izog/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6283,19 +6283,43 @@
 
     // ▼ 出欠結果の描画（#repEvent の value を eventId とみなして取得→描画）
     async function renderReport(){
-        const lidRaw = (window.state && window.state.lineId) || "";
-        const lidEnc = encodeURIComponent(lidRaw);
-        const sel    = document.getElementById("repEvent");
-        const box    = document.getElementById("repBox");
-        const id     = sel?.value || "";
+        const sel = document.getElementById("repEvent");
+        const box = document.getElementById("repBox");
+        const id  = sel?.value || "";
 
         if (!id){
-        if (box) box.textContent = "公演を選択してください";
-        return;
+            if (box) box.textContent = "公演を選択してください";
+            return;
         }
 
+        // --- lineId を取得（state → getLineId の順）---
+        let lidRaw = (window.state && window.state.lineId) || "";
+
+        if (!lidRaw && typeof window.getLineId === "function") {
+            try {
+                lidRaw = await window.getLineId();
+                if (lidRaw) {
+                    // ついでに共通 state にキャッシュ
+                    window.state = window.state || {};
+                    window.state.lineId = lidRaw;
+                }
+            } catch (e) {
+                console.warn("getLineId failed in renderReport:", e);
+            }
+        }
+
+        if (!lidRaw) {
+            if (box) {
+                box.textContent = "管理者の LINE ID を取得できませんでした。LINE から開き直して再度お試しください。";
+            }
+            console.warn("renderReport: lineId is empty");
+            return;
+        }
+
+        const lidEnc = encodeURIComponent(lidRaw);
+
         if (box) {
-        box.innerHTML = '結果を取得中… <span class="spinner"></span>';
+            box.innerHTML = '結果を取得中… <span class="spinner"></span>';
         }
 
         let payload = null;
