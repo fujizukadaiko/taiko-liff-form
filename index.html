@@ -6557,20 +6557,20 @@
 
         if (!lidRaw && typeof window.getLineId === "function") {
             try {
-                lidRaw = await window.getLineId();
-                if (lidRaw) {
-                    // ついでに共通 state にキャッシュ
-                    window.state = window.state || {};
-                    window.state.lineId = lidRaw;
-                }
+            lidRaw = await window.getLineId();
+            if (lidRaw) {
+                // ついでに共通 state にキャッシュ
+                window.state = window.state || {};
+                window.state.lineId = lidRaw;
+            }
             } catch (e) {
-                console.warn("getLineId failed in renderReport:", e);
+            console.warn("getLineId failed in renderReport:", e);
             }
         }
 
         if (!lidRaw) {
             if (box) {
-                box.textContent = "管理者の LINE ID を取得できませんでした。LINE から開き直して再度お試しください。";
+            box.textContent = "管理者の LINE ID を取得できませんでした。LINE から開き直して再度お試しください。";
             }
             console.warn("renderReport: lineId is empty");
             return;
@@ -6584,71 +6584,80 @@
 
         let payload = null;
         let list    = [];
+        let used    = "none";   // ★ どのルートを使ったか記録
 
         // ---- 0) まず D1 の /line/attendance/report を叩く（爆速ルート） ----
         if (D1_BASE && lidRaw) {
-        try {
+            try {
             const url =
-            `${D1_BASE}/line/attendance/report` +
-            `?eventKey=${encodeURIComponent(id)}` +
-            `&lineId=${encodeURIComponent(lidRaw)}`;
+                `${D1_BASE}/line/attendance/report` +
+                `?eventKey=${encodeURIComponent(id)}` +
+                `&lineId=${encodeURIComponent(lidRaw)}`;
 
             const res = await fetch(url, { method: "GET" });
             if (res.ok) {
-            const json = await res.json();
-            if (json && json.status === "ok") {
+                const json = await res.json();
+                if (json && json.status === "ok") {
                 payload = json;
                 list    = pickRows(payload);
-            } else {
+                used    = list.length ? "D1" : "D1-empty";
+                } else {
                 console.warn("D1 report bad response:", json);
-            }
+                }
             } else {
-            console.warn("D1 report http error:", res.status);
+                console.warn("D1 report http error:", res.status);
             }
-        } catch (e) {
+            } catch (e) {
             console.warn("D1 report fetch failed:", e);
-        }
+            }
         }
 
-        // ---- 1) D1 で取れなかったときだけ、従来の GAS API にフォールバック ----
+        // ---- 1) D1 で rows が取れなかったときだけ、従来の GAS API にフォールバック ----
         if (!payload || list.length === 0) {
-        let resp;
-        try{
-            resp = await api(
-            `?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lidEnc}`
-            );
-        }catch(e){
-            console.error("fetch error(eventId):", e);
-        }
-
-        payload = resp && (resp.detail || resp);
-        list    = pickRows(payload);
-
-        // 2) うまく取れなければ id フォールバック
-        if (!(resp?.status === "ok") || list.length === 0){
+            let resp;
             try{
-            const r2 = await api(
-                `?attendanceReport=1&id=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lidEnc}`
+            resp = await api(
+                `?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lidEnc}`
             );
-            const p2 = r2 && (r2.detail || r2);
-            const l2 = pickRows(p2);
-            if (r2?.status === "ok" && l2.length){
+            }catch(e){
+            console.error("fetch error(eventId):", e);
+            }
+
+            payload = resp && (resp.detail || resp);
+            list    = pickRows(payload);
+
+            if (resp?.status === "ok" && list.length){
+            used = "GAS-eventId";
+            }
+
+            // 2) うまく取れなければ id フォールバック
+            if (!(resp?.status === "ok") || list.length === 0){
+            try{
+                const r2 = await api(
+                `?attendanceReport=1&id=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lidEnc}`
+                );
+                const p2 = r2 && (r2.detail || r2);
+                const l2 = pickRows(p2);
+                if (r2?.status === "ok" && l2.length){
                 payload = p2;
                 list    = l2;
-            }
+                used    = "GAS-fallback-id";
+                }
             }catch(e){
-            console.error("fallback fetch error(id):", e);
+                console.error("fallback fetch error(id):", e);
+            }
             }
         }
-        }
+
+        console.debug("[report] source for", id, "=", used, "(rows:", list.length, ")");
 
         // どのルートでもダメだったとき
         if (!payload || !(payload.status === "ok")){
-        if (box) {
+            if (box) {
             box.textContent = payload?.message || "取得に失敗しました";
-        }
-        console.warn("report payload:", payload);
-        return;
+            }
+            console.warn("report payload:", payload);
+            return;
         }
 
         // ★ 家族フィルタは一切しない（= 全員表示）
@@ -6656,7 +6665,7 @@
 
         // --- 比較用：名前の正規化（全員ぶん） ---
         const answeredCanon = new Set(
-        rows.map(r => canonName(r.name)).filter(Boolean)
+            rows.map(r => canonName(r.name)).filter(Boolean)
         );
 
         // members から「名前→区分」索引（未回答表示で接頭辞付与に使う）
@@ -6673,16 +6682,16 @@
         // フィルタ
         const f = document.getElementById("repAttend")?.value || "";
         const view = rowsAllSorted.filter(r =>
-        !f ? true : (f === "未回答" ? r.attend === "未回答" : r.attend === f)
+            !f ? true : (f === "未回答" ? r.attend === "未回答" : r.attend === f)
         );
 
         // 集計（カウントもソート後の配列を使えば OK）
         const cnt = {
-        yes  : rowsAllSorted.filter(r => r.attend === "参加").length,
-        no   : rowsAllSorted.filter(r => r.attend === "欠席").length,
-        maybe: rowsAllSorted.filter(r => r.attend === "未定").length,
-        na   : rowsAllSorted.filter(r => r.attend === "未回答").length,
-        all  : rowsAllSorted.length,
+            yes  : rowsAllSorted.filter(r => r.attend === "参加").length,
+            no   : rowsAllSorted.filter(r => r.attend === "欠席").length,
+            maybe: rowsAllSorted.filter(r => r.attend === "未定").length,
+            na   : rowsAllSorted.filter(r => r.attend === "未回答").length,
+            all  : rowsAllSorted.length,
         };
         // console.log("report counts:", cnt);
 
@@ -6694,37 +6703,37 @@
 
         // accepting が来ていればそれを優先（'closed' なら締切）
         const open =
-        typeof payload.accepting !== "undefined"
+            typeof payload.accepting !== "undefined"
             ? String(payload.accepting).toLowerCase() !== "closed"
             : (payload.isOpen ?? payload.open ?? payload.status === "open")
-            ? true
-            : false;
+                ? true
+                : false;
 
         // ★ここからヘッダーHTML
         const head = `
-        <div class="repHeader">
+            <div class="repHeader">
             <!-- 1行目：タイトルだけ -->
             <div class="repLine">
-            <div class="repLeft">
+                <div class="repLeft">
                 <span class="repTitle">${title || "(無題)"}</span>
-            </div>
+                </div>
             </div>
 
             <!-- 2行目：日時・場所（左）／受付バッジ（右） -->
             <div class="repLine repHeadRow">
-            <div class="repLeft">
+                <div class="repLeft">
                 <span class="repMeta">
-                ${date}${time ? ` ${time}` : ""}
-                ${place ? `<span class="repPlace"> @${place}</span>` : ""}
+                    ${date}${time ? ` ${time}` : ""}
+                    ${place ? `<span class="repPlace"> @${place}</span>` : ""}
                 </span>
-            </div>
-            <div class="repRight">
+                </div>
+                <div class="repRight">
                 <span class="badge-status ${open ? "open" : "closed"}">
-                ${open ? "受付中" : "締切"}
+                    ${open ? "受付中" : "締切"}
                 </span>
+                </div>
             </div>
-            </div>
-        </div>`;
+            </div>`;
 
         // 出欠ごとにグルーピング（画面フィルタを反映した view を対象に）
         const by = { "参加": [], "未定": [], "欠席": [], "未回答": [] };
@@ -6735,36 +6744,36 @@
 
         const body =
             order
-                .map(k => {
+            .map(k => {
                 const arr = by[k] || [];
                 if (!arr.length) return "";
                 return `
-                    <div class="repGroup">
+                <div class="repGroup">
                     <div class="repGroupHead">
-                        <span class="badge-att ${badgeCls(k)}">${k}</span>
-                        <span class="repCount">${arr.length}名</span>
+                    <span class="badge-att ${badgeCls(k)}">${k}</span>
+                    <span class="repCount">${arr.length}名</span>
                     </div>
                     ${arr
-                        .map(p => {
+                    .map(p => {
                         const commentText = String(p.comment || "").trim();
                         return `
-                            <div class="repPersonRow">
+                        <div class="repPersonRow">
                             <div class="repName">${h(p.name)}</div>
                             <div class="repAt">${
-                                commentText
+                            commentText
                                 ? `<span class="repComment">${h(commentText)}</span>`
                                 : ""
                             }</div>
-                            </div>`;
-                        }).join("")}
-                    </div>`;
-                })
-                .join("") || `<div class="repNA">該当者がいません</div>`;
+                        </div>`;
+                    }).join("")}
+                </div>`;
+            })
+            .join("") || `<div class="repNA">該当者がいません</div>`;
 
         if (box) {
-        box.innerHTML = `<div class="repCard">${head}${body}</div>`;
+            box.innerHTML = `<div class="repCard">${head}${body}</div>`;
         }
-    }
+        }
 
     // ▼ 名前 + 区分から表示名を組み立て（大人の部の接頭辞を付ける）
     function nameWithSegPrefix(p){
