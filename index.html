@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.5.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.6.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzKEjbv2DULcYKaN35MbvSI5QJ15azUI8cuaaEfMuLvcZU9Qa-heem4XuIfc8x0imrTaA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6452,19 +6452,21 @@
             const nmKey = canonName(c.name);
             if (answeredCanon.has(nmKey)) return false; // すでに回答済みなら除外
 
-            const rawSeg = c.seg || segIndex[nmKey] || "";
+            const rawSeg  = c.seg || segIndex[nmKey] || "";
             const segNorm = normalizeSegmentLabel(rawSeg);
 
-            // イベント区分が未指定 / 両方 → 全員対象
+            // イベント区分が未指定 or 両方 → 全員対象
             if (!eventSegNorm || eventSegNorm === "両方") {
                 return true;
             }
 
-            // セグメント未設定や "両方" は「どちらにも出て良い」とみなすなら true
-            if (!segNorm) return true;
+            // 区分が取れない場合 → このイベントでは対象外にする
+            if (!segNorm) return false;
+
+            // メンバー側が両方 → 両方に出る想定なら true
             if (segNorm === "両方") return true;
 
-            // それ以外はイベントの区分と一致するメンバーだけ残す
+            // それ以外は「イベントの区分と一致するメンバーだけ残す」
             return segNorm === eventSegNorm;
             })
             .map(c => {
@@ -6479,7 +6481,7 @@
                 seg   : seg,
             };
             });
-    }   
+    } 
 
     // ▼ 名前 → 並び順情報（sortGroup / birthYear）インデックス
     function buildMemberSortIndex(payload){
@@ -6717,12 +6719,18 @@
         // ▼ イベントの対象区分で「回答済み rows」をフィルタ
         let rowsFiltered = rows;
         if (eventSegNorm && eventSegNorm !== "両方") {
-        rowsFiltered = rows.filter(r => {
-            const segNorm = normalizeSegmentLabel(r.seg);
-            if (!segNorm) return true;      // 未設定は「両方」と同じ扱いにしたいなら true
-            if (segNorm === "両方") return true;
-            return segNorm === eventSegNorm;
-        });
+            rowsFiltered = rows.filter(r => {
+                const segNorm = normalizeSegmentLabel(r.seg);
+
+                // 区分が取れない場合 → このイベントでは対象外にする
+                if (!segNorm) return false;
+
+                // 両方 → どちらのイベントにも出て良い
+                if (segNorm === "両方") return true;
+
+                // それ以外はイベント区分と一致するかどうか
+                return segNorm === eventSegNorm;
+            });
         }
 
         // ▼ 未回答も同じくイベント区分でフィルタ
@@ -6838,6 +6846,38 @@
         if (s.includes("子ども") || s.includes("子供")) return "子ども";
         if (s.includes("両方") || s.includes("両部") || s.includes("両")) return "両方";
         return "";
+        }
+
+        // ▼ payload から「イベントの対象区分」をいい感じに探して正規化
+        function getEventSegmentNorm(payload){
+        if (!payload) return "";
+
+        const raw =
+            // まずトップレベル直下
+            payload.segment ||
+            payload.targetSegment ||
+            payload.target_group ||
+            payload.targetGroup ||
+            payload.eventSegment ||
+            // event オブジェクト配下（D1 がこの形を返している可能性大）
+            (payload.event && (
+            payload.event.segment ||
+            payload.event.targetSegment ||
+            payload.event.target_group ||
+            payload.event.targetGroup
+            )) ||
+            // meta 的な場所にある可能性も一応見る
+            (payload.meta && (
+            payload.meta.segment ||
+            payload.meta.targetSegment ||
+            payload.meta.target_group ||
+            payload.meta.targetGroup
+            )) ||
+            "";
+
+        const norm = normalizeSegmentLabel(raw);
+        console.debug("[report] event segment raw=", raw, "norm=", norm);
+        return norm;
     }
 
     // ▼ 名前 + 区分から表示名を組み立て（大人の部の接頭辞を付ける）
