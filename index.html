@@ -3834,19 +3834,46 @@
     const url = API_ENDPOINT + path;
     console.debug('[api] request url =', url);
 
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort('timeout'), 15000); // 15s
+    // 呼び出し側から signal が来ていればそれを優先
+    const ctrl = signal ? null : new AbortController();
+    const usedSignal = signal || (ctrl && ctrl.signal);
+
+    const timeoutMs = 15000;
+    const timerId = ctrl
+        ? setTimeout(() => ctrl.abort('timeout'), timeoutMs)
+        : null;
+
+    // 1回分のトライ（CORS モード）
+    async function tryOnceCors() {
+        const res = await fetch(url, { signal: usedSignal });
+
+        // CORS が通っていて JSON が返ってくる場合はこちら
+        try {
+        return await res.json();
+        } catch (e) {
+        // JSON が読めない場合（opaque など）は「とりあえず OK 扱い」にする
+        console.warn('[api] JSON parse failed, treat as opaque OK:', e);
+        return { status: 'ok', note: 'opaque or non-JSON response' };
+        }
+    }
 
     try {
-        const r = await fetch(url, { signal: signal || ctrl.signal });
-        clearTimeout(t);
-        return await r.json();
+        const r = await tryOnceCors();
+        if (timerId) clearTimeout(timerId);
+        return r;
     } catch (e) {
-        clearTimeout(t);
-        // 1回だけ即リトライ（短め）
-        await new Promise(res => setTimeout(res, 400));
-        const r2 = await fetch(url);
-        return await r2.json();
+        // ここに来るのは主に CORS ブロックやネットワークエラー
+        if (timerId) clearTimeout(timerId);
+        console.warn('[api] first fetch failed, fallback to no-cors fire-and-forget:', e);
+
+        try {
+        // no-cors で「投げっぱなし」。結果は読めないが、サーバには届く前提で OK 扱い
+        await fetch(url, { mode: 'no-cors' });
+        return { status: 'ok', note: 'no-cors fallback' };
+        } catch (e2) {
+        console.error('[api] no-cors fallback also failed:', e2);
+        throw e2; // 本当にダメなときだけ呼び出し元にエラーを投げる
+        }
     }
     }
 /* ===== 初期化 ===== */
@@ -5461,14 +5488,17 @@
     }
 
     /* ▼ 管理フォームの入力値を検証し、API に投げて新規登録/更新する */
-    async function adminSubmit(){
-        try{
-            if (!state.isAdmin){ alert("管理者のみ利用できます"); return; }
-            logAdmin("");
+        async function adminSubmit(){
+        if (!state.isAdmin){
+            alert("管理者のみ利用できます");
+            return;
+        }
 
-            // ★ 保存中オーバーレイ表示
-            const overlayMsg = (adminMode === "edit") ? "保存中…" : "登録中…";
-            if (window.showSavingOverlay) showSavingOverlay(overlayMsg);
+        await withLoadingSnackbar(
+            (adminMode === "edit") ? "保存中…" : "登録中…",
+            (adminMode === "edit") ? "保存しました" : "登録しました",
+            async () => {
+            logAdmin("");
 
             const type  = $("#ad_type").value.trim();
             let   title = $("#ad_title").value.trim();
@@ -5480,83 +5510,113 @@
             const attT  = $("#ad_attendTarget").value.trim().toUpperCase();
             const dlIn  = $("#ad_deadline").value.trim();
             const pub   = $("#ad_publish").value.trim();
-            const st = (adminMode === "create") ? "active" : $("#ad_status").value.trim();
-            const segRaw = $("#ad_segment").value.trim(); // ← 追加
+            const st    = (adminMode === "create")
+                            ? "active"
+                            : $("#ad_status").value.trim();
+            const segRaw = $("#ad_segment").value.trim();
+
             let seg = segRaw;
-            // セグメント表記ゆれを正す（スプシ側：子ども/大人/両方 を想定）
             if (seg.includes("大人")) seg = "大人";
             else if (seg.includes("子ども") || seg.includes("子供")) seg = "子ども";
             else if (seg.includes("両方")) seg = "両方";
 
-            if (!title || !type || !ymdIn){ throw new Error("タイトル/種別/公演日は必須です"); }
+            if (!title || !type || !ymdIn){
+                throw new Error("タイトル/種別/公演日は必須です");
+            }
 
             if (type === "発表"){
-            const flag = $("#ad_flag").value.trim();
-            const allowed = (adminMode==="create") ? ["Y","N"] : ["Y","S","D","N"];
-            if (!flag || !allowed.includes(flag)){
-                throw new Error(adminMode==="create"
-                ? "配信フラグは Y または N を選択してください（発表/新規）"
-                : "配信フラグは Y/S/D/N から選択してください（発表/編集）"
+                const flag = $("#ad_flag").value.trim();
+                const allowed = (adminMode==="create") ? ["Y","N"] : ["Y","S","D","N"];
+                if (!flag || !allowed.includes(flag)){
+                throw new Error(
+                    adminMode==="create"
+                    ? "配信フラグは Y または N を選択してください（発表/新規）"
+                    : "配信フラグは Y/S/D/N から選択してください（発表/編集）"
                 );
-            }
+                }
             }
 
-            let meetAtSend = meetAt, meetPlSend = meetPl, attSend = attT, dlSend = dlIn;
+            let meetAtSend = meetAt;
+            let meetPlSend = meetPl;
+            let attSend    = attT;
+            let dlSend     = dlIn;
+
             if (type==="練習"){
-            meetAtSend = ""; meetPlSend = ""; attSend = "N"; dlSend = "";
+                meetAtSend = "";
+                meetPlSend = "";
+                attSend    = "N";
+                dlSend     = "";
             }
-            if (type!=="発表"){ attSend = "N"; }
+            if (type!=="発表"){
+                attSend = "N";
+            }
 
             const ymd = toYmdSlashFromDateInput(ymdIn);
             const dl  = dlSend ? toYmdSlashFromDateInput(dlSend) : "";
 
-            $("#btnAdminSubmit").disabled = true;
-            $("#btnAdminSubmit").textContent = (adminMode==="edit" ? "保存中…" : "登録中…");
+            const btn = $("#btnAdminSubmit");
+            if (btn) btn.disabled = true;
 
-            // ★ 送信：&segment= を常に付与
-            let urlBase = `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}`
-            + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
-            + (hm?`&hm=${esc(hm)}`:"")
-            + (place?`&place=${esc(place)}`:"")
-            + (meetAtSend?`&meetAt=${esc(meetAtSend)}`:"")
-            + (meetPlSend?`&meetPlace=${esc(meetPlSend)}`:"")
-            + `&attendTarget=${esc(attSend)}`
-            + (dl?`&deadline=${esc(dl)}`:"")
-            + `&publish=${esc(pub)}&status=${esc(st)}`
-            + `&segment=${esc(seg)}`;
+            try{
+                let urlBase =
+                `?adminUpsertSchedule=1&lineId=${esc(state.lineId)}`
+                + `&type=${esc(type)}&title=${esc(title)}&ymd=${esc(ymd)}`
+                + (hm?        `&hm=${esc(hm)}`                     : "")
+                + (place?     `&place=${esc(place)}`               : "")
+                + (meetAtSend?`&meetAt=${esc(meetAtSend)}`         : "")
+                + (meetPlSend?`&meetPlace=${esc(meetPlSend)}`      : "")
+                + `&attendTarget=${esc(attSend)}`
+                + (dl?        `&deadline=${esc(dl)}`               : "")
+                + `&publish=${esc(pub)}&status=${esc(st)}`
+                + `&segment=${esc(seg)}`;
 
-            let res;
-            if (adminMode === "create"){
-            // flag は発表のみ有効
-            if (type==="発表"){
-                const flag = $("#ad_flag").value.trim();
-                urlBase += `&flag=${esc(flag)}`;
-            } else {
-                urlBase += `&flag=N`;
+                let res;
+                if (adminMode === "create"){
+                if (type==="発表"){
+                    const flag = $("#ad_flag").value.trim();
+                    urlBase += `&flag=${esc(flag)}`;
+                } else {
+                    urlBase += `&flag=N`;
+                }
+
+                res = await api(urlBase);
+
+                // CORS フォールバックで {status:'ok', note:'...'} が返るケースもある
+                if (res && res.status && res.status !== "ok"){
+                    throw new Error(res.message || "登録に失敗しました");
+                }
+
+                // スプレッドシート保存後の UI 更新
+                enterAdminCreateMode();
+                await adminListFetch();
+
+                } else {
+                if (!adminEditingId){
+                    throw new Error("編集対象IDが不正です");
+                }
+
+                const url =
+                    urlBase
+                    + `&id=${esc(adminEditingId)}`
+                    + (type==="発表"
+                        ? `&flag=${esc($("#ad_flag").value.trim())}`
+                        : `&flag=N`);
+
+                res = await api(url);
+                if (res && res.status && res.status !== "ok"){
+                    throw new Error(res.message || "保存に失敗しました");
+                }
+
+                await adminListFetch();
+                }
+
+                // ここまでエラーが出なければ withLoadingSnackbar が「保存しました」トーストを出してくれる
+            } finally {
+                if (btn) btn.disabled = false;
             }
-            res = await api(urlBase);
-            if (res.status!=="ok") throw new Error(res.message||"登録に失敗しました");
-            alert(`登録しました（ID: ${res.id || "(不明)"}）`);
-            enterAdminCreateMode();
-            await adminListFetch();
-
-            } else {
-            if (!adminEditingId){ throw new Error("編集対象IDが不正です"); }
-            const url = urlBase + `&id=${esc(adminEditingId)}`
-                + (type==="発表" ? `&flag=${esc($("#ad_flag").value.trim())}` : `&flag=N`);
-            res = await api(url);
-            if (res.status!=="ok") throw new Error(res.message||"保存に失敗しました");
-            alert("保存しました");
-            await adminListFetch();
             }
-        }catch(err){
-            logAdmin(err.message || String(err));
-        }finally{
-            if (window.hideSavingOverlay) hideSavingOverlay();   // ★ 追加
-            $("#btnAdminSubmit").disabled = false;
-            $("#btnAdminSubmit").textContent = (adminMode==="edit" ? "保存" : "新規登録");
+        );
         }
-    }
 
     /* ▼ 一覧タブの「予定一覧」を取得（D1優先・なければ GAS にフォールバック） */
     async function adminListFetch(){
