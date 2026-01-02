@@ -3525,6 +3525,36 @@
     const m = String(v||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
     return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
     }
+
+    // イベントセレクト用の表示ラベル生成
+    function formatEventOptionLabel(ev){
+    // D1 から来る raw 値
+    const rawYmd = ev.ymd || ev.date || '';
+    const rawHm  = ev.hm  || ev.time || '';
+    const title  = ev.title || '';
+
+    // 日付ラベル（yyyy/MM/dd（曜））
+    let dateLabel = '';
+    const d = parseYmdStrict(rawYmd);
+    if (d instanceof Date && !isNaN(d)) {
+        dateLabel = ymdDow(d);  // 2026/01/11（日）
+    } else {
+        dateLabel = String(rawYmd || '');
+    }
+
+    // 時刻ラベル（HH:mm）
+    let timeLabel = '';
+    if (rawHm) {
+        timeLabel = hmFromTimeCell(rawHm); // "14:00" / "17:15" などに正規化
+    }
+
+    const head = [dateLabel, timeLabel].filter(Boolean).join(' ');
+
+    // 「2026/01/11（日） 14:00　タイトル」のイメージ
+    if (head && title) return `${head}　${title}`;
+    if (head)          return head;
+    return title || '';
+    }
   // --- 区分（セグメント）関連 ---
     function normSeg(raw){
     const s = String(raw||"").trim().toLowerCase();
@@ -4925,36 +4955,7 @@
         x.setHours(0, 0, 0, 0);
         return x;
     }
-    // イベントセレクト用の表示ラベル生成
-    function formatEventOptionLabel(ev){
-        // D1 から来る raw 値
-        const rawYmd = ev.ymd || ev.date || '';
-        const rawHm  = ev.hm  || ev.time || '';
-        const title  = ev.title || '';
 
-        // 日付ラベル（yyyy/MM/dd（曜））
-        let dateLabel = '';
-        const d = parseYmdStrict(rawYmd);
-        if (d instanceof Date && !isNaN(d)) {
-            dateLabel = ymdDow(d);  // 2026/01/11（日）
-        } else {
-            dateLabel = String(rawYmd || '');
-        }
-
-        // 時刻ラベル（HH:mm）
-        let timeLabel = '';
-        if (rawHm) {
-            timeLabel = hmFromTimeCell(rawHm); // "14:00" / "17:15" などに正規化
-        }
-
-        const head = [dateLabel, timeLabel].filter(Boolean).join(' ');
-
-        // 「2026/01/11（日） 14:00　タイトル」のイメージ
-        if (head && title) return `${head}　${title}`;
-        if (head)          return head;
-        return title || '';
-    }
-      
     // 「なんかよく分からない時間の値」を HH:MM に正規化
     function toHmFromAny(raw) {
         const s = String(raw || "").trim();
@@ -6850,6 +6851,8 @@
 
             if (optGroup){
             optGroup.innerHTML = opts;
+            }
+                    applyModeUI();
         }
 
     document.addEventListener('DOMContentLoaded', () => {
