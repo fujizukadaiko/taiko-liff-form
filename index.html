@@ -6899,25 +6899,35 @@
 
         function pickEventCtx(){
             const eid = selMode.value;
-            const ev  = (eid && eid !== 'manual')
-                ? (window.__EVENT_INDEX__?.[eid] || null)
-                : null;
 
-            return ev || {
-                title   : '{TITLE}',
-                date    : '{DATE}',
-                time    : '{TIME}',
-                datetime: '{DATETIME}',
-                place   : '{PLACE}',
-                meet    : '{MEET_OLD}',
-                meetPoint: '{MEET_POINT}'
-            };
-        }
+            // イベント未選択 or 手動モード → イベント情報なし
+            if (!eid || eid === 'manual') {
+                return null;
+            }
+
+            const ev = window.__EVENT_INDEX__?.[eid] || null;
+            return ev;
+            }
 
         function applyTemplate(){
             const kind = selTpl.value;
             const ctx  = pickEventCtx();
-            let text   = '';
+
+            // イベントが選ばれていないときはテンプレ適用しない
+            if (!ctx) {
+                // 好みでアラート or スナックバー
+                if (typeof showSnackbar === 'function') {
+                showSnackbar('テンプレートを使うには、先にイベントを選んでください', {
+                    type: 'info',
+                    duration: 2500,
+                });
+                } else {
+                alert('テンプレートを使うには、先にイベントを選んでください。');
+                }
+                return;
+            }
+
+            let text = '';
 
             // 安全側：datetime が空なら date + time で補完
             const datetimeLabel =
