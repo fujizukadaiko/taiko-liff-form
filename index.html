@@ -5706,51 +5706,33 @@
 
             let items = [];
 
-            // ★ まず D1 から取得（広めに 365 日分）
-            if (D1_BASE) {
-            const url = `${D1_BASE}/line/schedules?days=365`;
-            const res = await fetch(url, { method: "GET" });
-
-            if (!res.ok) {
-                throw new Error("schedules http error: " + res.status);
-            }
-
-            const json = await res.json();
-            if (!json || json.status !== "ok" || !Array.isArray(json.schedules)) {
-                throw new Error(json && json.message ? json.message : "schedules bad response");
-            }
-
-            items = json.schedules;
-            } else {
-            // ★ 保険：D1 が未設定なら従来の GAS API にフォールバック
+            // ★ 管理画面の一覧は GAS から取得（公開/非公開・active/archived も全部見える）
             const r = await api(`?adminListSchedules=1&lineId=${esc(state.lineId)}&days=${esc(days)}`);
             if (r.status !== "ok" || !Array.isArray(r.items)) {
-                if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
-                return;
+            if (top) top.innerHTML = `<span class="err">取得に失敗しました</span>`;
+            return;
             }
             items = r.items;
-            }
 
             if (!items.length) {
             if (top) {
                 top.innerHTML = `<div class="listEmpty">該当する予定はありません</div>`;
             }
-            // 生配列も一応空で初期化
             state.adminItemsRaw = [];
             adminItemsMap = {};
             return;
             }
 
-            // ★ D1 / GAS 両対応の正規化
+            // ★ 以下は今のまま（正規化～描画処理）
             const raw = items.map(ev => ({
             id   : String(
-                    ev.id ||
-                    ev.eventId ||
-                    ev.event_id ||
-                    ev.event_key ||
-                    ev.eventKey ||
-                    ""
-                    ).trim(),
+                ev.id ||
+                ev.eventId ||
+                ev.event_id ||
+                ev.event_key ||
+                ev.eventKey ||
+                ""
+            ).trim(),
             type : ev.type || ev.kind || "",
             title: ev.title || ev.name || "",
             ymd  : ev.ymd || ev.date || "",
@@ -5785,18 +5767,14 @@
                 ev.target_segment ||
                 ev.attendSegment  ||
                 ""
-            })).filter(it => it.id); // id 無しは念のため除外
+            })).filter(it => it.id);
 
-            // ★ 生配列を保存（ここから先はローカルフィルタだけ）
             state.adminItemsRaw = raw;
-
-            // 編集用マップは全件から作成
             adminItemsMap = {};
             raw.forEach(it => {
             adminItemsMap[String(it.id)] = it;
             });
 
-            // UI の値（期間 / 区分フィルタ）でローカル描画
             adminListRenderLocal();
 
         } catch (err) {
@@ -5804,7 +5782,7 @@
             const topEl = document.getElementById("adminListBoxTop");
             if (topEl) topEl.innerHTML = msg;
         }
-    }
+        }
 
     /* ▼ 取得済みの adminItemsRaw を期間/区分でローカルフィルタして一覧に描画 */
     function adminListRenderLocal(){
