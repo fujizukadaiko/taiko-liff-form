@@ -5676,6 +5676,9 @@
                     }
 
                     await adminListFetch();
+
+                    // ★ ここでフォームを「新規モード」に戻す
+                    enterAdminCreateMode();  
                 }
 
                 // ここまでエラーが出なければ withLoadingSnackbar が
