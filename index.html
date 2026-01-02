@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.4.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.4.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZjkLE6oDFz4xxJgagZC78vEKctTbOxWdLNyaR4PIP9u4admagMp-zso7GIjKXtA-V/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1943,6 +1943,13 @@
         @keyframes fbsp{
         to{ transform: rotate(360deg); }
         }
+
+        .fb-row.is-dirty {
+        border-left: 4px solid #f0a000;
+        }
+        .fb-status.is-dirty {
+        outline: 2px solid #f0a000;
+        }
     /* ===== Changelog modal ===== */
         /* 初期は非表示 */
         #changelogModal[hidden]{
@@ -2824,6 +2831,10 @@
                 </div>
 
                 <div id="feedbackListBox">読み込み中…</div>
+            </div>
+
+            <div class="toolbar">
+                <button id="fbSave" class="btn btn-primary btn-sm">変更を保存</button>
             </div>
         </section>
 </main>
@@ -7635,8 +7646,21 @@
         sel.classList.add(statusClass(sel.value));
     }
 
-    // ご意見一覧（カテゴリ別表示）
-        window.loadFeedbackList = async function () {
+    // エスケープ & 日付整形
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c])
+    );
+    const pad = n => String(n).padStart(2, '0');
+    const fmtDate = (s) => {
+        if (!s) return '';
+        if (/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return String(s);
+        return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    // ご意見一覧（カテゴリ別表示・D1直叩き）
+    window.loadFeedbackList = async function () {
         console.debug('[fb] loadFeedbackList invoked');
 
         // 念のためビューを可視化
@@ -7646,62 +7670,60 @@
         if (!box) return;
         box.innerHTML = '読み込み中… <span class="spinner"></span>';
 
-        // 1) まず state から lineId を取る
+        try {
+        // 1) まず state から lineId を試す
         let lineId = (window.state?.lineId || window.STATE?.lineId || '');
+        console.debug('[fb] lineId from state:', JSON.stringify(lineId));
 
-        // 2) state に無い場合は LIFF から取得（フォールバック）
+        // 2) state に無ければ profile.userId を試す
+        if (!lineId) {
+            const fromProfile =
+            window.state?.profile?.userId ||
+            window.STATE?.profile?.userId ||
+            '';
+            console.debug('[fb] lineId from profile.userId:', JSON.stringify(fromProfile));
+            lineId = fromProfile;
+        }
+
+        // 3) それでも無ければ LIFF から直接取得
         if (!lineId && window.liff && typeof liff.getProfile === 'function') {
             try {
             const prof = await liff.getProfile();
             lineId = prof.userId || '';
-            console.debug('[fb] lineId from liff.getProfile:', lineId);
+            console.debug('[fb] lineId from liff.getProfile:', JSON.stringify(lineId));
             } catch (e) {
             console.warn('[fb] liff.getProfile fallback failed', e);
             }
         }
 
-        // 3) それでも取れなかったら諦める
+        console.debug('[fb] final lineId used =', JSON.stringify(lineId));
+
         if (!lineId) {
-            console.warn('[fb] lineId is empty, abort feedback load');
-            box.innerHTML = '<div class="err">LINE ID が取得できませんでした</div>';
+            box.innerHTML = '<div class="err">lineId が取得できませんでした</div>';
             return;
         }
 
-        console.debug('[fb] final lineId used =', JSON.stringify(lineId));
+        // 共通 state に書き戻す（更新側も同じ値を使えるように）
+        window.state = window.state || {};
+        window.state.lineId = lineId;
 
-        // 日時整形
-        const pad = n => String(n).padStart(2, '0');
-        const fmtDate = (s) => {
-        if (!s) return '';
-        if (/^\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
-        const d = new Date(s);
-        if (isNaN(d.getTime())) return String(s);
-        return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        };
-
-        const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c])
-        );
-
-        try {
-        // ここでさっき決めた lineId だけを使う
-            // ★ Worker (D1) を直接叩く
-            const workerUrl = new URL(
+        // ★ Worker (D1) を直接叩く
+        const workerUrl = new URL(
             `/line/admin/feedback/list?lineId=${encodeURIComponent(lineId)}`,
-            D1_ORIGIN   // ← サマリで使っているのと同じ変数を使う
-            );
-            console.debug('[fb] request workerUrl =', workerUrl.toString());
+            D1_ORIGIN
+        );
+        console.debug('[fb] request workerUrl =', workerUrl.toString());
 
-            const res = await fetch(workerUrl.toString());
-            const j = await res.json();
-            console.debug('[fb] worker api response –', j);
+        const res = await fetch(workerUrl.toString());
+        const j = await res.json();
+        console.debug('[fb] worker api response –', j);
 
         if (j?.status !== 'ok' || !Array.isArray(j.items)) {
             box.innerHTML = '<div class="err">取得に失敗しました</div>';
             return;
         }
 
-        // ==== ここから下は今までの items 正規化〜描画ロジックそのままで OK ====
+        // ==== items 正規化 ====
         const items = j.items.map(it => ({
             no:       it.no ?? it.No ?? '',
             name:     it.name ?? it.名前 ?? '',
@@ -7711,12 +7733,14 @@
             status:   it.status ?? it.ステータス ?? '未対応',
         }));
 
+        // カテゴリごとにグルーピング
         const byCat = {};
         for (const it of items) {
             const c = it.category || 'その他';
             (byCat[c] ||= []).push(it);
         }
 
+        // カテゴリの表示順
         const CAT_ORDER = ['要望', '不具合', 'デザイン', 'その他'];
         const orderKey = (c) => {
             const i = CAT_ORDER.indexOf(c);
@@ -7767,8 +7791,10 @@
 
         box.innerHTML = html;
 
+        // ステータス色
         box.querySelectorAll('.fb-status').forEach(sel => applyStatusColor(sel));
 
+        // カテゴリを開いたら既読更新
         box.querySelectorAll('details.fb-cat').forEach(det => {
             det.addEventListener('toggle', () => {
             if (!det.open) return;
@@ -7788,44 +7814,107 @@
         }
     };
 
-    // ステータス変更イベント（イベント委任）
+    // ステータス変更イベント（イベント委任）: 変更フラグだけ立てる
     (function () {
         const box = document.getElementById('feedbackListBox');
         if (!box) return;
 
-        box.addEventListener('change', async (e) => {
+        box.addEventListener('change', (e) => {
         const sel = e.target;
         if (!sel.classList || !sel.classList.contains('fb-status')) return;
 
-        const no = sel.dataset.no;
-        const to = sel.value;
-        const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+        const cur = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+        const now = sel.value;
 
-        sel.disabled = true;
-
-        try {
-            const lid =
-            window.state?.lineId ||
-            window.STATE?.lineId ||
-            ''; // ※ここも同じように fallback するなら、共通関数にしてもOK
-
-            const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
-            const r = await api(q);
-            if (r?.status === 'ok') {
-            sel.dataset.cur = to;
-            applyStatusColor(sel);
-            } else {
-            sel.value = prev;
-            alert(r?.message || '更新に失敗しました');
-            }
-        } catch (err) {
-            sel.value = prev;
-            alert('通信エラー:' + (err?.message || err));
-        } finally {
-            sel.disabled = false;
+        const row = sel.closest('.fb-row');
+        if (cur !== now) {
+            sel.classList.add('is-dirty');
+            row?.classList.add('is-dirty');
+        } else {
+            sel.classList.remove('is-dirty');
+            row?.classList.remove('is-dirty');
         }
         });
     })();
+    })();
+    </script>
+
+    <!-- 「変更を保存」ボタンでまとめて更新 -->
+    <script>
+    (function () {
+    const btn = document.getElementById('fbSave');
+    const box = document.getElementById('feedbackListBox');
+    if (!btn || !box) return;
+
+    btn.addEventListener('click', async () => {
+        const sels = Array.from(
+        box.querySelectorAll('.fb-status')
+        );
+
+        const targets = sels.filter(sel => {
+        const cur = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+        return cur !== sel.value;
+        });
+
+        if (targets.length === 0) {
+        alert('変更された項目はありません。');
+        return;
+        }
+
+        // lineId を共通で取得
+        let lid = (window.state?.lineId || window.STATE?.lineId || '');
+        if (!lid) {
+        const fromProfile =
+            window.state?.profile?.userId ||
+            window.STATE?.profile?.userId ||
+            '';
+        if (fromProfile) {
+            lid = fromProfile;
+            window.state = window.state || {};
+            window.state.lineId = lid;
+        }
+        }
+
+        if (!lid) {
+        alert('LINE ID が取得できず、保存できませんでした。');
+        return;
+        }
+
+        btn.disabled = true;
+
+        try {
+        for (const sel of targets) {
+            const no = sel.dataset.no;
+            const to = sel.value;
+            const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+
+            const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
+            console.debug('[fb] bulk save – request path:', q);
+
+            try {
+            const r = await api(q);   // ← ここは GAS 経由（スプシ更新＋D1更新）
+            console.debug('[fb] bulk save – response:', r);
+
+            if (r?.status === 'ok') {
+                sel.dataset.cur = to;
+                sel.classList.remove('is-dirty');
+                sel.closest('.fb-row')?.classList.remove('is-dirty');
+                applyStatusColor(sel);
+            } else {
+                sel.value = prev;
+                alert(`No.${no} の更新に失敗しました: ${r?.message || 'error'}`);
+            }
+            } catch (err) {
+            sel.value = prev;
+            alert(`No.${no} の通信エラー: ${err?.message || err}`);
+            }
+        }
+
+        alert('変更を保存しました。');
+        } finally {
+        btn.disabled = false;
+        }
+    });
     })();
 </script>
 
