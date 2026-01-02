@@ -6446,19 +6446,40 @@
     }
 
     // ▼ 未回答行の生成（候補 − 回答済み）
-    function buildNaRows(candidates, answeredCanon, segIndex){
+    function buildNaRows(candidates, answeredCanon, segIndex, eventSegNorm){
         return candidates
-        .filter(c => !answeredCanon.has(canonName(c.name)))
-        .map(c => {
-            const seg = c.seg || segIndex[canonName(c.name)] || "";
+            .filter(c => {
+            const nmKey = canonName(c.name);
+            if (answeredCanon.has(nmKey)) return false; // すでに回答済みなら除外
+
+            const rawSeg = c.seg || segIndex[nmKey] || "";
+            const segNorm = normalizeSegmentLabel(rawSeg);
+
+            // イベント区分が未指定 / 両方 → 全員対象
+            if (!eventSegNorm || eventSegNorm === "両方") {
+                return true;
+            }
+
+            // セグメント未設定や "両方" は「どちらにも出て良い」とみなすなら true
+            if (!segNorm) return true;
+            if (segNorm === "両方") return true;
+
+            // それ以外はイベントの区分と一致するメンバーだけ残す
+            return segNorm === eventSegNorm;
+            })
+            .map(c => {
+            const nmKey = canonName(c.name);
+            const segRaw = c.seg || segIndex[nmKey] || "";
+            const seg    = segRaw;
+
             return {
-            name  : nameWithSegPrefix({ name: c.name, seg }),
-            attend: "未回答",
-            at    : "",
-            seg   : seg,
+                name  : nameWithSegPrefix({ name: c.name, seg }),
+                attend: "未回答",
+                at    : "",
+                seg   : seg,
             };
-        });
-    }
+            });
+    }   
 
     // ▼ 名前 → 並び順情報（sortGroup / birthYear）インデックス
     function buildMemberSortIndex(payload){
@@ -6660,21 +6681,55 @@
             return;
         }
 
-        // ★ 家族フィルタは一切しない（= 全員表示）
+        // ★ 家族フィルタは一切しない（= 全員ベースで扱う）
         const rows = list.map(mapRow);
 
         // --- 比較用：名前の正規化（全員ぶん） ---
+        // → 未回答生成のときには「大人だけど間違って子ども公演に回答した人」も
+        //   きちんと「回答済み」として扱いたいので、ここは *フィルタ前* の rows を見る
         const answeredCanon = new Set(
-            rows.map(r => canonName(r.name)).filter(Boolean)
+        rows.map(r => canonName(r.name)).filter(Boolean)
         );
 
         // members から「名前→区分」索引（未回答表示で接頭辞付与に使う）
         const segIndex   = buildSegIndex(payload);
         const candidates = buildCandidates(payload, segIndex);
-        const naRows     = buildNaRows(candidates, answeredCanon, segIndex);
 
-        // rows を未回答で拡張
-        const rowsAll = rows.concat(naRows);
+        // ▼ イベント自体の対象区分を取得（payload 内のそれっぽいフィールドを総当たり）
+        const eventSegNorm = normalizeSegmentLabel(
+        payload.segment ||
+        payload.targetSegment ||
+        payload.target_group ||
+        payload.targetGroup ||
+        payload.eventSegment ||
+        ""
+        );
+
+        // ▼ 回答済み rows にも seg を補完しておく（members 情報から）
+        rows.forEach(r => {
+        if (!r.seg) {
+            const nmKey = canonName(r.name);
+            const segFromIdx = segIndex[nmKey];
+            if (segFromIdx) r.seg = segFromIdx;
+        }
+        });
+
+        // ▼ イベントの対象区分で「回答済み rows」をフィルタ
+        let rowsFiltered = rows;
+        if (eventSegNorm && eventSegNorm !== "両方") {
+        rowsFiltered = rows.filter(r => {
+            const segNorm = normalizeSegmentLabel(r.seg);
+            if (!segNorm) return true;      // 未設定は「両方」と同じ扱いにしたいなら true
+            if (segNorm === "両方") return true;
+            return segNorm === eventSegNorm;
+        });
+        }
+
+        // ▼ 未回答も同じくイベント区分でフィルタ
+        const naRows = buildNaRows(candidates, answeredCanon, segIndex, eventSegNorm);
+
+        // rows を未回答で拡張（ここから先は元の処理と同じ）
+        const rowsAll = rowsFiltered.concat(naRows);
 
         // ★ 並び替え（sortGroup → birthYear → 名前）
         const rowsAllSorted = sortRowsByPriority(rowsAll, payload);
@@ -6773,7 +6828,17 @@
         if (box) {
             box.innerHTML = `<div class="repCard">${head}${body}</div>`;
         }
-        }
+    }
+
+    // ▼ 対象区分の正規化（"子ども" / "大人" / "両方"）
+    function normalizeSegmentLabel(raw){
+        const s = String(raw || "").trim();
+        if (!s) return "";
+        if (s.includes("大人")) return "大人";
+        if (s.includes("子ども") || s.includes("子供")) return "子ども";
+        if (s.includes("両方") || s.includes("両部") || s.includes("両")) return "両方";
+        return "";
+    }
 
     // ▼ 名前 + 区分から表示名を組み立て（大人の部の接頭辞を付ける）
     function nameWithSegPrefix(p){
