@@ -6004,54 +6004,95 @@
 
     // ① メタを取得してセレクトに流し込む（D1 直版）
     async loadMeta(){
-      const sel = document.querySelector("#repEvent");
-      const box = document.querySelector("#repBox");
-      if (!sel) return;
+        const sel = document.querySelector("#repEvent");
+        const box = document.querySelector("#repBox");
+        if (!sel) return;
 
-      sel.disabled = true;
-      sel.innerHTML = `<option value="">（読み込み中…）</option>`;
+        sel.disabled = true;
+        sel.innerHTML = `<option value="">（読み込み中…）</option>`;
 
-      try {
-        let list = [];
+        try {
+            let list = [];
 
-        if (D1_BASE) {
-          // ★ D1 の今後の予定 API を利用（365日分）
-          const url  = `${D1_BASE}/line/schedules?days=365`;
-          const resp = await fetch(url, { method: "GET" });
-          if (!resp.ok) {
-            throw new Error("schedules http error: " + resp.status);
-          }
-          const json = await resp.json();
-          if (json.status !== "ok" || !Array.isArray(json.schedules)) {
-            throw new Error("schedules bad response");
-          }
+            if (D1_BASE) {
+            // ★ D1 の今後の予定 API を利用（365日分）
+            const url  = `${D1_BASE}/line/schedules?days=365`;
+            const resp = await fetch(url, { method: "GET" });
+            if (!resp.ok) {
+                throw new Error("schedules http error: " + resp.status);
+            }
+            const json = await resp.json();
+            if (json.status !== "ok" || !Array.isArray(json.schedules)) {
+                throw new Error("schedules bad response");
+            }
 
-          // 必要な項目だけ軽量化して保持
-          list = json.schedules.map(ev => ({
-            id    : String(ev.id || ev.eventId || ev.event_key || ev.eventKey || "").trim(),
-            ymd   : ev.ymd || ev.date || "",
-            time  : ev.time || ev.hm || "",
-            title : ev.title || ev.name || "",
-            // ★ 出欠対象フラグ（need_attendance）
-            needAttendance: ev.need_attendance ?? ev.needAttendance ?? ""
-            })).filter(e => e.id);
-        } else {
-          // ★ 保険：D1_BASE 未設定なら従来の GAS API にフォールバック
-          const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}&admin=1`);
-          if (r?.status !== "ok" || !Array.isArray(r.list)) {
-            const msg = r?.message || "サーバーがエラーを返しました";
-            console.error("meta error:", r);
-            sel.innerHTML = `<option value="">取得エラー</option>`;
-            if (box) box.textContent = `エラー: ${msg}`;
-            sel.disabled = false;
-            return;
-          }
-          list = r.list;
-        }
+            // 必要な項目だけ軽量化して保持（★ segment も持たせる）
+            list = json.schedules
+                .map(ev => {
+                const id = String(
+                    ev.id ||
+                    ev.eventId ||
+                    ev.event_id ||
+                    ev.eventKey ||
+                    ev.event_key ||
+                    ""
+                ).trim();
+                if (!id) return null;
 
-            // ▼ 出欠対象フラグ y のイベントだけに絞る
-            console.log('[rep] raw list length =', list.length);
-            console.log('[rep] sample item =', list[0]);
+                const segRaw =
+                    ev.segment ||
+                    ev.targetSegment ||
+                    ev.target_segment ||
+                    ev.target_group ||    // D1 events のカラム名
+                    ev.targetGroup ||
+                    ev.attendSegment ||
+                    "";
+
+                return {
+                    id,
+                    ymd   : ev.ymd  || ev.date || "",
+                    time  : ev.time || ev.hm   || "",
+                    title : ev.title || ev.name || "",
+                    // 出欠対象フラグ
+                    needAttendance:
+                    ev.need_attendance ??
+                    ev.needAttendance ??
+                    "",
+                    // ★ 対象区分
+                    segment: segRaw,
+                };
+                })
+                .filter(e => e && e.id);
+
+            } else {
+            // ★ 保険：D1_BASE 未設定なら従来の GAS API にフォールバック
+            const r = await api(`?attendanceReport=1&meta=1&lineId=${esc(state.lineId)}&admin=1`);
+            if (r?.status !== "ok" || !Array.isArray(r.list)) {
+                const msg = r?.message || "サーバーがエラーを返しました";
+                console.error("meta error:", r);
+                sel.innerHTML = `<option value="">取得エラー</option>`;
+                if (box) box.textContent = `エラー: ${msg}`;
+                sel.disabled = false;
+                return;
+            }
+            // GAS 側の戻り値にも segment があればそのまま乗る
+            list = r.list.map(ev => ({
+                ...ev,
+                segment:
+                ev.segment ||
+                ev.targetSegment ||
+                ev.target_group ||
+                ev.targetGroup ||
+                ev.attendSegment ||
+                ev.segmentLabel ||
+                "",
+            }));
+            }
+
+            // ▼ 出欠対象フラグ Y のイベントだけに絞る
+            console.log("[rep] raw list length =", list.length);
+            console.log("[rep] sample item =", list[0]);
+
             const filtered = list.filter(ev => {
             const flagRaw = (
                 ev.needAttendance ??
@@ -6062,49 +6103,56 @@
             // "Y" / "1" / "TRUE" を全部 OK とみなす
             return flagRaw === "Y" || flagRaw === "1" || flagRaw === "TRUE";
             });
-            console.log('[rep] filtered length =', filtered.length);
+            console.log("[rep] filtered length =", filtered.length);
 
-        // 一覧としても絞り込んだものを保存
-        state.reportMeta = filtered;
+            // 一覧としても絞り込んだものを保存
+            state.reportMeta = filtered;
 
-        // ▼ セレクト用ラベル生成（fmtYmd / fmtTime を利用）
-        const opts = filtered.map(e => {
-        const rawDate  = e.ymd || e.date || "";
-        const rawTime  = e.time || e.hm  || "";
-        const dateDisp = fmtYmd(rawDate);     // 例: 2026/01/11（日）
-        const timeDisp = fmtTime(rawTime);    // 例: 14:00
+            // ★ イベント区分フィルタ用にグローバルにも残しておく
+            window.__adminReportEventList = filtered;
+            console.log("[rep] normalized sample =", filtered[0]);
 
-        const title = (e.title || e.name || "").trim() || "（無題）";
+            // ▼ セレクト用ラベル生成（fmtYmd / fmtTime を利用）
+            const opts = filtered
+            .map(e => {
+                const rawDate  = e.ymd || e.date || "";
+                const rawTime  = e.time || e.hm  || "";
+                const dateDisp = fmtYmd(rawDate);   // 例: 2026/01/11（日）
+                const timeDisp = fmtTime(rawTime);  // 例: 14:00
 
-        const label = `${dateDisp}${timeDisp ? ` ${timeDisp}` : ""}　${title}`;
+                const title = (e.title || e.name || "").trim() || "（無題）";
 
-        const value = String(
-            e.id ??
-            e.eventId ??
-            e.event_key ??
-            e.eventKey ??
-            ""
-        ).trim();
+                const label = `${dateDisp}${timeDisp ? ` ${timeDisp}` : ""}　${title}`;
 
-        if (!value) return ""; // value が無いものはスキップ
-        return `<option value="${value}">${label}</option>`;
-        }).filter(Boolean).join("");
+                const value = String(
+                e.id ??
+                e.eventId ??
+                e.event_key ??
+                e.eventKey ??
+                ""
+                ).trim();
 
-        sel.innerHTML =
-        `<option value="">（選択してください）</option>` +
-        (opts || `<option value="" disabled>（出欠対象の公演がありません）</option>`);
+                if (!value) return "";
+                return `<option value="${value}">${label}</option>`;
+            })
+            .filter(Boolean)
+            .join("");
 
-        if (box && !sel.value) {
-          box.textContent = "公演を選択してください";
+            sel.innerHTML =
+            `<option value="">（選択してください）</option>` +
+            (opts || `<option value="" disabled>（出欠対象の公演がありません）</option>`);
+
+            if (box && !sel.value) {
+            box.textContent = "公演を選択してください";
+            }
+        } catch (e) {
+            console.error(e);
+            sel.innerHTML = `<option value="">取得エラー</option>`;
+            if (box) box.textContent = `通信エラー: ${e.message || e}`;
+        } finally {
+            sel.disabled = false;
         }
-      } catch (e) {
-        console.error(e);
-        sel.innerHTML = `<option value="">取得エラー</option>`;
-        if (box) box.textContent = `通信エラー: ${e.message || e}`;
-      } finally {
-        sel.disabled = false;
-      }
-    },
+        }
        
         // ② セレクト変更→その1件だけ詳細取得→renderReport を呼ぶ（D1 版）
         onChange(){
