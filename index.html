@@ -8,9 +8,9 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.4.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.5.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwZjkLE6oDFz4xxJgagZC78vEKctTbOxWdLNyaR4PIP9u4admagMp-zso7GIjKXtA-V/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbz0ekPBesrMZaZLqvnI9nVmxTO3KVnNqqLR4WK9JME732-IjuC-yVg5wFbA2ae1xOab5A/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
            
             // D1 のベースURL
@@ -7848,42 +7848,44 @@
 
     btn.addEventListener('click', async () => {
         const sels = Array.from(
-        box.querySelectorAll('.fb-status')
+            box.querySelectorAll('.fb-status')
         );
 
         const targets = sels.filter(sel => {
-        const cur = sel.dataset.cur || sel.getAttribute('data-cur') || '';
-        return cur !== sel.value;
+            const cur = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+            return cur !== sel.value;
         });
 
         if (targets.length === 0) {
-        alert('変更された項目はありません。');
-        return;
+            alert('変更された項目はありません。');
+            return;
         }
 
         // lineId を共通で取得
         let lid = (window.state?.lineId || window.STATE?.lineId || '');
         if (!lid) {
-        const fromProfile =
+            const fromProfile =
             window.state?.profile?.userId ||
             window.STATE?.profile?.userId ||
             '';
-        if (fromProfile) {
+            if (fromProfile) {
             lid = fromProfile;
             window.state = window.state || {};
             window.state.lineId = lid;
-        }
+            }
         }
 
         if (!lid) {
-        alert('LINE ID が取得できず、保存できませんでした。');
-        return;
+            alert('LINE ID が取得できず、保存できませんでした。');
+            return;
         }
 
         btn.disabled = true;
 
         try {
-        for (const sel of targets) {
+            let hasError = false;
+
+            for (const sel of targets) {
             const no = sel.dataset.no;
             const to = sel.value;
             const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
@@ -7892,29 +7894,42 @@
             console.debug('[fb] bulk save – request path:', q);
 
             try {
-            const r = await api(q);   // ← ここは GAS 経由（スプシ更新＋D1更新）
-            console.debug('[fb] bulk save – response:', r);
+                const r = await api(q);
+                console.debug('[fb] bulk save – response:', r);
 
-            if (r?.status === 'ok') {
+                if (r?.status === 'ok') {
                 sel.dataset.cur = to;
                 sel.classList.remove('is-dirty');
                 sel.closest('.fb-row')?.classList.remove('is-dirty');
-                applyStatusColor(sel);
-            } else {
+                // ※ applyStatusColor は同じスコープにある場合だけ呼ぶ
+                // applyStatusColor(sel);
+                } else {
+                hasError = true;
                 sel.value = prev;
                 alert(`No.${no} の更新に失敗しました: ${r?.message || 'error'}`);
-            }
+                }
             } catch (err) {
-            sel.value = prev;
-            alert(`No.${no} の通信エラー: ${err?.message || err}`);
+                hasError = true;
+                sel.value = prev;
+                alert(`No.${no} の通信エラー: ${err?.message || err}`);
             }
-        }
+            }
 
-        alert('変更を保存しました。');
+            // 🔁 ここで一覧を D1 から再読み込み
+            if (typeof window.loadFeedbackList === 'function') {
+            await window.loadFeedbackList();
+            }
+
+            if (!hasError) {
+            alert('変更を保存しました。');
+            } else {
+            // 一部失敗しても、リロードで「D1 上の最新状態」には揃う
+            alert('一部の更新でエラーが発生しました（画面は最新状態に更新済みです）。');
+            }
         } finally {
-        btn.disabled = false;
+            btn.disabled = false;
         }
-    });
+        });
     })();
 </script>
 
