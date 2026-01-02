@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.4.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.4.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbx4xY2aRDnT6rziUsrbsXVEHHyTD7ogoVg8NZZ-ldlawbEWb2U0DFiFYCTP7GM3em-yQA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -7636,7 +7636,7 @@
     }
 
     // ご意見一覧（カテゴリ別表示）
-    window.loadFeedbackList = async function () {
+        window.loadFeedbackList = async function () {
         console.debug('[fb] loadFeedbackList invoked');
 
         // 念のためビューを可視化
@@ -7646,25 +7646,25 @@
         if (!box) return;
         box.innerHTML = '読み込み中… <span class="spinner"></span>';
 
-        // --- ここで「一度だけ」lineId を決める ---
+        // 1) まず state から lineId を取る
         let lineId = (window.state?.lineId || window.STATE?.lineId || '');
 
-        // state に無い場合は LIFF から直接取得する fallback
+        // 2) state に無い場合は LIFF から取得（フォールバック）
         if (!lineId && window.liff && typeof liff.getProfile === 'function') {
-        try {
+            try {
             const prof = await liff.getProfile();
             lineId = prof.userId || '';
             console.debug('[fb] lineId from liff.getProfile:', lineId);
-        } catch (e) {
+            } catch (e) {
             console.warn('[fb] liff.getProfile fallback failed', e);
-        }
+            }
         }
 
-        // それでも取れなかったら諦める
+        // 3) それでも取れなかったら諦める
         if (!lineId) {
-        console.warn('[fb] lineId is empty, abort feedback load');
-        box.innerHTML = '<div class="err">LINE ID が取得できませんでした</div>';
-        return;
+            console.warn('[fb] lineId is empty, abort feedback load');
+            box.innerHTML = '<div class="err">LINE ID が取得できませんでした</div>';
+            return;
         }
 
         console.debug('[fb] final lineId used =', JSON.stringify(lineId));
@@ -7685,11 +7685,16 @@
 
         try {
         // ここでさっき決めた lineId だけを使う
-        const path = `?feedbackList=1&lineId=${encodeURIComponent(lineId)}`;
-        console.debug('[fb] request path =', path);
+            // ★ Worker (D1) を直接叩く
+            const workerUrl = new URL(
+            `/line/admin/feedback/list?lineId=${encodeURIComponent(lineId)}`,
+            D1_ORIGIN   // ← サマリで使っているのと同じ変数を使う
+            );
+            console.debug('[fb] request workerUrl =', workerUrl.toString());
 
-        const j = await api(path);
-        console.debug('[fb] api response –', j);
+            const res = await fetch(workerUrl.toString());
+            const j = await res.json();
+            console.debug('[fb] worker api response –', j);
 
         if (j?.status !== 'ok' || !Array.isArray(j.items)) {
             box.innerHTML = '<div class="err">取得に失敗しました</div>';
