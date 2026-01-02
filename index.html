@@ -8,9 +8,9 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.5.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.5.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbx5-641bRldg0_NbJy7iYWkxP1QqvpMdc1vuSgxVxk779PMLLD_hjPKFXVGN1Thu1zWmQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxZCmDi5Ac0f8C_66ZHumPdkwl7RkJ-K_IzwLdGtcwoJFfTLKjnTL7fM2b9U-j6K6izog/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
            
             // D1 のベースURL
@@ -1721,10 +1721,30 @@
         font-size:14px;
         opacity:0;
         pointer-events:none;
-        transition: opacity .2s ease;
+        transition: opacity .2s ease, transform .2s ease;
         z-index: 1400;
+        max-width: 90vw;
+        box-sizing: border-box;
+        text-align: center;
         }
-        #snackbar.show{ opacity:1; }
+
+        /* 表示中 */
+        #snackbar.show{
+        opacity:1;
+        pointer-events:auto;
+        transform:translateX(-50%) translateY(-4px);
+        }
+
+        /* 種別ごとの色（お好みで） */
+        #snackbar.snackbar-info{
+        background: rgba(35,35,35,.95);
+        }
+        #snackbar.snackbar-success{
+        background: rgba(22,163,74,.96);   /* 緑っぽい */
+        }
+        #snackbar.snackbar-error{
+        background: rgba(220,38,38,.96);   /* 赤っぽい */
+        }
 
         /* ===== ご意見BOX（管理画面） ===== */
         .fb-cat{
@@ -3429,7 +3449,7 @@
     btn.textContent = "まとめて送信"; // ラベルは常に統一
     }
 
-/* ===== 共通ユーティリティ（画面切替 / 日付 / 区分 / カレンダー） ===== */
+/* ===== 共通ユーティリティ（画面切替 / 日付 / 区分 / カレンダー / スナックバー） ===== */
   // --- DOM / ログ系 ---
     function h(s){
     return String(s==null?'':s).replace(/[&<>"']/g, c => (
@@ -3608,7 +3628,73 @@
     ].filter(Boolean).join("&");
     return `${base}&${params}`;
     }
+  /* ===== 共通スナックバー ===== */
+        (function () {
+        const SNACKBAR_ID = 'snackbar';
+        let hideTimer = null;
 
+        /**
+        * 共通トースト表示
+        * @param {string} message  表示したいメッセージ
+        * @param {object} opts     { duration, type } など
+        *   - duration: 表示時間(ms) デフォルト 2500
+        *   - type    : 'info' | 'success' | 'error'
+        */
+        window.showSnackbar = function (message, opts) {
+            const options = opts || {};
+            const duration = Number(options.duration || 2500);
+            const type = String(options.type || 'info');
+
+            const el = document.getElementById(SNACKBAR_ID);
+            if (!el) {
+            // 保険：snackbar が無い環境でも一応動くように
+            console.warn('#snackbar not found, fallback to alert');
+            alert(message);
+            return;
+            }
+
+            // 既存タイマーがあればクリア
+            if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+            }
+
+            // テキストセット
+            el.textContent = message;
+
+            // 種別クラスを付け替える
+            el.classList.remove('snackbar-info', 'snackbar-success', 'snackbar-error');
+            if (type === 'success') {
+            el.classList.add('snackbar-success');
+            } else if (type === 'error') {
+            el.classList.add('snackbar-error');
+            } else {
+            el.classList.add('snackbar-info');
+            }
+
+            // 表示
+            el.classList.add('show');
+
+            // duration 後に自動で消す
+            hideTimer = setTimeout(function () {
+            el.classList.remove('show');
+            hideTimer = null;
+            }, duration);
+        };
+
+        // クリックで即閉じる
+        window.addEventListener('DOMContentLoaded', function () {
+            const el = document.getElementById(SNACKBAR_ID);
+            if (!el) return;
+            el.addEventListener('click', function () {
+            el.classList.remove('show');
+            if (hideTimer) {
+                clearTimeout(hideTimer);
+                hideTimer = null;
+            }
+            });
+        });
+        })();
 /* ===== API ===== */
     async function api(path, { signal } = {}) {
     const url = API_ENDPOINT + path;
