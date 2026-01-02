@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.5.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.5.3";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbxZCmDi5Ac0f8C_66ZHumPdkwl7RkJ-K_IzwLdGtcwoJFfTLKjnTL7fM2b9U-j6K6izog/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1745,7 +1745,27 @@
         #snackbar.snackbar-error{
         background: rgba(220,38,38,.96);   /* 赤っぽい */
         }
+        /* 保存中（loading）のとき左に小さいスピナーを出す */
+        #snackbar.loading::before {
+        content: "";
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        margin-right: 6px;
+        border-radius: 999px;
+        border: 2px solid rgba(255,255,255,.5);
+        border-top-color: #fff;
+        animation: fbsp 0.8s linear infinite;
+        vertical-align: -2px;
+        }
 
+        /* お好みで成功/エラーの色だけ変えてもOK（任意） */
+        #snackbar.success {
+        background: rgba(22,163,74,.95);  /* 緑っぽい */
+        }
+        #snackbar.error {
+        background: rgba(220,38,38,.95);  /* 赤っぽい */
+        }
         /* ===== ご意見BOX（管理画面） ===== */
         .fb-cat{
         font-weight:700;
@@ -3631,69 +3651,86 @@
   /* ===== 共通スナックバー ===== */
         (function () {
         const SNACKBAR_ID = 'snackbar';
-        let hideTimer = null;
 
-        /**
-        * 共通トースト表示
-        * @param {string} message  表示したいメッセージ
-        * @param {object} opts     { duration, type } など
-        *   - duration: 表示時間(ms) デフォルト 2500
-        *   - type    : 'info' | 'success' | 'error'
-        */
-        window.showSnackbar = function (message, opts) {
-            const options = opts || {};
-            const duration = Number(options.duration || 2500);
-            const type = String(options.type || 'info');
-
+        window.showSnackbar = function (message, options = {}) {
             const el = document.getElementById(SNACKBAR_ID);
             if (!el) {
-            // 保険：snackbar が無い環境でも一応動くように
             console.warn('#snackbar not found, fallback to alert');
             alert(message);
             return;
             }
 
-            // 既存タイマーがあればクリア
-            if (hideTimer) {
-            clearTimeout(hideTimer);
-            hideTimer = null;
+            const variant = options.variant || 'default'; // 'default' | 'loading' | 'success' | 'error'
+            let duration  = options.duration;
+
+            // loading のときデフォで「自動で消さない」
+            if (duration == null) {
+            duration = (variant === 'loading') ? 0 : 2500;
             }
 
-            // テキストセット
+            // メッセージ差し込み
             el.textContent = message;
 
-            // 種別クラスを付け替える
-            el.classList.remove('snackbar-info', 'snackbar-success', 'snackbar-error');
-            if (type === 'success') {
-            el.classList.add('snackbar-success');
-            } else if (type === 'error') {
-            el.classList.add('snackbar-error');
-            } else {
-            el.classList.add('snackbar-info');
+            // 既存タイマーがあればクリア
+            if (el._snackbarTimer) {
+            clearTimeout(el._snackbarTimer);
+            el._snackbarTimer = null;
             }
+
+            // variant クラス付け替え
+            el.classList.remove('loading', 'success', 'error');
+            if (variant === 'loading') el.classList.add('loading');
+            if (variant === 'success') el.classList.add('success');
+            if (variant === 'error')   el.classList.add('error');
 
             // 表示
             el.classList.add('show');
 
-            // duration 後に自動で消す
-            hideTimer = setTimeout(function () {
-            el.classList.remove('show');
-            hideTimer = null;
+            // duration > 0 のときだけ自動で消す
+            if (duration > 0) {
+            el._snackbarTimer = setTimeout(() => {
+                el.classList.remove('show');
+                el._snackbarTimer = null;
             }, duration);
+            }
         };
 
-        // クリックで即閉じる
+        window.hideSnackbar = function () {
+            const el = document.getElementById(SNACKBAR_ID);
+            if (!el) return;
+
+            if (el._snackbarTimer) {
+            clearTimeout(el._snackbarTimer);
+            el._snackbarTimer = null;
+            }
+            el.classList.remove('show');
+        };
+
+        // （お好み）クリックで即閉じる
         window.addEventListener('DOMContentLoaded', function () {
             const el = document.getElementById(SNACKBAR_ID);
             if (!el) return;
             el.addEventListener('click', function () {
-            el.classList.remove('show');
-            if (hideTimer) {
-                clearTimeout(hideTimer);
-                hideTimer = null;
-            }
+            hideSnackbar();
             });
         });
+
+        // （将来用）共通ラッパー
+        window.withLoadingSnackbar = async function (doingMsg, doneMsg, fn) {
+            showSnackbar(doingMsg, { variant: 'loading' });
+            try {
+            const result = await fn();
+            hideSnackbar();
+            if (doneMsg) {
+                showSnackbar(doneMsg, { variant: 'success' });
+            }
+            return result;
+            } catch (e) {
+            hideSnackbar();
+            showSnackbar('エラーが発生しました', { variant: 'error', duration: 4000 });
+            throw e;
+            }
+        };
         })();
 /* ===== API ===== */
     async function api(path, { signal } = {}) {
@@ -7923,112 +7960,121 @@
         });
     })();
     })();
-    </script>
 
-    <!-- 「変更を保存」ボタンでまとめて更新 -->
-    <script>
-    (function () {
-    const btn = document.getElementById('fbSave');
-    const box = document.getElementById('feedbackListBox');
-    if (!btn || !box) return;
+    // 「変更を保存」ボタンでまとめて更新
+        (function () {
+        const btn = document.getElementById('fbSave');
+        const box = document.getElementById('feedbackListBox');
+        if (!btn || !box) return;
 
-    btn.addEventListener('click', async () => {
-        const sels = Array.from(
-            box.querySelectorAll('.fb-status')
-        );
+        btn.addEventListener('click', async () => {
+            const sels = Array.from(box.querySelectorAll('.fb-status'));
 
-        const targets = sels.filter(sel => {
+            const targets = sels.filter(sel => {
             const cur = sel.dataset.cur || sel.getAttribute('data-cur') || '';
             return cur !== sel.value;
-        });
+            });
 
-        if (targets.length === 0) {
-            alert('変更された項目はありません。');
+            if (targets.length === 0) {
+            showSnackbar('変更された項目はありません。', { variant: 'default' });
             return;
-        }
-
-        // lineId を共通で取得
-        let lid = (window.state?.lineId || window.STATE?.lineId || '');
-        if (!lid) {
-            const fromProfile =
-            window.state?.profile?.userId ||
-            window.STATE?.profile?.userId ||
-            '';
-            if (fromProfile) {
-            lid = fromProfile;
-            window.state = window.state || {};
-            window.state.lineId = lid;
             }
-        }
 
-        if (!lid) {
-            alert('LINE ID が取得できず、保存できませんでした。');
+            // lineId を共通で取得
+            let lid = (window.state?.lineId || window.STATE?.lineId || '');
+            if (!lid) {
+            const fromProfile =
+                window.state?.profile?.userId ||
+                window.STATE?.profile?.userId ||
+                '';
+            if (fromProfile) {
+                lid = fromProfile;
+                window.state = window.state || {};
+                window.state.lineId = lid;
+            }
+            }
+
+            if (!lid) {
+            showSnackbar('LINE ID が取得できず、保存できませんでした。', {
+                variant: 'error',
+                duration: 4000,
+            });
             return;
-        }
+            }
 
-        btn.disabled = true;
+            btn.disabled = true;
+            showSnackbar('ステータスを保存中…', { variant: 'loading' });
 
-        try {
             let hasError = false;
 
-            for (const sel of targets) {
-            const no = sel.dataset.no;
-            const to = sel.value;
-            const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
-
-            const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
-            console.debug('[fb] bulk save – request path:', q);
-
             try {
+            for (const sel of targets) {
+                const no   = sel.dataset.no;
+                const to   = sel.value;
+                const prev = sel.dataset.cur || sel.getAttribute('data-cur') || '';
+
+                const q = `?feedbackSetStatus=1&lineId=${encodeURIComponent(lid)}&no=${encodeURIComponent(no)}&status=${encodeURIComponent(to)}`;
+                console.debug('[fb] bulk save – request path:', q);
+
+                try {
                 const r = await api(q);
                 console.debug('[fb] bulk save – response:', r);
 
                 if (r?.status === 'ok') {
-                sel.dataset.cur = to;
-                sel.classList.remove('is-dirty');
-                sel.closest('.fb-row')?.classList.remove('is-dirty');
-                // ※ applyStatusColor は同じスコープにある場合だけ呼ぶ
-                // applyStatusColor(sel);
+                    sel.dataset.cur = to;
+                    sel.classList.remove('is-dirty');
+                    sel.closest('.fb-row')?.classList.remove('is-dirty');
                 } else {
-                hasError = true;
-                sel.value = prev;
-                alert(`No.${no} の更新に失敗しました: ${r?.message || 'error'}`);
+                    hasError = true;
+                    sel.value = prev;
+                    showSnackbar(`No.${no} の更新に失敗しました: ${r?.message || 'error'}`, {
+                    variant: 'error',
+                    duration: 4000,
+                    });
                 }
-            } catch (err) {
+                } catch (err) {
                 hasError = true;
                 sel.value = prev;
-                alert(`No.${no} の通信エラー: ${err?.message || err}`);
-            }
+                showSnackbar(`No.${no} の通信エラー: ${err?.message || err}`, {
+                    variant: 'error',
+                    duration: 4000,
+                });
+                }
             }
 
-            // 🔁 ここで一覧を D1 から再読み込み
+            // 🔁 D1 から最新を再読み込み
             if (typeof window.loadFeedbackList === 'function') {
-            await window.loadFeedbackList();
+                await window.loadFeedbackList();
             }
 
-            // 🔁 一覧再読み込み
-            if (typeof window.loadFeedbackList === 'function') {
-            await window.loadFeedbackList();
-            }
+            hideSnackbar();
 
-            // ここを alert → showSnackbar に
             if (!hasError) {
-            showSnackbar('ご意見のステータスを保存しました');
+                showSnackbar('ステータスを保存しました', { variant: 'success' });
             } else {
-            showSnackbar('一部の更新でエラーが発生しました（最新状態を再読込しました）');
+                showSnackbar('一部の更新でエラーが発生しました（最新状態を再読込しました）', {
+                variant: 'error',
+                duration: 4000,
+                });
             }
-        } finally {
+            } finally {
             btn.disabled = false;
-        }
+            }
         });
-    })();
+        })();
 
     // ===== 共通スナックバー =====
         window.showSnackbar = function (message, options = {}) {
         const el = document.getElementById('snackbar');
         if (!el) return;
 
-        const duration = options.duration != null ? options.duration : 2500; // ms
+        const variant = options.variant || 'default'; // 'default' | 'loading' | 'success' | 'error'
+        let duration  = options.duration;
+
+        // loading のときデフォで「自動で消さない」
+        if (duration == null) {
+            duration = (variant === 'loading') ? 0 : 2500;
+        }
 
         // メッセージ差し込み
         el.textContent = message;
@@ -8038,6 +8084,12 @@
             clearTimeout(el._snackbarTimer);
             el._snackbarTimer = null;
         }
+
+        // variant クラス付け替え
+        el.classList.remove('loading', 'success', 'error');
+        if (variant === 'loading')   el.classList.add('loading');
+        if (variant === 'success')   el.classList.add('success');
+        if (variant === 'error')     el.classList.add('error');
 
         // 表示
         el.classList.add('show');
