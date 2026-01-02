@@ -4925,7 +4925,36 @@
         x.setHours(0, 0, 0, 0);
         return x;
     }
+    // イベントセレクト用の表示ラベル生成
+    function formatEventOptionLabel(ev){
+        // D1 から来る raw 値
+        const rawYmd = ev.ymd || ev.date || '';
+        const rawHm  = ev.hm  || ev.time || '';
+        const title  = ev.title || '';
 
+        // 日付ラベル（yyyy/MM/dd（曜））
+        let dateLabel = '';
+        const d = parseYmdStrict(rawYmd);
+        if (d instanceof Date && !isNaN(d)) {
+            dateLabel = ymdDow(d);  // 2026/01/11（日）
+        } else {
+            dateLabel = String(rawYmd || '');
+        }
+
+        // 時刻ラベル（HH:mm）
+        let timeLabel = '';
+        if (rawHm) {
+            timeLabel = hmFromTimeCell(rawHm); // "14:00" / "17:15" などに正規化
+        }
+
+        const head = [dateLabel, timeLabel].filter(Boolean).join(' ');
+
+        // 「2026/01/11（日） 14:00　タイトル」のイメージ
+        if (head && title) return `${head}　${title}`;
+        if (head)          return head;
+        return title || '';
+    }
+      
     // 「なんかよく分からない時間の値」を HH:MM に正規化
     function toHmFromAny(raw) {
         const s = String(raw || "").trim();
@@ -6590,46 +6619,43 @@
     
         // ===== イベント一覧をプルダウンへ（先頭は「手動で選ぶ」） =====
         async function fillEventOptions(){
-        if (!selMode) return;
+            if (!selMode) return;
 
-        // 一旦ローディング
-        selMode.innerHTML = '<option value="" disabled>読み込み中…</option>';
-        selMode.disabled = true;
+            // 一旦ローディング
+            selMode.innerHTML = '<option value="" disabled>読み込み中…</option>';
+            selMode.disabled = true;
 
-        let resp;
-        try {
-            const url = new URL('/line/schedules', D1_ORIGIN);
-            url.searchParams.set('days', '365');     // 1年分くらい
-            url.searchParams.set('kind', '発表');    // 発表のみ
-            const res = await fetch(url.toString());
-            resp = await res.json();
-        } catch (e) {
-            console.error('fillEventOptions error:', e);
-            resp = null;
-        }
+            let resp;
+            try {
+                const url = new URL('/line/schedules', D1_ORIGIN);
+                url.searchParams.set('days', '365');     // 1年分くらい
+                url.searchParams.set('kind', '発表');    // 発表のみ
+                const res = await fetch(url.toString());
+                resp = await res.json();
+            } catch (e) {
+                console.error('fillEventOptions error:', e);
+                resp = null;
+            }
 
-        const list = Array.isArray(resp?.schedules) ? resp.schedules : [];
+            const list = Array.isArray(resp?.schedules) ? resp.schedules : [];
 
-        const opts = [
-            `<option value="manual">手動のみで選ぶ</option>`,
-            ...list.map(e => {
-            const id = String(e.id || e.eventKey || '');
-            const dt = [e.ymd || e.date || '', e.hm || e.time || '']
-                .filter(Boolean)
-                .join(' ');
-            const tt = e.title || '';
-            return `<option value="${id}">${dt}　${tt}</option>`;
-            })
-        ].join('');
+            const opts = [
+                `<option value="manual">手動のみで選ぶ</option>`,
+                ...list.map(e => {
+                const id    = String(e.id || e.eventKey || '');
+                const label = formatEventOptionLabel(e);
+                return `<option value="${id}">${h(label)}</option>`;
+                })
+            ].join('');
 
-        selMode.innerHTML = opts || `<option value="manual">手動のみで選ぶ</option>`;
-        selMode.disabled = false;
-        selMode.value = 'manual';       // 既定＝手動
-        applyModeLock();
+            selMode.innerHTML = opts || `<option value="manual">手動のみで選ぶ</option>`;
+            selMode.disabled = false;
+            selMode.value = 'manual';       // 既定＝手動
+            applyModeLock();
 
-        // 手動の候補を初回取得
-        await populateManualList();
-        }
+            // 手動の候補を初回取得
+            await populateManualList();
+            }
     
         // ===== 手動モード：通知Yの名簿を取得 → selExtra に入れる =====
         async function populateManualList() {
@@ -6817,18 +6843,13 @@
         window.__EVENT_INDEX__ = idx;
 
         const opts = list.map(e => {
-            const id  = String(e.id || e.eventKey || '');
-            const ymd = e.ymd || e.date || '';
-            const hm  = e.hm  || e.time || '';
-            const dt  = [ymd, hm].filter(Boolean).join(' ');
-            const tt  = e.title || '';
-            return `<option value="${id}">${dt} ｜ ${tt}</option>`;
-        }).join('') || '<option value="" disabled>（該当イベントなし）</option>';
+            const id    = String(e.id || e.eventKey || '');
+            const label = formatEventOptionLabel(e);
+            return `<option value="${id}">${h(label)}</option>`;
+            }).join('') || '<option value="" disabled>（該当イベントなし）</option>';
 
-        if (optGroup){
+            if (optGroup){
             optGroup.innerHTML = opts;
-        }
-        applyModeUI();
         }
 
     document.addEventListener('DOMContentLoaded', () => {
