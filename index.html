@@ -6612,40 +6612,40 @@
             }
         }
 
-        // ---- 1) D1 で rows が取れなかったときだけ、従来の GAS API にフォールバック ----
-        if (!payload || list.length === 0) {
+        // ---- 1) D1 で「エラーのときだけ」従来の GAS API にフォールバック ----
+        if (!payload) {
             let resp;
             try{
-            resp = await api(
+                resp = await api(
                 `?attendanceReport=1&eventId=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lidEnc}`
-            );
+                );
             }catch(e){
-            console.error("fetch error(eventId):", e);
+                console.error("fetch error(eventId):", e);
             }
 
             payload = resp && (resp.detail || resp);
             list    = pickRows(payload);
 
             if (resp?.status === "ok" && list.length){
-            used = "GAS-eventId";
+                used = "GAS-eventId";
             }
 
             // 2) うまく取れなければ id フォールバック
             if (!(resp?.status === "ok") || list.length === 0){
-            try{
+                try{
                 const r2 = await api(
-                `?attendanceReport=1&id=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lidEnc}`
+                    `?attendanceReport=1&id=${encodeURIComponent(id)}&detail=1&admin=1&lineId=${lidEnc}`
                 );
                 const p2 = r2 && (r2.detail || r2);
                 const l2 = pickRows(p2);
                 if (r2?.status === "ok" && l2.length){
-                payload = p2;
-                list    = l2;
-                used    = "GAS-fallback-id";
+                    payload = p2;
+                    list    = l2;
+                    used    = "GAS-fallback-id";
                 }
-            }catch(e){
+                }catch(e){
                 console.error("fallback fetch error(id):", e);
-            }
+                }
             }
         }
 
