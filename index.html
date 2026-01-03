@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.9.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.9.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6548,6 +6548,7 @@
                         ev.deadline_date ??
                         ev.deadlineDate ??
                         ev.deadline ??
+                        ev.limit ?? 
                         "",
                 };
                 })
@@ -7326,17 +7327,15 @@
         // rawDeadline から数字だけ抜き出し
         let deadlineDigits = String(rawDeadline || "").replace(/[^0-9]/g, "");
 
-        // 2) 締切日が payload に無さそうなら meta から補完
-        if (deadlineDigits.length < 8 && metaHit) {
-        const metaRaw =
-            metaHit.deadlineYmd ??
-            metaHit.deadline_date ??
-            metaHit.deadline ??
-            "";
-        const metaDigits = String(metaRaw || "").replace(/[^0-9]/g, "");
-        if (metaDigits.length >= 8) {
-            deadlineDigits = metaDigits;
-        }
+        // 2) それでも無ければ、さっき loadMeta で作った一覧から拾う
+        if (!rawDeadline && Array.isArray(state.reportMeta) && id) {
+            const metaHit = state.reportMeta.find(e => String(e.id) === String(id));
+            if (metaHit) {
+                rawDeadline =
+                    metaHit.deadlineRaw ||   // ← さっき追加したやつ
+                    metaHit.deadlineYmd ||
+                    "";
+            }
         }
 
         // 3) イベント日も fallback 用に取っておく
