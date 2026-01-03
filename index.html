@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.6.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.6.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwjsIiFQHfDvyQzWOf-IzFiuTk3IfJDl2ic8O0OXDa4o2_UJGVIwpkqSRaQ92tUNPpJ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4986,25 +4986,35 @@
 
         box.innerHTML = html;
 
+        // ★ 既存レイアウトの「下の線(.line)」を消す
+        (function hideOldBottomLine() {
+        // #formFields のすぐ次にある .line を探す
+        const globalLine = box.nextElementSibling;
+        if (globalLine && globalLine.classList.contains("line")) {
+            globalLine.style.display = "none";
+        }
+        })();
+
         // ★ ここから送信ボタンの配置 --------------------------
         btnTemplate = document.getElementById("btnSubmitTemplate");
 
         if (btnTemplate) {
-            const newBtn = btnTemplate.cloneNode(true);
-            newBtn.id = "btnSubmit";
-            newBtn.style.display = "";
+        const newBtn = btnTemplate.cloneNode(true);
+        newBtn.id = "btnSubmit";
+        newBtn.style.display = "";
 
-            // 締切済みヘッダの「直前」にボタンを差し込む
-            const readonlyHeader = document.getElementById("formReadonlyHeader");
+        // 締切済みヘッダの「直前」にボタンを差し込む
+        const readonlyHeader = document.getElementById("formReadonlyHeader");
 
-            if (readonlyHeader && readonlyHeader.parentNode) {
-                readonlyHeader.parentNode.insertBefore(newBtn, readonlyHeader);
-            } else {
-                // 締切済みイベントがない場合は、フォームの一番下へ
-                box.appendChild(newBtn);
-            }
+        if (readonlyHeader && readonlyHeader.parentNode) {
+            readonlyHeader.parentNode.insertBefore(newBtn, readonlyHeader);
+        } else {
+            // 締切済みイベントがない場合は、フォームの一番下へ
+            box.appendChild(newBtn);
+        }
         }
         // ★ ここまで ------------------------------------------
+
 
         // アコーディオン開閉
         box.querySelectorAll(".fEvent .fHead").forEach(h => {
