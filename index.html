@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.6.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.7.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwjsIiFQHfDvyQzWOf-IzFiuTk3IfJDl2ic8O0OXDa4o2_UJGVIwpkqSRaQ92tUNPpJ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4962,14 +4962,14 @@
         // 編集可能なイベント部分
         html += `<div id="formEditableBlock">${editableHtml}</div>`;
 
-        if (readonlyHtml) {
+                if (readonlyHtml) {
             html += `
-                <div id="formReadonlyHeader"
-                    style="
-                        margin-top:16px;
-                        padding-top:8px;
-                        border-top:1px dashed var(--c-border-soft);
-                    ">
+                <!-- ボタンの直後に来る区切り線 -->
+                <div id="formReadonlyDivider"
+                     class="line"
+                     style="margin:16px 0 8px;"></div>
+
+                <div id="formReadonlyHeader">
                     <div class="formSectionTitle" style="margin-top:4px; margin-bottom:4px;">
                         締切済み（内容の確認のみ）
                     </div>
@@ -4999,19 +4999,24 @@
         btnTemplate = document.getElementById("btnSubmitTemplate");
 
         if (btnTemplate) {
-        const newBtn = btnTemplate.cloneNode(true);
-        newBtn.id = "btnSubmit";
-        newBtn.style.display = "";
+            const newBtn = btnTemplate.cloneNode(true);
+            newBtn.id = "btnSubmit";
+            newBtn.style.display = "";
 
-        // 締切済みヘッダの「直前」にボタンを差し込む
-        const readonlyHeader = document.getElementById("formReadonlyHeader");
+            // まずは「区切り線」の直前に差し込む
+            const divider = document.getElementById("formReadonlyDivider");
 
-        if (readonlyHeader && readonlyHeader.parentNode) {
-            readonlyHeader.parentNode.insertBefore(newBtn, readonlyHeader);
-        } else {
-            // 締切済みイベントがない場合は、フォームの一番下へ
-            box.appendChild(newBtn);
-        }
+            if (divider && divider.parentNode) {
+                divider.parentNode.insertBefore(newBtn, divider);
+            } else {
+                // 締切済みイベントがない場合 or 何かで divider が無い場合のフォールバック
+                const readonlyHeader = document.getElementById("formReadonlyHeader");
+                if (readonlyHeader && readonlyHeader.parentNode) {
+                    readonlyHeader.parentNode.insertBefore(newBtn, readonlyHeader);
+                } else {
+                    box.appendChild(newBtn);
+                }
+            }
         }
         // ★ ここまで ------------------------------------------
 
