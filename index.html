@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.6.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.6.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwjsIiFQHfDvyQzWOf-IzFiuTk3IfJDl2ic8O0OXDa4o2_UJGVIwpkqSRaQ92tUNPpJ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4946,21 +4946,44 @@
         }).join("");
 
         let html = "";
-        html += editableHtml;
+
+        // 編集可能なイベント部分
+        html += `<div id="formEditableBlock">${editableHtml}</div>`;
 
         if (readonlyHtml) {
-            html += `
-                <div class="formSectionTitle" style="margin-top:16px; margin-bottom:4px;">
-                    締切済み（内容の確認のみ）
-                </div>
-                <div class="muted" style="font-size:12px; margin-bottom:8px;">
-                    ※締切後に予定が変わる場合は、必ず運営まで個別にご連絡ください。
-                </div>
-            `;
-            html += readonlyHtml;
+        // 締切済みヘッダ（区切り線＋タイトル＋注意書き）
+        html += `
+            <div id="formReadonlyHeader">
+            <div class="formSectionDivider"
+                style="margin:16px 0 8px; border-top:1px dashed var(--c-border-soft);"></div>
+            <div class="formSectionTitle" style="margin-top:4px; margin-bottom:4px;">
+                締切済み（内容の確認のみ）
+            </div>
+            <div class="muted" style="font-size:12px; margin-bottom:8px;">
+                ※締切後に予定が変わる場合は、必ず運営まで個別にご連絡ください。
+            </div>
+            </div>
+            <div id="formReadonlyBlock">
+            ${readonlyHtml}
+            </div>
+        `;
         }
 
-        box.innerHTML = html;
+            box.innerHTML = html;
+
+            // ★ ここからボタンの位置調整 --------------------------
+            const btnSubmit = $("#btnSubmit");
+            const readonlyHeader = $("#formReadonlyHeader");
+
+            if (btnSubmit) {
+            if (readonlyHeader && readonlyHeader.parentNode) {
+                // 締切済みヘッダの「直前」にボタンを移動
+                readonlyHeader.parentNode.insertBefore(btnSubmit, readonlyHeader);
+            } else {
+                // 締切済みイベントがない場合は、フォームの一番下に置く
+                box.appendChild(btnSubmit);
+            }
+            }
 
         // アコーディオン開閉
         box.querySelectorAll(".fEvent .fHead").forEach(h => {
