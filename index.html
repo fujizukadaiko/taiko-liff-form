@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.9.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.9.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6650,15 +6650,15 @@
           renderReport();
         },
 
-    // 初期配線
-    mount(){
-      if (this.mounted) return;
-      this.mounted = true;
-      document.querySelector("#repEvent")?.addEventListener("change", ()=>this.onChange());
-      // ← 実HTMLは #btnReportReload なのでこちらに合わせます
-      document.querySelector("#btnReportReload")?.addEventListener("click", ()=>this.loadMeta());
-    }
-  };
+        // 初期配線
+        mount(){
+        if (this.mounted) return;
+        this.mounted = true;
+        document.querySelector("#repEvent")?.addEventListener("change", ()=>this.onChange());
+        // ← 実HTMLは #btnReportReload なのでこちらに合わせます
+        document.querySelector("#btnReportReload")?.addEventListener("click", ()=>this.loadMeta());
+        }
+    };
 
     // 管理レポート初期化（公演メタ一覧の取得＆セレクト更新）
     async function initAdminReportPage(){
@@ -7305,52 +7305,75 @@
         const td  = String(jst.getDate()).padStart(2, "0");
         const todayYmd = `${ty}${tm}${td}`;
 
-        // 0) メタ側の該当イベント（あれば使う）
+        // 0-A) meta側（/line/schedules）から該当イベント
         let metaHit = null;
         if (Array.isArray(state.reportMeta) && id) {
-        metaHit = state.reportMeta.find(e => String(e.id) === String(id)) || null;
+            metaHit = state.reportMeta.find(e => String(e.id) === String(id)) || null;
+        }
+
+        // 0-B) 管理一覧（adminItemsRaw）から該当イベント
+        let adminHit = null;
+        if (Array.isArray(state.adminItemsRaw) && id) {
+            adminHit = state.adminItemsRaw.find(e => String(e.id) === String(id)) || null;
         }
 
         // 1) payload 内から締切日っぽい値を拾う
         let rawDeadline =
-        payload.deadline ||
-        payload.limit ||
-        payload.deadlineYmd ||
-        payload.deadline_date ||
-        (payload.event && (
-            payload.event.deadline ||
-            payload.event.deadlineYmd ||
-            payload.event.deadline_date
-        )) ||
-        "";
+            payload.deadline ||
+            payload.limit ||
+            payload.deadlineYmd ||
+            payload.deadline_ymd ||
+            payload.deadlineDate ||
+            payload.deadline_date ||
+            (payload.event && (
+                payload.event.deadline ||
+                payload.event.limit ||
+                payload.event.deadlineYmd ||
+                payload.event.deadline_ymd ||
+                payload.event.deadlineDate ||
+                payload.event.deadline_date
+            )) ||
+            "";
 
-        // rawDeadline から数字だけ抜き出し
+        // 2) 無ければ metaHit / adminHit から拾う
+        if (!rawDeadline && metaHit) {
+            rawDeadline =
+                metaHit.deadline ||
+                metaHit.deadlineYmd ||
+                metaHit.deadline_ymd ||
+                metaHit.deadlineDate ||
+                metaHit.deadline_date ||
+                "";
+        }
+
+        if (!rawDeadline && adminHit) {
+            // ★ adminListFetch で正規化した deadline を最優先で使う
+            rawDeadline =
+                adminHit.deadline ||
+                adminHit.deadlineYmd ||
+                adminHit.deadline_ymd ||
+                adminHit.deadlineDate ||
+                adminHit.deadline_date ||
+                "";
+        }
+
+        // 3) 数字だけ抜く
         let deadlineDigits = String(rawDeadline || "").replace(/[^0-9]/g, "");
 
-        // 2) それでも無ければ、さっき loadMeta で作った一覧から拾う
-        if (!rawDeadline && Array.isArray(state.reportMeta) && id) {
-            const metaHit = state.reportMeta.find(e => String(e.id) === String(id));
-            if (metaHit) {
-                rawDeadline =
-                    metaHit.deadlineRaw ||   // ← さっき追加したやつ
-                    metaHit.deadlineYmd ||
-                    "";
-            }
-        }
-
-        // 3) イベント日も fallback 用に取っておく
+        // 3.5) 公演日（締切が取れなかった場合のフォールバック用）
         let dateDigits = "";
         {
-        const rawDate =
-            payload.ymd ||
-            payload.date ||
-            (payload.event && (payload.event.ymd || payload.event.date)) ||
-            (metaHit && (metaHit.ymd || metaHit.date)) ||
-            "";
-        const d = String(rawDate || "").replace(/[^0-9]/g, "");
-        if (d.length >= 8) {
-            dateDigits = d.slice(0, 8);
-        }
+            const rawDate =
+                payload.ymd ||
+                payload.date ||
+                (payload.event && (payload.event.ymd || payload.event.date)) ||
+                (metaHit  && (metaHit.ymd  || metaHit.date)) ||
+                (adminHit && (adminHit.ymd || adminHit.date)) ||
+                "";
+            const d = String(rawDate || "").replace(/[^0-9]/g, "");
+            if (d.length >= 8) {
+                dateDigits = d.slice(0, 8);
+            }
         }
 
         // 4) 実際の open 判定
@@ -7358,42 +7381,43 @@
 
         // 4-1) まずは締切日で判定（締切日 < 今日 → 締切）
         if (deadlineDigits.length >= 8) {
-        const dlYmd = deadlineDigits.slice(0, 8); // 先頭8桁 yyyyMMdd
-        const isClosedByDeadline = dlYmd < todayYmd;
-        open = !isClosedByDeadline;
+            const dlYmd = deadlineDigits.slice(0, 8); // 先頭8桁 yyyyMMdd
+            const isClosedByDeadline = dlYmd < todayYmd;
+            open = !isClosedByDeadline;
         }
         // 4-2) 締切が取れない場合は「公演日」で判定（公演日 < 今日 → 締切）
         else if (dateDigits.length === 8) {
-        const isPastEvent = dateDigits < todayYmd;
-        open = !isPastEvent;
+            const isPastEvent = dateDigits < todayYmd;
+            open = !isPastEvent;
         }
         // 4-3) それでも判断できない場合だけ accepting / status でフォールバック
         else if (typeof payload.accepting !== "undefined") {
-        const v = String(payload.accepting).toLowerCase();
-        open = !(
-            v === "closed" ||
-            v === "close"  ||
-            v === "false"  ||
-            v === "n"
-        );
+            const v = String(payload.accepting).toLowerCase();
+            open = !(
+                v === "closed" ||
+                v === "close"  ||
+                v === "false"  ||
+                v === "n"
+            );
         } else {
-        const flag =
-            payload.isOpen ??
-            payload.open ??
-            (payload.status &&
-            String(payload.status).toLowerCase() === "open");
-        open = !!flag;
+            const flag =
+                payload.isOpen ??
+                payload.open ??
+                (payload.status &&
+                    String(payload.status).toLowerCase() === "open");
+            open = !!flag;
         }
 
-        // デバッグ用：必要なら一時的に有効に
+        // デバッグ用
         console.log("[rep/open-debug]", {
-        id,
-        todayYmd,
-        rawDeadline,
-        deadlineDigits,
-        dateDigits,
-        metaHit,
-        open,
+            id,
+            todayYmd,
+            rawDeadline,
+            deadlineDigits,
+            dateDigits,
+            metaHit,
+            adminHit,
+            open,
         });
 
         // ★ここからヘッダーHTML
