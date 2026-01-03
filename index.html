@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.7.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.7.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwjsIiFQHfDvyQzWOf-IzFiuTk3IfJDl2ic8O0OXDa4o2_UJGVIwpkqSRaQ92tUNPpJ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3162,6 +3162,17 @@
         return dt;
         }
 
+        function isPastDeadline(ev){
+            // ev.deadline / ev.limit / ev.deadlineYmd のどれかに締切が入っている想定
+            const raw = ev.deadline || ev.limit || ev.deadlineYmd || "";
+            const d = parseYmd(raw);
+            if (!d) return false;  // 締切未設定 → 「受付中」とみなして表示する
+
+            const today = new Date();
+            today.setHours(0,0,0,0);     // 今日 0:00
+            return d < today;            // 締切日が「今日より前」なら締切済み
+        }
+
         function deadlineClass(deadlineStr){
         const d = parseYmd(deadlineStr); if (!d) return '';
         const today = new Date(); today.setHours(0,0,0,0);
@@ -3271,20 +3282,26 @@
         }
     
         function render(){
-        const box = E.box(); if (!box) return;
-        const list = (S.events || []).slice().sort((a,b) => {
-            const da = parseYmd(a.ymd || a.date) || new Date(8640000000000000);
-            const db = parseYmd(b.ymd || b.date) || new Date(8640000000000000);
-            return da - db;
-        });
-        const rows = [];
-        for (const ev of list){
-            const sum = summarizeForEvent(ev);
-            if (S.onlyNA && !(sum.key === 'na' || sum.key === 'partial' || sum.key === 'pending')) continue;
-            rows.push(rowHtml(ev, sum));
-        }
-        box.innerHTML = rows.length ? `<div class="evList">${rows.join('')}</div>`
-                                    : '<div class="listEmpty">該当する公演はありません</div>';
+            const box = E.box(); if (!box) return;
+
+            // ★ ここで「締切を過ぎた公演」は除外する
+            const activeEvents = (S.events || []).filter(ev => !isPastDeadline(ev));
+
+            const list = activeEvents.slice().sort((a,b) => {
+                const da = parseYmd(a.ymd || a.date) || new Date(8640000000000000);
+                const db = parseYmd(b.ymd || b.date) || new Date(8640000000000000);
+                return da - db;
+            });
+
+            const rows = [];
+            for (const ev of list){
+                const sum = summarizeForEvent(ev);
+                if (S.onlyNA && !(sum.key === 'na' || sum.key === 'partial' || sum.key === 'pending')) continue;
+                rows.push(rowHtml(ev, sum));
+            }
+            box.innerHTML = rows.length
+                ? `<div class="evList">${rows.join('')}</div>`
+                : '<div class="listEmpty">該当する公演はありません</div>';
     
         // 詳細: 家族別チップ
         box.querySelectorAll('.eventRow').forEach(row => {
