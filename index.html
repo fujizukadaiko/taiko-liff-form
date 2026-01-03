@@ -24,6 +24,24 @@
             // === 更新履歴（アプリ内「変更履歴」表示用） ===
             window.__CHANGELOG_ENTRIES__ = [
                 {
+                    date: "2026-01-04",
+                    title: "システムの読み込みを高速化",
+                    tags: ["改善", "内部"],
+                    body: "トップ画面の「今後の予定」「会員情報」などの読み込み処理を変更し、表示速度と安定性を改善しました。"
+                },
+                {
+                    date: "2026-01-04",
+                    title: "出欠入力フォームに締切後のイベントの回答内容を表示",
+                    tags: ["改善", "UI"],
+                    body: "回答締切後もそのイベントへの回答内容を確認できるように改善しました。"
+                },
+                {
+                    date: "2026-01-04",
+                    title: "保存中のモーダル表示を追加",
+                    tags: ["改善", "UI"],
+                    body: "編集画面で保存ボタンを押した際に、「保存中…」などのモーダルを表示するようにしました。処理中かどうかが一目で分かります。"
+                },
+                {
                 date: "2025-11-15",
                 title: "ご意見BOX（右下ボタン）を追加",
                 tags: ["機能追加","UI"],
@@ -2100,8 +2118,10 @@
         box-shadow: 0 8px 28px rgba(0,0,0,.15);
         padding: 18px 16px;
         font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Segoe UI", sans-serif;
+        display: flex;
+        flex-direction: column;
+        max-height: 80vh;  /* モーダル全体の高さ制限 */
         }
-
         /* リスト */
         .cg-item{
         border: 1px solid #e5e5ef;
@@ -2187,6 +2207,13 @@
         height: 8px;
         background: #e11d48;
         border-radius: 9999px;
+        }
+        /* リスト部分だけスクロールさせる */
+        #changelogList{
+        margin-top: 8px;        /* タイトルとの余白が欲しければ */
+        flex: 1 1 auto;         /* 残り高さをここに割り当てる */
+        min-height: 0;          /* flexコンテナ内スクロール用のおまじない */
+        overflow-y: auto;       /* 縦スクロールON */
         }
     /* ===== 回答受付中の公演リスト 専用 ===== */
         const css = document.createElement('style');
@@ -7407,18 +7434,6 @@
                     String(payload.status).toLowerCase() === "open");
             open = !!flag;
         }
-
-        // デバッグ用
-        console.log("[rep/open-debug]", {
-            id,
-            todayYmd,
-            rawDeadline,
-            deadlineDigits,
-            dateDigits,
-            metaHit,
-            adminHit,
-            open,
-        });
 
         // ★ここからヘッダーHTML
         const head = `
