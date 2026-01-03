@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.8.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.8.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzfYptMZnqtMvXPIKSwTj6NtzIU1pLF1I5rKo3s9pLhl5ta7v0r_GB9rgvYoeecTBwxuA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -5337,41 +5337,31 @@
     // ★ "Y" / "N" / true / false / 1 / 0 などを全部 boolean にそろえる
     function normalizeNotifyFlag(raw) {
         if (raw === undefined || raw === null || raw === "") {
-            // 初回は「チェックあり」でスタートしたい場合 → true
-            return true;
+            // 初回はチェックなし
+            return false;
         }
-        if (raw === false) return false;
+        if (raw === true || raw === false) return raw;
+
         const s = String(raw).trim().toUpperCase();
         if (s === "Y" || s === "1" || s === "TRUE")  return true;
         if (s === "N" || s === "0" || s === "FALSE") return false;
-        // よく分からない値は「とりあえず ON」に寄せる
-        return true;
+
+        // よく分からない値は安全側で OFF
+        return false;
     }
     function resetRegisterForm(){
         $("#regInputName").value =
             state.inputName
             || state.name
             || "";
+
         $("#perfList").innerHTML = "";
         addPerformerField("");
 
-        // ★ state.notify を正規化してチェック状態を決める
+        // ★ D1 → state.notify をそのまま使う
         $("#regNotify").checked = normalizeNotifyFlag(state.notify);
     }
 
-    function buildRegisterFormFromMembers(){
-        const inputName = 
-            state.inputName
-            || state.members[0]?.inputName
-            || state.name
-            || "";
-
-        $("#regInputName").value = inputName;
-        $("#perfList").innerHTML = "";
-        // ... 演奏者展開 ...
-
-        $("#regNotify").checked = normalizeNotifyFlag(state.notify);
-    }
     function buildRegisterFormFromMembers(){
         const inputName = 
             state.inputName           // D1 からの保存値が最優先
@@ -5382,33 +5372,23 @@
         $("#regInputName").value = inputName;
         $("#perfList").innerHTML = "";
 
-        const list = (state.members||[]).map(m => ({
-            name: (m.performerName||"").trim(),
+        // 演奏者の展開
+        const list = (state.members || []).map(m => ({
+            name: (m.performerName || "").trim(),
             seg : (m.segment || m?.区分 || "子どもの部")
         })).filter(x => x.name);
 
-        if (list.length===0){
+        if (list.length === 0){
             addPerformerField("", "子どもの部");
         } else {
             list.forEach(x => addPerformerField(x.name, x.seg));
         }
 
-        // ★ ここを変更：members から notify を復元
-        let notifyFlag = false;
-        if (state.members && state.members.length > 0) {
-            // 1行目の notify を代表値として使う（全部同じ前提）
-            const m0 = state.members[0];
-            // スプレッドシートから来るなら "Y"/"N" か true/false のはず
-            const raw = (m0.notify !== undefined ? m0.notify : m0.通知);
-            const s = String(raw || "").trim().toUpperCase();
-            notifyFlag = (s === "Y" || s === "TRUE" || s === "1");
-        } else {
-            // members が取れないときだけ、過去の state.notify を使う
-            notifyFlag = !!state.notify;
-        }
-
-        state.notify = notifyFlag;             // 状態も更新
-        $("#regNotify").checked = isNotifyOn_(state.notify);  // チェックボックスに反映
+        // ★ ポイント：members[0].notify からは取らない
+        //   D1 → refreshData で決めた state.notify をそのまま使う
+        const notifyFlag = normalizeNotifyFlag(state.notify);
+        state.notify = notifyFlag;                   // 状態も更新
+        $("#regNotify").checked = notifyFlag;        // チェックボックスに反映
     }
     function addPerformerField(value="", segValue="子どもの部"){
     const id = "perf_" + Math.random().toString(36).slice(2);
