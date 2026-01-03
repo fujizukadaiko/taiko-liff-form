@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.9.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.9.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -7296,7 +7296,7 @@
 
         // === 受付状態（ヘッダ右側の「受付中 / 締切」バッジ）を決定 ===
 
-        // 今日（JST）を YYYYMMDD で用意
+        // 今日（JST）を YYYYMMDD
         const now = new Date();
         const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
         const ty  = jst.getFullYear();
@@ -7304,7 +7304,13 @@
         const td  = String(jst.getDate()).padStart(2, "0");
         const todayYmd = `${ty}${tm}${td}`;
 
-        // 1) payload 内から締切日っぽい値を探す
+        // 0) メタ側の該当イベント（あれば使う）
+        let metaHit = null;
+        if (Array.isArray(state.reportMeta) && id) {
+        metaHit = state.reportMeta.find(e => String(e.id) === String(id)) || null;
+        }
+
+        // 1) payload 内から締切日っぽい値を拾う
         let rawDeadline =
         payload.deadline ||
         payload.limit ||
@@ -7317,69 +7323,105 @@
         )) ||
         "";
 
-        // 2) digitsが足りないときだけ meta から補完
-        let digits = String(rawDeadline || "").replace(/[^0-9]/g, "");
-        if (digits.length < 8 && Array.isArray(state.reportMeta) && id) {
-        const metaHit = state.reportMeta.find(e => String(e.id) === String(id));
-        if (metaHit && metaHit.deadlineYmd) {
-            const metaDigits = String(metaHit.deadlineYmd || "").replace(/[^0-9]/g, "");
-            if (metaDigits.length >= 8) {
-            digits = metaDigits;
-            }
+        // rawDeadline から数字だけ抜き出し
+        let deadlineDigits = String(rawDeadline || "").replace(/[^0-9]/g, "");
+
+        // 2) 締切日が payload に無さそうなら meta から補完
+        if (deadlineDigits.length < 8 && metaHit) {
+        const metaRaw =
+            metaHit.deadlineYmd ??
+            metaHit.deadline_date ??
+            metaHit.deadline ??
+            "";
+        const metaDigits = String(metaRaw || "").replace(/[^0-9]/g, "");
+        if (metaDigits.length >= 8) {
+            deadlineDigits = metaDigits;
         }
         }
 
+        // 3) イベント日も fallback 用に取っておく
+        let dateDigits = "";
+        {
+        const rawDate =
+            payload.ymd ||
+            payload.date ||
+            (payload.event && (payload.event.ymd || payload.event.date)) ||
+            (metaHit && (metaHit.ymd || metaHit.date)) ||
+            "";
+        const d = String(rawDate || "").replace(/[^0-9]/g, "");
+        if (d.length >= 8) {
+            dateDigits = d.slice(0, 8);
+        }
+        }
+
+        // 4) 実際の open 判定
         let open;
-        if (digits.length >= 8) {
-        // 3) 先頭8桁だけ YYYYMMDD として使う
-        const dlYmd = digits.slice(0, 8);
+
+        // 4-1) まずは締切日で判定（締切日 < 今日 → 締切）
+        if (deadlineDigits.length >= 8) {
+        const dlYmd = deadlineDigits.slice(0, 8); // 先頭8桁 yyyyMMdd
         const isClosedByDeadline = dlYmd < todayYmd;
         open = !isClosedByDeadline;
-        } else {
-        // 4) それでも締切日が取れないときだけ accepting / status を見る
-        if (typeof payload.accepting !== "undefined") {
-            const v = String(payload.accepting).toLowerCase();
-            open = !(
+        }
+        // 4-2) 締切が取れない場合は「公演日」で判定（公演日 < 今日 → 締切）
+        else if (dateDigits.length === 8) {
+        const isPastEvent = dateDigits < todayYmd;
+        open = !isPastEvent;
+        }
+        // 4-3) それでも判断できない場合だけ accepting / status でフォールバック
+        else if (typeof payload.accepting !== "undefined") {
+        const v = String(payload.accepting).toLowerCase();
+        open = !(
             v === "closed" ||
             v === "close"  ||
             v === "false"  ||
             v === "n"
-            );
+        );
         } else {
-            const flag =
+        const flag =
             payload.isOpen ??
             payload.open ??
             (payload.status &&
-                String(payload.status).toLowerCase() === "open");
-            open = !!flag;
+            String(payload.status).toLowerCase() === "open");
+        open = !!flag;
         }
-        }
+
+        // デバッグ用：必要なら一時的に有効に
+        // console.log("[rep/open-debug]", {
+        //   id,
+        //   todayYmd,
+        //   rawDeadline,
+        //   deadlineDigits,
+        //   dateDigits,
+        //   metaHit,
+        //   open,
+        // });
 
         // ★ここからヘッダーHTML
         const head = `
-            <div class="repHeader">
+        <div class="repHeader">
             <!-- 1行目：タイトルだけ -->
             <div class="repLine">
-                <div class="repLeft">
+            <div class="repLeft">
                 <span class="repTitle">${title || "(無題)"}</span>
-                </div>
+            </div>
             </div>
 
             <!-- 2行目：日時・場所（左）／受付バッジ（右） -->
             <div class="repLine repHeadRow">
-                <div class="repLeft">
+            <div class="repLeft">
                 <span class="repMeta">
-                    ${date}${time ? ` ${time}` : ""}
-                    ${place ? `<span class="repPlace"> @${place}</span>` : ""}
+                ${date}${time ? ` ${time}` : ""}
+                ${place ? `<span class="repPlace"> @${place}</span>` : ""}
                 </span>
-                </div>
-                <div class="repRight">
-                <span class="badge-status ${open ? "open" : "closed"}">
-                    ${open ? "受付中" : "締切"}
-                </span>
-                </div>
             </div>
-            </div>`;
+            <div class="repRight">
+                <span class="badge-status ${open ? "open" : "closed"}">
+                ${open ? "受付中" : "締切"}
+                </span>
+            </div>
+            </div>
+        </div>`;
 
         // 出欠ごとにグルーピング（画面フィルタを反映した view を対象に）
         const by = { "参加": [], "未定": [], "欠席": [], "未回答": [] };
