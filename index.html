@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.8.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.8.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwNTWBTt8r2mu6OOKMk3gvr3qEhnggObeWZakA-ifjLRdVCVVcY-gl0R7O1bvgEk1dcZg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -5375,31 +5375,23 @@
             const inputName = $("#regInputName").value.trim();
             if (!inputName) throw new Error("入力者氏名を入力してください");
 
-            // ★ チェックあり＝閲覧者モード
-            const viewerOnly = !!$("#regNotify")?.checked;
-            // 閲覧者は通知 OFF
-            const notify = !viewerOnly;
+            // ★ チェック状態をそのまま notify に
+            const checked = !!$("#regNotify")?.checked;
+            const notify = checked;        // チェックあり → 通知 Y
+            const viewerOnly = !checked;   // チェックなし → 閲覧者 Y
 
             // {name, segment} の配列（空文字は除外）
-            let items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
+            const items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
             const name = row.querySelector(".regPerf")?.value.trim();
             const seg  = row.querySelector(".regPerfSeg")?.value || "子どもの部";
             return name ? { name, segment: seg } : null;
             }).filter(Boolean);
 
-            // 閲覧者モードのときは、演奏者は 0 件前提にする
-            if (viewerOnly && items.length > 0){
-            throw new Error("閲覧のみの場合は演奏者を入力しないでください");
-            // もし「勝手に全部捨てて閲覧者にする」で良ければ↓でもOK
-            // items = [];
-            }
-
-            // 通常モードなのに演奏者 0 件は NG
+            // ★ バリデーションはシンプルにこのままでもOK
+            //   （閲覧者でも演奏者が入っていてもいい、という運用なら触らなくてOK）
             if (!viewerOnly && items.length === 0){
             throw new Error("演奏者を1名以上入力してください");
             }
-
-            const isViewerOnly = viewerOnly;
 
             $("#btnRegister").disabled = true;
             $("#btnRegister").textContent =
@@ -5414,15 +5406,15 @@
                 + `&inputName=${esc(inputName)}`
                 + `&list2=${esc(listJson)}`
                 + `&purge=0`
-                + `&notify=${notify?1:0}`          // ← notify はチェック反転後の値
-                + `&viewerOnly=${isViewerOnly?1:0}`; // ← チェック状態そのもの
+                + `&notify=${notify?1:0}`          // ← チェック状態そのまま
+                + `&viewerOnly=${viewerOnly?1:0}`; // ← チェックの反転
             } else {
             url = `${API_ENDPOINT}?registerBulk=1`
                 + `&lineId=${esc(state.lineId)}`
                 + `&inputName=${esc(inputName)}`
                 + `&list2=${esc(listJson)}`
                 + `&notify=${notify?1:0}`
-                + `&viewerOnly=${isViewerOnly?1:0}`;
+                + `&viewerOnly=${viewerOnly?1:0}`;
             }
 
             const r = await fetch(url);
