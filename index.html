@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.9.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.9.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6541,6 +6541,14 @@
                     "",
                     // ★ 対象区分
                     segment: segRaw,
+
+                    // ★ 締切日（YYYYMMDD 相当）をメタ情報として保持しておく
+                    deadlineYmd:
+                        ev.deadlineYmd ??
+                        ev.deadline_date ??
+                        ev.deadlineDate ??
+                        ev.deadline ??
+                        "",
                 };
                 })
                 .filter(e => e && e.id);
@@ -7286,13 +7294,65 @@
         const time  = fmtTime(payload.hm   || payload.time || "");
         const place = payload.place || payload.venue || "";
 
-        // accepting が来ていればそれを優先（'closed' なら締切）
-        const open =
-            typeof payload.accepting !== "undefined"
-            ? String(payload.accepting).toLowerCase() !== "closed"
-            : (payload.isOpen ?? payload.open ?? payload.status === "open")
-                ? true
-                : false;
+        // === 受付状態（ヘッダ右側の「受付中 / 締切」バッジ）を決定 ===
+
+            // 今日（JST）を YYYYMMDD で用意
+            const now = new Date();
+            const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+            const ty  = jst.getFullYear();
+            const tm  = String(jst.getMonth() + 1).padStart(2, "0");
+            const td  = String(jst.getDate()).padStart(2, "0");
+            const todayYmd = `${ty}${tm}${td}`;
+
+            // 1) payload 内から締切日っぽい値を探す
+            let rawDeadline =
+            payload.deadline ||
+            payload.limit ||
+            payload.deadlineYmd ||
+            payload.deadline_date ||
+            (payload.event && (
+                payload.event.deadline ||
+                payload.event.deadlineYmd ||
+                payload.event.deadline_date
+            )) ||
+            "";
+
+            // 2) それでも無ければ、さっき loadMeta で作った一覧から拾う
+            if (!rawDeadline && Array.isArray(state.reportMeta) && id) {
+            const metaHit = state.reportMeta.find(e => String(e.id) === String(id));
+            if (metaHit && metaHit.deadlineYmd) {
+                rawDeadline = metaHit.deadlineYmd;
+            }
+            }
+
+            // 3) 締切日文字列を数値比較用 YYYYMMDD に正規化
+            let open;
+            const digits = String(rawDeadline || "").replace(/[^0-9]/g, "");
+            if (digits.length === 8) {
+            // ex. "2025-12-31" → "20251231"
+            const dlYmd = digits;
+            // 締切日 < 今日 → 締切扱い
+            const isClosedByDeadline = dlYmd < todayYmd;
+            open = !isClosedByDeadline;
+            } else {
+            // 4) 締切日が取れない場合だけ、従来通り accepting / status を見る
+            if (typeof payload.accepting !== "undefined") {
+                const v = String(payload.accepting).toLowerCase();
+                open = !(
+                v === "closed" ||
+                v === "close"  ||
+                v === "false"  ||
+                v === "n"
+                );
+            } else {
+                const flag =
+                payload.isOpen ??
+                payload.open ??
+                (payload.status &&
+                    String(payload.status).toLowerCase() === "open");
+                open = !!flag;
+            }
+            }
 
         // ★ここからヘッダーHTML
         const head = `
@@ -7424,8 +7484,8 @@
                         "/ fallback raw=", raw2, "norm2=", norm);
 
         return norm;
-        }
-
+    }
+    
     // ▼ 名前 + 区分から表示名を組み立て（大人の部の接頭辞を付ける）
     function nameWithSegPrefix(p){
         const nm = String(p?.name || "");
