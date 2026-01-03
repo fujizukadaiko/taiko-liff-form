@@ -4958,7 +4958,7 @@
     };
 
     /* ===== 出欠送信（ドラフト一括送信） ===== */
-    async function onSubmit(){
+    window.onSubmit = async function onSubmit(){
         if (state.submitting) return;
         state.submitting = true;
 
@@ -5149,6 +5149,7 @@
 
         return { editableEvents, readonlyEvents };
     }
+    })();
 
 /* ===== 初回登録 ===== */
     function resetRegisterForm(){
