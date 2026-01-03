@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.7.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.7.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbw33_2Q75AuhIIEHRLxx64Qh8-qc52C9pqQaW2QYN64jF1NB1wlWNmUur__TWCkjKlihQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -5370,71 +5370,83 @@
     document.getElementById("perfList").appendChild(row);
     }
     async function onRegister(){
-    try{
-        logReg("");
-        const inputName = $("#regInputName").value.trim();
-        if (!inputName) throw new Error("入力者氏名を入力してください");
+        try{
+            logReg("");
+            const inputName = $("#regInputName").value.trim();
+            if (!inputName) throw new Error("入力者氏名を入力してください");
 
-        const notify = !!$("#regNotify")?.checked;
+            // ★ チェックボックスは「閲覧専用モード」
+            const viewerOnlyFlag = !!$("#regNotify")?.checked;
 
-        // {name, segment} の配列（空文字は除外）
-        const items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
-        const name = row.querySelector(".regPerf")?.value.trim();
-        const seg  = row.querySelector(".regPerfSeg")?.value || "子どもの部";
-        return name ? { name, segment: seg } : null;
-        }).filter(Boolean);
+            // {name, segment} の配列（空文字は除外）
+            const items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
+            const name = row.querySelector(".regPerf")?.value.trim();
+            const seg  = row.querySelector(".regPerfSeg")?.value || "子どもの部";
+            return name ? { name, segment: seg } : null;
+            }).filter(Boolean);
 
-        // 閲覧のみ：演奏者0件 かつ 通知OFF（チェック外し）
-        const isViewerOnly = (items.length === 0) && !notify;
+            // ★ 閲覧専用モードの定義
+            //   → チェックあり かつ 演奏者0人 のときだけ viewerOnly にする
+            const isViewerOnly = viewerOnlyFlag && items.length === 0;
 
-        // これまでのバリデーションを「閲覧のみ」のときだけ免除
-        if (!isViewerOnly && items.length === 0){
-        throw new Error("演奏者を1名以上入力してください");
+            // ★ 通知フラグ
+            //   閲覧者 → 通知しない
+            //   それ以外 → 通知する
+            const notify = !isViewerOnly;
+
+            // 閲覧のみ：演奏者0件 かつ 閲覧者モード ON
+            if (!isViewerOnly && items.length === 0){
+            // 普通の人なのに演奏者0人 → これまで通りエラー
+            throw new Error("演奏者を1名以上入力してください");
+            }
+
+            $("#btnRegister").disabled = true;
+            $("#btnRegister").textContent = (registerMode==="edit" ? "保存中…" : "登録中…");
+
+            const listJson = JSON.stringify(items);
+            
+            let url = "";
+            if (registerMode === "edit") {
+            url = `${API_ENDPOINT}?replaceMembers=1`
+                + `&lineId=${esc(state.lineId)}`
+                + `&inputName=${esc(inputName)}`
+                + `&list2=${esc(listJson)}`
+                + `&purge=0`
+                + `&notify=${notify?1:0}`
+                + `&viewerOnly=${isViewerOnly?1:0}`;
+            } else {
+            url = `${API_ENDPOINT}?registerBulk=1`
+                + `&lineId=${esc(state.lineId)}`
+                + `&inputName=${esc(inputName)}`
+                + `&list2=${esc(listJson)}`
+                + `&notify=${notify?1:0}`
+                + `&viewerOnly=${isViewerOnly?1:0}`;
+            }
+
+            const r = await fetch(url);
+            const j = await r.json();
+            if (j.status !== "ok") throw new Error(j.message || "登録に失敗しました");
+
+            state.notify    = notify;
+            state.inputName = inputName;
+
+            alert(
+            registerMode==="edit"
+                ? "氏名を保存しました"
+                : (isViewerOnly ? "閲覧者として登録しました" : "初回登録が完了しました")
+            );
+
+            show("#view-home");
+            logHome("更新中…");
+            await refreshData();
+            logHome("");
+
+        }catch(err){
+            logReg(err.message || String(err));
+        }finally{
+            $("#btnRegister").disabled = false;
+            $("#btnRegister").textContent = (registerMode==="edit" ? "保存" : "登録する");
         }
-
-        $("#btnRegister").disabled = true;
-        $("#btnRegister").textContent = (registerMode==="edit" ? "保存中…" : "登録中…");
-
-        // list2 は空配列のまま送る。viewerOnly=1 を付与
-        const listJson = JSON.stringify(items);
-
-        let url = "";
-        if (registerMode === "edit") {
-        url = `${API_ENDPOINT}?replaceMembers=1`
-            + `&lineId=${esc(state.lineId)}`
-            + `&inputName=${esc(inputName)}`
-            + `&list2=${esc(listJson)}`
-            + `&purge=0`
-            + `&notify=${notify?1:0}`
-            + `&viewerOnly=${isViewerOnly?1:0}`;
-        } else {
-        url = `${API_ENDPOINT}?registerBulk=1`
-            + `&lineId=${esc(state.lineId)}`
-            + `&inputName=${esc(inputName)}`
-            + `&list2=${esc(listJson)}`
-            + `&notify=${notify?1:0}`
-            + `&viewerOnly=${isViewerOnly?1:0}`;
-        }
-
-        const r = await fetch(url);
-        const j = await r.json();
-        if (j.status !== "ok") throw new Error(j.message || "登録に失敗しました");
-
-        state.notify = notify; // サーバ保存成功でローカル状態も反映
-        state.inputName = inputName;   // ★ ここでローカル状態も更新
-        alert(registerMode==="edit" ? "氏名を保存しました" : (isViewerOnly ? "閲覧者として登録しました" : "初回登録が完了しました"));
-
-        show("#view-home");
-        logHome("更新中…");
-        await refreshData();
-        logHome("");
-
-    }catch(err){
-        logReg(err.message || String(err));
-    }finally{
-        $("#btnRegister").disabled = false;
-        $("#btnRegister").textContent = (registerMode==="edit" ? "保存" : "登録する");
-    }
     }
 /* ===== 今後の予定（Schedules） v5 ===== */
     (() => {
