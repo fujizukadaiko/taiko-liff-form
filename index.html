@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.7.1";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.7.2";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwjsIiFQHfDvyQzWOf-IzFiuTk3IfJDl2ic8O0OXDa4o2_UJGVIwpkqSRaQ92tUNPpJ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3313,13 +3313,17 @@
             if (det.dataset.loaded !== '1'){
                 const arr = S.ansMap[id] || [];
                 det.innerHTML = `
-                <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
-                    ${arr.map(m => {
-                    const name = m?.name || m?.member || '';
-                    const v    = m?.answer || '未回答';
-                    return `<span class="pill sm ${ansClass(v)}" title="${v}">${name}</span>`;
-                    }).join('')}
-                </div>`;
+                    <div class="row" style="gap:6px; flex-wrap:wrap; padding:4px 2px 0 2px;">
+                        ${arr.map(m => {
+                            const nameRaw = m?.name || m?.member || '';
+                            const name    = (nameRaw || '').trim();
+                            const vRaw    = (m?.answer ?? '').trim();
+                            const v       = vRaw || '未回答';              // 空なら「未回答」に統一
+                            const label   = name ? `${name}:${v}` : v;     // 「名前:結果」 or 結果だけ
+
+                            return `<span class="pill sm ${ansClass(v)}" title="${v}">${label}</span>`;
+                        }).join('')}
+                    </div>`;
                 det.dataset.loaded = '1';
             }
             row.classList.toggle('open');
