@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.8.6";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.8.7";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzfYptMZnqtMvXPIKSwTj6NtzIU1pLF1I5rKo3s9pLhl5ta7v0r_GB9rgvYoeecTBwxuA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4552,35 +4552,44 @@
         // 4) 取得できたら state に反映
         const tRenderState0 = performance.now();
 
-        if (home && home.status === "ok"){
-            // events
-            if (Array.isArray(home.events)) {
-            state.events = home.events;
-            pruneDraftAgainstCurrentEvents();
-            }
+                if (home && home.status === "ok"){
+                    // events
+                    if (Array.isArray(home.events)) {
+                        state.events = home.events;
+                        pruneDraftAgainstCurrentEvents();
+                    }
 
-            // whoami
-            if (home.whoami && home.whoami.status === "ok"){
-            state.members = Array.isArray(home.whoami.members)
-                ? home.whoami.members
-                : [];
-            state.notify = (typeof home.whoami.notify === "boolean")
-                ? home.whoami.notify
-                : (typeof state.notify === "boolean" ? state.notify : true);
-            state.viewerOnly = (typeof home.whoami.viewerOnly === "boolean")
-                ? home.whoami.viewerOnly
-                : !!state.viewerOnly;
+                    // whoami
+                    if (home.whoami && home.whoami.status === "ok"){
+                        state.members = Array.isArray(home.whoami.members)
+                            ? home.whoami.members
+                            : [];
 
-                // ★ ここで inputName を state に反映
-                if (typeof home.whoami.inputName === "string" && home.whoami.inputName.trim()){
-                state.inputName = home.whoami.inputName.trim();
-                }
-            } else if (home.whoami && home.whoami.status === "new") {
-            state.members    = [];
-            state.viewerOnly = true;
-            state.notify     = true;
-            state.inputName  = "";  // ★ new の場合はクリア
-            }
+                        // ★ notify は normalizeNotifyFlag 経由で boolean に揃える
+                        const rawNotify =
+                            (home.whoami.notify !== undefined)
+                                ? home.whoami.notify
+                                : state.notify; // なければ以前の値を尊重
+                        state.notify = normalizeNotifyFlag(rawNotify);
+
+                        // viewerOnly はひとまず従来ロジックそのまま
+                        state.viewerOnly = (typeof home.whoami.viewerOnly === "boolean")
+                            ? home.whoami.viewerOnly
+                            : !!state.viewerOnly;
+
+                        // ★ inputName を state に反映
+                        if (typeof home.whoami.inputName === "string" && home.whoami.inputName.trim()){
+                            state.inputName = home.whoami.inputName.trim();
+                        }
+                    } else if (home.whoami && home.whoami.status === "new") {
+                        state.members    = [];
+                        state.viewerOnly = true;
+
+                        // ★ new のときは「初回なのでチェックなし」に寄せる
+                        state.notify     = normalizeNotifyFlag(undefined);
+
+                        state.inputName  = "";
+                    }
 
             // isAdmin（D1で取れた分）
             if (typeof home.isAdmin === "boolean"){
@@ -5324,6 +5333,20 @@
     if (s === "N" || s === "0") return false;
     return true; // それ以外は ON
     }
+
+    // ★ "Y" / "N" / true / false / 1 / 0 などを全部 boolean にそろえる
+    function normalizeNotifyFlag(raw) {
+        if (raw === undefined || raw === null || raw === "") {
+            // 初回は「チェックあり」でスタートしたい場合 → true
+            return true;
+        }
+        if (raw === false) return false;
+        const s = String(raw).trim().toUpperCase();
+        if (s === "Y" || s === "1" || s === "TRUE")  return true;
+        if (s === "N" || s === "0" || s === "FALSE") return false;
+        // よく分からない値は「とりあえず ON」に寄せる
+        return true;
+    }
     function resetRegisterForm(){
         $("#regInputName").value =
             state.inputName
@@ -5332,10 +5355,22 @@
         $("#perfList").innerHTML = "";
         addPerformerField("");
 
-        // ★ 初回は OFF をデフォルトにしたいなら false に固定
-        // （もしくは state.notify があればそれを尊重）
-        const notifyFlag = !!state.notify; // 初回から明示的に false で初期化しておくとよい
-        $("#regNotify").checked = isNotifyOn_(state.notify);
+        // ★ state.notify を正規化してチェック状態を決める
+        $("#regNotify").checked = normalizeNotifyFlag(state.notify);
+    }
+
+    function buildRegisterFormFromMembers(){
+        const inputName = 
+            state.inputName
+            || state.members[0]?.inputName
+            || state.name
+            || "";
+
+        $("#regInputName").value = inputName;
+        $("#perfList").innerHTML = "";
+        // ... 演奏者展開 ...
+
+        $("#regNotify").checked = normalizeNotifyFlag(state.notify);
     }
     function buildRegisterFormFromMembers(){
         const inputName = 
