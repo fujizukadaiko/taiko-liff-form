@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.6.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.6.5";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwjsIiFQHfDvyQzWOf-IzFiuTk3IfJDl2ic8O0OXDa4o2_UJGVIwpkqSRaQ92tUNPpJ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -692,6 +692,25 @@
                 font-size: 14px ;   /* お好みで 13〜15px に調整OK */
                 font-weight: 400 ;  
                 margin-left: .5em;            /* タイトルとの間を少し空ける（任意） */
+                }
+
+                .fEvent.readonly {
+                opacity: 0.9;
+                background: #f7f7f7;
+                }
+
+                .row-att-readonly .attLabel {
+                margin-left: 8px;
+                font-weight: 600;
+                }
+
+                .commentReadOnly .commentText {
+                font-weight: 500;
+                }
+
+                .fEvent.readonly .selectBtn,
+                .fEvent.readonly input.evComment {
+                pointer-events: none;
                 }
     /* ===== Schedules（今後の予定） ===== */   
         /* 2行のラベル プルダウン配置 */
@@ -4652,187 +4671,291 @@
     // 1件分のフォームカードHTMLを返す（バッジは1段上に独立行で表示）
     window.renderAttendEvent = function(ev, ctx){
         // ctx: { uniqueNamesAll, ansMap, nameSegMap, userSegSet }
-    
-        // ★ ここを修正：D1/GAS 両対応で生値を拾う
+
+        const readOnly = !!ev.readOnly;
+
+        // ★ D1/GAS 両対応で生値を拾う
         const rawDate = ev.date   || ev.ymd || "";
         const rawTime = ev.time   || ev.hm  || ev.performAt || ev["時間"] || "";
         const place   = ev.place  || "";
-    
+
         // 表示用（yyyy/mm/dd（曜） と hh:mm）
         const dateDisp = fmtYmd(rawDate);      // 例: "2026/01/11（日）"
         const timeDisp = fmtTime(rawTime);     // 例: "14:00"
-    
-        // ★ 追加：締切（yyyy/mm/dd）
-        const rawDeadline = ev.deadline || ev.limit || ev.deadlineYmd || "";
-        const deadlineDisp = fmtYmdNoWeekday(rawDeadline);  // 例: "2026/01/11"
-    
-        // ★ 追加：タイトルを安全に取得（API差異の吸収）
+
+        // 締切（yyyy/mm/dd）
+        const rawDeadline   = ev.deadline || ev.limit || ev.deadlineYmd || "";
+        const deadlineDisp  = fmtYmdNoWeekday(rawDeadline);  // 例: "2026/01/11"
+        const deadlineLabel = readOnly
+            ? `締切：${deadlineDisp || "—"}（締切済み）`
+            : `締切：${deadlineDisp || "—"}`;
+
+        // タイトルを安全に取得（API差異の吸収）
         const titleStr = String(
-        ev.title ?? ev.name ?? ev.eventName ?? ev.subject ?? ""
+            ev.title ?? ev.name ?? ev.eventName ?? ev.subject ?? ""
         ).trim();
-    
-        const evSegNorm = normSeg(ev.segment || ev.targetSegment || ev.attendSegment || "");
+
+        const titleAttr = `${titleStr}${place ? ` @ ${place}` : ""}`;
+
+        const evSegNorm     = normSeg(ev.segment || ev.targetSegment || ev.attendSegment || "");
         const segBadgeLabel = dispSeg(evSegNorm);
-        const segBadgeCls = evSegNorm==="adult" ? "seg-adult" : evSegNorm==="child" ? "seg-child" : "seg-both";
+        const segBadgeCls   =
+            evSegNorm === "adult" ? "seg-adult" :
+            evSegNorm === "child" ? "seg-child" :
+            "seg-both";
 
         // 表示対象の演奏者を決定（ユーザー/名前側の区分が欠落していれば除外しない＝全表示）
-        const performers = (ctx.uniqueNamesAll||[]).filter(n=>{
-            if (!ctx.userSegSet || ctx.userSegSet.size===0) return true;
+        const performers = (ctx.uniqueNamesAll || []).filter(n => {
+            if (!ctx.userSegSet || ctx.userSegSet.size === 0) return true;
             return matchSeg(ctx.nameSegMap[n], evSegNorm);
         });
 
         // 未保存バッジ判定
-        const dblock = (draft.byEvent||{})[String(ev.eventId)];
-        const hasUnsaved = !!dblock && (
-        Object.keys(dblock.members || {}).length > 0 ||
-        (dblock.comment||"").trim() !== ""
+        const dblock = (draft.byEvent || {})[String(ev.eventId)];
+        const hasUnsaved = !readOnly && !!dblock && (
+            Object.keys(dblock.members || {}).length > 0 ||
+            (dblock.comment || "").trim() !== ""
         );
 
         // ステータス行（pill）表示のため、現在値（ドラフト優先）を取得
-        const pills = performers.map(name=>{
-        const current = draftGetAttend(ev.eventId, name) || (ctx.ansMap[name]?.attend || "");
-        let cls="stat-na", label="未回答";
-        if (current==="参加") cls="stat-ok", label="参加";
-        else if (current==="欠席") cls="stat-ng", label="欠席";
-        else if (current==="未定") cls="stat-pd", label="未定";
-        return `<span class="pill sm ${cls}">${h(name)}:${label}</span>`;
+        const pills = performers.map(name => {
+            const current =
+                draftGetAttend(ev.eventId, name) ||
+                (ctx.ansMap[name]?.attend || "");
+            let cls = "stat-na", label = "未回答";
+            if (current === "参加") cls = "stat-ok", label = "参加";
+            else if (current === "欠席") cls = "stat-ng", label = "欠席";
+            else if (current === "未定") cls = "stat-pd", label = "未定";
+            return `<span class="pill sm ${cls}">${h(name)}:${label}</span>`;
         }).join(" ");
 
-        // セレクト（初回だけplaceholderを出す）
-        const rows = performers.map(name=>{
-        const current = draftGetAttend(ev.eventId, name) || (ctx.ansMap[name]?.attend || "");
-        const placeholderOpt = (current === "")
-            ? `<option value="" disabled hidden selected>（選択してください）</option>` : "";
-        return `
-            <div class="row-att" style="border-top:1px dashed var(--c-border); padding-top:8px; margin-top:8px;">
-            <span class="nameLabel">${h(name)}</span>
-            <select class="attSel selectBtn"
-                    data-event="${ev.eventId}"
-                    data-name="${name}">
-                ${placeholderOpt}
-                <option value="参加" ${current==="参加"?"selected":""}>参加</option>
-                <option value="欠席" ${current==="欠席"?"selected":""}>欠席</option>
-                <option value="未定" ${current==="未定"?"selected":""}>未定</option>
-            </select>
-            </div>
-        `;
+        // セレクト or 読み取り専用行
+        const rows = performers.map(name => {
+            const current =
+                draftGetAttend(ev.eventId, name) ||
+                (ctx.ansMap[name]?.attend || "");
+            const placeholderOpt =
+                current === ""
+                    ? `<option value="" disabled hidden selected>（選択してください）</option>`
+                    : "";
+
+            if (readOnly) {
+                // ★ 閲覧専用：ラベルだけ表示
+                const label =
+                    current === "参加" ? "参加" :
+                    current === "欠席" ? "欠席" :
+                    current === "未定" ? "未定" : "未回答";
+
+                return `
+                    <div class="row-att row-att-readonly"
+                        style="border-top:1px dashed var(--c-border); padding-top:8px; margin-top:8px;">
+                        <span class="nameLabel">${h(name)}</span>
+                        <span class="attLabel">${label}</span>
+                    </div>
+                `;
+            }
+
+            // 通常モード：select
+            return `
+                <div class="row-att"
+                    style="border-top:1px dashed var(--c-border); padding-top:8px; margin-top:8px;">
+                    <span class="nameLabel">${h(name)}</span>
+                    <select class="attSel selectBtn"
+                            data-event="${ev.eventId}"
+                            data-name="${name}">
+                        ${placeholderOpt}
+                        <option value="参加" ${current==="参加"?"selected":""}>参加</option>
+                        <option value="欠席" ${current==="欠席"?"selected":""}>欠席</option>
+                        <option value="未定" ${current==="未定"?"selected":""}>未定</option>
+                    </select>
+                </div>
+            `;
         }).join("");
 
         const initComment = draftGetComment(ev.eventId)
-        || ((ctx.ansList||[]).find(x => (x.comment||"").trim())?.comment || "");
-        const titleAttr = `${titleStr}${place ? ` @ ${place}` : ''}`;
+            || ((ctx.ansList || []).find(x => (x.comment || "").trim())?.comment || "");
+
+        const commentPart = readOnly
+            ? `
+                <div class="line"></div>
+                <div class="commentReadOnly">
+                    コメント：
+                    ${
+                        initComment
+                            ? `<span class="commentText">${h(initComment)}</span>`
+                            : `<span class="muted">（コメントなし）</span>`
+                    }
+                </div>
+            `
+            : `
+                <div class="line"></div>
+                <label>コメント（任意・100文字まで）</label>
+                <input type="text"
+                    maxlength="100"
+                    class="evComment"
+                    data-event="${ev.eventId}"
+                    value="${h(initComment)}">
+            `;
 
         return `
-        <div class="fEvent" data-evt="${ev.eventId}" data-seg="${evSegNorm || 'both'}">
-            <div class="fHead">
-            <div class="fTitle">
-                <!-- 1行目：日付 時間 ／ 右端=区分バッジ -->
-                <div class="fRow1" title="${dateDisp} ${timeDisp}">
-                <span class="t-date">${dateDisp}${timeDisp ? ` <small>${timeDisp}</small>` : ``}</span>
-                ${hasUnsaved ? `<span class="badge-unsaved" style="margin-left:8px;">未保存</span>` : ``}
-                ${segBadgeLabel ? `<span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span>` : ``}
+            <div class="fEvent ${readOnly ? "readonly" : ""}"
+                data-evt="${ev.eventId}"
+                data-seg="${evSegNorm || "both"}">
+                <div class="fHead">
+                    <!-- 1行目：日付・時間・区分バッジなど -->
+                    <div class="fTitle">
+                        <div class="fRow1" title="${dateDisp} ${timeDisp}">
+                            <span class="t-date">
+                                ${dateDisp}${timeDisp ? ` <small>${timeDisp}</small>` : ``}
+                            </span>
+                            ${hasUnsaved ? `<span class="badge-unsaved" style="margin-left:8px;">未保存</span>` : ``}
+                            ${segBadgeLabel ? `<span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span>` : ``}
+                            ${readOnly ? `<span class="badge-closed">締切済み</span>` : ``}
+                        </div>
+
+                        <!-- 2行目：タイトル ＠場所 -->
+                        <div class="fRow2" title="${h(titleAttr)}">
+                            <span class="t-title">${h(titleStr || "（無題）")}</span>
+                            ${place ? `<span class="t-place">@ ${h(place)}</span>` : ``}
+                        </div>
+                    </div>
+
+                    <!-- 回答チップ行 -->
+                    <div class="fStatusRow">${pills}</div>
+
+                    <!-- 締切表示 -->
+                    <div class="fSub">${deadlineLabel}</div>
                 </div>
-    
-                <!-- 2行目：タイトル ＠場所 -->
-                <div class="fRow2" title="${h(titleAttr)}">
-                    <span class="t-title">${h(titleStr || '（無題）')}</span>
-                    ${place ? `<span class="t-place">@ ${h(place)}</span>` : ``}
+
+                <div class="fBody">
+                    ${rows}
+                    ${commentPart}
                 </div>
             </div>
-    
-            <!-- 回答チップ行 -->
-            <div class="fStatusRow">${pills}</div>
-    
-            <!-- ★ ここを修正：締切もフォーマット済みを使用 -->
-            <div class="fSub">締切：${deadlineDisp || "—"}</div>
-            </div>
-    
-            <div class="fBody">
-            ${rows}
-            <div class="line"></div>
-            <label>コメント（任意・100文字まで）</label>
-            <input type="text" maxlength="100" class="evComment" data-event="${ev.eventId}" value="${h(initComment)}">
-            </div>
-        </div>
         `;
     };
 
     // ===== 既存の buildFormView を置換（renderAttendEvent を使用） =====
     window.buildFormView = function(){
-        // ← 追加：このタイミングで “今あるイベント以外のドラフト” を掃除
         pruneDraftAgainstCurrentEvents();
-        const boxHeader = $("#formEventsBox");
-        const box = $("#formFields");
-        box.innerHTML = "";
-        boxHeader.innerHTML = `
-        <span class="muted">
-            イベントをタップして出欠を入力後、
-            <span class="em-red">送信ボタンを押してください。</span>
-        </span>`;
 
-        const eventsForForm = state._filteredEventsForViews || [];
-        if (!eventsForForm.length){
-        box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
-        updateSubmitButton();
-        return;
+        const boxHeader = $("#formEventsBox");
+        const box       = $("#formFields");
+        box.innerHTML   = "";
+
+        boxHeader.innerHTML = `
+            <span class="muted">
+                イベントをタップして出欠を入力後、
+                <span class="em-red">送信ボタンを押してください。</span>
+            </span>`;
+
+        // ★ ここで「フォーム対象イベント」を取得
+        const allEvents = state._filteredEventsForViews || [];
+
+        // ★ 受付中 / 締切済み に分割
+        const { editableEvents, readonlyEvents } = splitEventsForForm(allEvents);
+
+        if (!editableEvents.length && !readonlyEvents.length){
+            box.innerHTML = `<div class="muted">現在、あなたの区分向けの公演はありません</div>`;
+            updateSubmitButton();
+            return;
         }
 
-        const nameSegMap = buildNameSegMap();
-        const uniqueNamesAll = Array.from(new Set((state.members||[]).map(m => m.performerName))).filter(Boolean);
-        const userSegSet = getMemberSegSet();
+        const nameSegMap     = buildNameSegMap();
+        const uniqueNamesAll = Array.from(
+            new Set((state.members || []).map(m => m.performerName))
+        ).filter(Boolean);
+        const userSegSet     = getMemberSegSet();
 
-        // まとめてレンダリング（HTML組み立て）
-        const html = eventsForForm.map(e=>{
-        const ansList = state.answers[e.eventId] || [];
-        const ansMap  = {}; ansList.forEach(r => ansMap[r.performerName] = r);
-        return window.renderAttendEvent({
-            eventId : e.eventId,
-            date    : e.date,
-            time    : e.time,
-            place   : e.place || "",
-            deadline: e.deadline || "",
-            segment : e.segment || e.targetSegment || e.attendSegment || "",
-            title   : e.title || e.eventTitle || e.name || e.eventName || ""
-        }, {
-            uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet
-        });
+        // ① 編集可能なイベント
+        const editableHtml = editableEvents.map(e => {
+            const ansList = state.answers[e.eventId] || [];
+            const ansMap  = {}; ansList.forEach(r => ansMap[r.performerName] = r);
+
+            return window.renderAttendEvent({
+                eventId : e.eventId,
+                date    : e.date,
+                time    : e.time,
+                place   : e.place || "",
+                deadline: e.deadline || "",
+                segment : e.segment || e.targetSegment || e.attendSegment || "",
+                title   : e.title || e.eventTitle || e.name || e.eventName || "",
+                readOnly: false,
+            }, {
+                uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet,
+            });
         }).join("");
+
+        // ② 閲覧専用イベント（締切済みなど）
+        const readonlyHtml = readonlyEvents.map(e => {
+            const ansList = state.answers[e.eventId] || [];
+            const ansMap  = {}; ansList.forEach(r => ansMap[r.performerName] = r);
+
+            return window.renderAttendEvent({
+                eventId : e.eventId,
+                date    : e.date,
+                time    : e.time,
+                place   : e.place || "",
+                deadline: e.deadline || "",
+                segment : e.segment || e.targetSegment || e.attendSegment || "",
+                title   : e.title || e.eventTitle || e.name || e.eventName || "",
+                readOnly: true,   // ★ここだけ true
+            }, {
+                uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet,
+            });
+        }).join("");
+
+        let html = "";
+        html += editableHtml;
+
+        if (readonlyHtml) {
+            html += `
+                <div class="formSectionTitle" style="margin-top:16px; margin-bottom:4px;">
+                    締切済み（内容の確認のみ）
+                </div>
+                <div class="muted" style="font-size:12px; margin-bottom:8px;">
+                    ※締切後に予定が変わる場合は、必ず運営まで個別にご連絡ください。
+                </div>
+            `;
+            html += readonlyHtml;
+        }
 
         box.innerHTML = html;
 
         // アコーディオン開閉
-        box.querySelectorAll(".fEvent .fHead").forEach(h=>{
-        h.addEventListener("click", () => h.closest(".fEvent")?.classList.toggle("open"));
+        box.querySelectorAll(".fEvent .fHead").forEach(h => {
+            h.addEventListener("click", () =>
+                h.closest(".fEvent")?.classList.toggle("open")
+            );
         });
 
-        // ★ 入力監視（change/input）は一度だけバインド
+        // change / input ハンドラはそのままでOK
         if (!box.__bound) {
             box.__bound = true;
 
-            box.addEventListener("change", (ev)=>{
-            const sel = ev.target.closest("select.attSel");
-            if (!sel) return;
-            const eid  = sel.dataset.event;
-            const name = sel.dataset.name;
-            const val  = sel.value;
-            draftSetAttend(eid, name, val || "");
-            markUnsavedBadge(eid);
-            updateSubmitButton();
+            box.addEventListener("change", (ev) => {
+                const sel = ev.target.closest("select.attSel");
+                if (!sel) return;
+                const eid  = sel.dataset.event;
+                const name = sel.dataset.name;
+                const val  = sel.value;
+                draftSetAttend(eid, name, val || "");
+                markUnsavedBadge(eid);
+                updateSubmitButton();
             });
 
-            box.addEventListener("input", (ev)=>{
-            const c = ev.target.closest("input.evComment");
-            if (!c) return;
-            const eid = c.dataset.event;
-            draftSetComment(eid, c.value);
-            markUnsavedBadge(eid);
-            updateSubmitButton();
+            box.addEventListener("input", (ev) => {
+                const c = ev.target.closest("input.evComment");
+                if (!c) return;
+                const eid = c.dataset.event;
+                draftSetComment(eid, c.value);
+                markUnsavedBadge(eid);
+                updateSubmitButton();
             });
         }
 
         updateSubmitButton();
-        };
-    })();
+    };
 
     /* ===== 出欠送信（ドラフト一括送信） ===== */
     async function onSubmit(){
@@ -5000,6 +5123,31 @@
             // ★ 送信処理が終わったら必ず OFF
             toggleSubmitOverlay(false);
         }
+    }
+
+    // ★ 出欠フォーム用のイベントを
+    //   - 編集可能（受付中）
+    //   - 閲覧専用（受付終了）
+    //   に分けるヘルパー（state は書き換えない）
+    function splitEventsForForm(allEvents){
+        const editableEvents = [];
+        const readonlyEvents = [];
+
+        (allEvents || []).forEach(ev => {
+            const accepting =
+                ev.accepting === true ||
+                ev.accepting === "open" ||
+                ev.formOpen === "open" ||
+                ev.status === "open";
+
+            if (accepting) {
+                editableEvents.push(ev);
+            } else {
+                readonlyEvents.push(ev);
+            }
+        });
+
+        return { editableEvents, readonlyEvents };
     }
 
 /* ===== 初回登録 ===== */
