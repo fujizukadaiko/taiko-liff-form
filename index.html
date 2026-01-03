@@ -4441,13 +4441,13 @@
 
             let whoami;
             if (perfRows.length === 0) {
-            whoami = {
-                status: "new",
-                members: [],
-                notify: true,
-                viewerOnly: true,
-                inputName: "",                     // ★ 追加
-            };
+                whoami = {
+                    status: "new",
+                    members: [],
+                    notify: true,
+                    viewerOnly: false,   // ★ 初回は viewerOnly=false にする
+                    inputName: "",
+                };
             } else {
             const members = perfRows
                 .map(r => ({
@@ -4597,7 +4597,7 @@
                         }
                     } else if (home.whoami && home.whoami.status === "new") {
                         state.members    = [];
-                        state.viewerOnly = true;
+                        state.viewerOnly = false;
 
                         // ★ new のときは「初回なのでチェックなし」に寄せる
                         state.notify     = normalizeNotifyFlag(undefined);
