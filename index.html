@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.8.8";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.8.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzfYptMZnqtMvXPIKSwTj6NtzIU1pLF1I5rKo3s9pLhl5ta7v0r_GB9rgvYoeecTBwxuA/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -2411,6 +2411,13 @@
             </div>
 
             <div id="regLog" class="muted" style="margin-top:8px;"></div>
+
+            <div id="regOverlay" class="overlay submitting-overlay" style="display:none;">
+                <div class="overlay-inner">
+                <div class="spinner"></div>
+                <div class="overlay-text">保存中です…</div>
+                </div>
+            </div>
         </section>
 
     <!-- ===== View: 今後の予定一覧 ===== -->
@@ -3953,6 +3960,13 @@
         const ov = document.getElementById('adminSavingOverlay');
         if (ov) ov.style.display = 'none';
         }
+
+  // ★ 登録画面用：保存中オーバーレイ ON/OFF
+        function toggleRegOverlay(show) {
+            const ov = document.getElementById("regOverlay");
+            if (!ov) return;
+            ov.style.display = show ? "flex" : "none"; // 出欠フォームの overlay に揃える
+        }
 /* ===== API ===== */
     async function api(path, { signal } = {}) {
     const url = API_ENDPOINT + path;
@@ -5440,6 +5454,8 @@
             $("#btnRegister").textContent =
             (registerMode==="edit" ? "保存中…" : "登録中…");
 
+            toggleRegOverlay(true);
+
             const listJson = JSON.stringify(items);
 
             let url = "";
@@ -5481,6 +5497,7 @@
         }catch(err){
             logReg(err.message || String(err));
         }finally{
+            toggleRegOverlay(false);
             $("#btnRegister").disabled = false;
             $("#btnRegister").textContent =
             (registerMode==="edit" ? "保存" : "登録する");
