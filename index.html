@@ -4964,27 +4964,25 @@
 
         if (readonlyHtml) {
             html += `
-                <div id="formReadonlyDivider"
+                <div id="formReadonlyHeader"
                     style="
-                    margin:16px 0 8px;
-                    border-top:1px dashed var(--c-border-soft);
-                    "
-                ></div>
-
-                <div id="formReadonlyHeader">
-                <div class="formSectionTitle" style="margin-top:4px; margin-bottom:4px;">
-                    締切済み（内容の確認のみ）
-                </div>
-                <div class="muted" style="font-size:12px; margin-bottom:8px;">
-                    ※締切後に予定が変わる場合は、必ず運営まで個別にご連絡ください。
-                </div>
+                        margin-top:16px;
+                        padding-top:8px;
+                        border-top:1px dashed var(--c-border-soft);
+                    ">
+                    <div class="formSectionTitle" style="margin-top:4px; margin-bottom:4px;">
+                        締切済み（内容の確認のみ）
+                    </div>
+                    <div class="muted" style="font-size:12px; margin-bottom:8px;">
+                        ※締切後に予定が変わる場合は、必ず運営まで個別にご連絡ください。
+                    </div>
                 </div>
 
                 <div id="formReadonlyBlock">
-                ${readonlyHtml}
+                    ${readonlyHtml}
                 </div>
             `;
-            }
+        }
 
         box.innerHTML = html;
 
@@ -4992,20 +4990,19 @@
         btnTemplate = document.getElementById("btnSubmitTemplate");
 
         if (btnTemplate) {
-        // テンプレからクローンを作成してフォーム内に配置
-        const newBtn = btnTemplate.cloneNode(true);
-        newBtn.id = "btnSubmit";   // onSubmit から参照される id
-        newBtn.style.display = ""; // 表示する
+            const newBtn = btnTemplate.cloneNode(true);
+            newBtn.id = "btnSubmit";
+            newBtn.style.display = "";
 
-        const divider = document.getElementById("formReadonlyDivider");
+            // 締切済みヘッダの「直前」にボタンを差し込む
+            const readonlyHeader = document.getElementById("formReadonlyHeader");
 
-        if (divider && divider.parentNode) {
-            // 区切り線の「直前」にボタンを挿入
-            divider.parentNode.insertBefore(newBtn, divider);
-        } else {
-            // 締切済みイベントがない場合は、フォームの一番下へ
-            box.appendChild(newBtn);
-        }
+            if (readonlyHeader && readonlyHeader.parentNode) {
+                readonlyHeader.parentNode.insertBefore(newBtn, readonlyHeader);
+            } else {
+                // 締切済みイベントがない場合は、フォームの一番下へ
+                box.appendChild(newBtn);
+            }
         }
         // ★ ここまで ------------------------------------------
 
