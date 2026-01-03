@@ -4881,7 +4881,19 @@
 
         const boxHeader = $("#formEventsBox");
         const box       = $("#formFields");
-        box.innerHTML   = "";
+
+        // ★ 送信ボタンのテンプレートを確保（初回だけ id を差し替えて隠す）
+        let btnTemplate = document.getElementById("btnSubmitTemplate");
+        if (!btnTemplate) {
+            const original = document.getElementById("btnSubmit");
+            if (original) {
+                original.id = "btnSubmitTemplate";  // テンプレ用 id
+                original.style.display = "none";    // 画面には出さない
+                btnTemplate = original;
+            }
+        }
+
+        box.innerHTML = "";
 
         boxHeader.innerHTML = `
             <span class="muted">
@@ -4939,7 +4951,7 @@
                 deadline: e.deadline || "",
                 segment : e.segment || e.targetSegment || e.attendSegment || "",
                 title   : e.title || e.eventTitle || e.name || e.eventName || "",
-                readOnly: true,   // ★ここだけ true
+                readOnly: true,
             }, {
                 uniqueNamesAll, ansMap, ansList, nameSegMap, userSegSet,
             });
@@ -4951,39 +4963,47 @@
         html += `<div id="formEditableBlock">${editableHtml}</div>`;
 
         if (readonlyHtml) {
-        // 締切済みヘッダ（区切り線＋タイトル＋注意書き）
-        html += `
-            <div id="formReadonlyHeader">
-            <div class="formSectionDivider"
-                style="margin:16px 0 8px; border-top:1px dashed var(--c-border-soft);"></div>
-            <div class="formSectionTitle" style="margin-top:4px; margin-bottom:4px;">
-                締切済み（内容の確認のみ）
-            </div>
-            <div class="muted" style="font-size:12px; margin-bottom:8px;">
-                ※締切後に予定が変わる場合は、必ず運営まで個別にご連絡ください。
-            </div>
-            </div>
-            <div id="formReadonlyBlock">
-            ${readonlyHtml}
-            </div>
-        `;
+            // ★ 区切り線＆ヘッダ
+            html += `
+                <div class="formSectionDivider"
+                     style="margin:16px 0 8px; border-top:1px dashed var(--c-border-soft);"></div>
+
+                <div id="formReadonlyHeader">
+                    <div class="formSectionTitle" style="margin-top:4px; margin-bottom:4px;">
+                        締切済み（内容の確認のみ）
+                    </div>
+                    <div class="muted" style="font-size:12px; margin-bottom:8px;">
+                        ※締切後に予定が変わる場合は、必ず運営まで個別にご連絡ください。
+                    </div>
+                </div>
+
+                <div id="formReadonlyBlock">
+                    ${readonlyHtml}
+                </div>
+            `;
         }
 
-            box.innerHTML = html;
+        box.innerHTML = html;
 
-            // ★ ここからボタンの位置調整 --------------------------
-            const btnSubmit = $("#btnSubmit");
-            const readonlyHeader = $("#formReadonlyHeader");
+        // ★ ここから送信ボタンの配置 --------------------------
+        const readonlyHeader = $("#formReadonlyHeader");
+        btnTemplate = document.getElementById("btnSubmitTemplate");
 
-            if (btnSubmit) {
+        if (btnTemplate) {
+            // テンプレからクローンを作成してフォーム内に配置
+            const newBtn = btnTemplate.cloneNode(true);
+            newBtn.id = "btnSubmit";         // onSubmit から参照される id
+            newBtn.style.display = "";       // 表示する
+
             if (readonlyHeader && readonlyHeader.parentNode) {
-                // 締切済みヘッダの「直前」にボタンを移動
-                readonlyHeader.parentNode.insertBefore(btnSubmit, readonlyHeader);
+                // 締切済みヘッダの「直前」にボタンを挿入
+                readonlyHeader.parentNode.insertBefore(newBtn, readonlyHeader);
             } else {
-                // 締切済みイベントがない場合は、フォームの一番下に置く
-                box.appendChild(btnSubmit);
+                // 締切済みイベントがない場合は、フォームの一番下へ
+                box.appendChild(newBtn);
             }
-            }
+        }
+        // ★ ここまで ------------------------------------------
 
         // アコーディオン開閉
         box.querySelectorAll(".fEvent .fHead").forEach(h => {
