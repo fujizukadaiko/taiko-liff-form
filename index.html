@@ -5133,12 +5133,57 @@
         const editableEvents = [];
         const readonlyEvents = [];
 
+        // 今日（JST）を "YYYYMMDD" で用意
+        const now = new Date();
+        const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+        const y   = jst.getFullYear();
+        const m   = String(jst.getMonth() + 1).padStart(2, "0");
+        const d   = String(jst.getDate()).padStart(2, "0");
+        const todayYmd = `${y}${m}${d}`;
+
         (allEvents || []).forEach(ev => {
-            const accepting =
-                ev.accepting === true ||
-                ev.accepting === "open" ||
-                ev.formOpen === "open" ||
-                ev.status === "open";
+            // 1) まずは既存フラグを優先して解釈
+            const rawFlag = String(
+                ev.accepting ??
+                ev.formOpen ??
+                ev.status ??
+                ""
+            ).toLowerCase();
+
+            let accepting; // true = 受付中, false = 締切, undefined = 不明
+
+            if (rawFlag === "open" || rawFlag === "true" || rawFlag === "y") {
+                accepting = true;
+            } else if (
+                rawFlag === "closed" ||
+                rawFlag === "close"  ||
+                rawFlag === "false" ||
+                rawFlag === "n"
+            ) {
+                accepting = false;
+            }
+
+            // 2) フラグで判定できなかったときは締切日で判定
+            if (typeof accepting === "undefined") {
+                const rawDeadline =
+                    ev.deadline ||
+                    ev.limit ||
+                    ev.deadlineYmd ||
+                    "";
+
+                const digits = String(rawDeadline || "").replace(/[^0-9]/g, "");
+
+                if (digits.length === 8) {
+                    // 例: 2026-01-11 → 20260111
+                    // 締切日 < 今日 なら「締切済み」
+                    const dlYmd = digits;
+                    const isClosedByDeadline = dlYmd < todayYmd;
+                    accepting = !isClosedByDeadline;
+                } else {
+                    // 締切日が取れない場合は「受付中」とみなす（従来挙動に近い）
+                    accepting = true;
+                }
+            }
 
             if (accepting) {
                 editableEvents.push(ev);
