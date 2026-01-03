@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.7.9";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.8.0";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwNTWBTt8r2mu6OOKMk3gvr3qEhnggObeWZakA-ifjLRdVCVVcY-gl0R7O1bvgEk1dcZg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -5375,36 +5375,38 @@
             const inputName = $("#regInputName").value.trim();
             if (!inputName) throw new Error("入力者氏名を入力してください");
 
-            // ★ チェックボックスは「閲覧専用モード」
-            const viewerOnlyFlag = !!$("#regNotify")?.checked;
+            // ★ チェックあり＝閲覧者モード
+            const viewerOnly = !!$("#regNotify")?.checked;
+            // 閲覧者は通知 OFF
+            const notify = !viewerOnly;
 
             // {name, segment} の配列（空文字は除外）
-            const items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
+            let items = Array.from(document.querySelectorAll(".perfRow")).map(row=>{
             const name = row.querySelector(".regPerf")?.value.trim();
             const seg  = row.querySelector(".regPerfSeg")?.value || "子どもの部";
             return name ? { name, segment: seg } : null;
             }).filter(Boolean);
 
-            // ★ 閲覧専用モードの定義
-            //   → チェックあり かつ 演奏者0人 のときだけ viewerOnly にする
-            const isViewerOnly = viewerOnlyFlag && items.length === 0;
+            // 閲覧者モードのときは、演奏者は 0 件前提にする
+            if (viewerOnly && items.length > 0){
+            throw new Error("閲覧のみの場合は演奏者を入力しないでください");
+            // もし「勝手に全部捨てて閲覧者にする」で良ければ↓でもOK
+            // items = [];
+            }
 
-            // ★ 通知フラグ
-            //   閲覧者 → 通知しない
-            //   それ以外 → 通知する
-            const notify = !isViewerOnly;
-
-            // 閲覧のみ：演奏者0件 かつ 閲覧者モード ON
-            if (!isViewerOnly && items.length === 0){
-            // 普通の人なのに演奏者0人 → これまで通りエラー
+            // 通常モードなのに演奏者 0 件は NG
+            if (!viewerOnly && items.length === 0){
             throw new Error("演奏者を1名以上入力してください");
             }
 
+            const isViewerOnly = viewerOnly;
+
             $("#btnRegister").disabled = true;
-            $("#btnRegister").textContent = (registerMode==="edit" ? "保存中…" : "登録中…");
+            $("#btnRegister").textContent =
+            (registerMode==="edit" ? "保存中…" : "登録中…");
 
             const listJson = JSON.stringify(items);
-            
+
             let url = "";
             if (registerMode === "edit") {
             url = `${API_ENDPOINT}?replaceMembers=1`
@@ -5412,8 +5414,8 @@
                 + `&inputName=${esc(inputName)}`
                 + `&list2=${esc(listJson)}`
                 + `&purge=0`
-                + `&notify=${notify?1:0}`
-                + `&viewerOnly=${isViewerOnly?1:0}`;
+                + `&notify=${notify?1:0}`          // ← notify はチェック反転後の値
+                + `&viewerOnly=${isViewerOnly?1:0}`; // ← チェック状態そのもの
             } else {
             url = `${API_ENDPOINT}?registerBulk=1`
                 + `&lineId=${esc(state.lineId)}`
@@ -5433,7 +5435,7 @@
             alert(
             registerMode==="edit"
                 ? "氏名を保存しました"
-                : (isViewerOnly ? "閲覧者として登録しました" : "初回登録が完了しました")
+                : (viewerOnly ? "閲覧者として登録しました" : "初回登録が完了しました")
             );
 
             show("#view-home");
@@ -5445,7 +5447,8 @@
             logReg(err.message || String(err));
         }finally{
             $("#btnRegister").disabled = false;
-            $("#btnRegister").textContent = (registerMode==="edit" ? "保存" : "登録する");
+            $("#btnRegister").textContent =
+            (registerMode==="edit" ? "保存" : "登録する");
         }
     }
 /* ===== 今後の予定（Schedules） v5 ===== */
