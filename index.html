@@ -7296,63 +7296,64 @@
 
         // === 受付状態（ヘッダ右側の「受付中 / 締切」バッジ）を決定 ===
 
-            // 今日（JST）を YYYYMMDD で用意
-            const now = new Date();
-            const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-            const ty  = jst.getFullYear();
-            const tm  = String(jst.getMonth() + 1).padStart(2, "0");
-            const td  = String(jst.getDate()).padStart(2, "0");
-            const todayYmd = `${ty}${tm}${td}`;
+        // 今日（JST）を YYYYMMDD で用意
+        const now = new Date();
+        const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+        const ty  = jst.getFullYear();
+        const tm  = String(jst.getMonth() + 1).padStart(2, "0");
+        const td  = String(jst.getDate()).padStart(2, "0");
+        const todayYmd = `${ty}${tm}${td}`;
 
-            // 1) payload 内から締切日っぽい値を探す
-            let rawDeadline =
-            payload.deadline ||
-            payload.limit ||
-            payload.deadlineYmd ||
-            payload.deadline_date ||
-            (payload.event && (
-                payload.event.deadline ||
-                payload.event.deadlineYmd ||
-                payload.event.deadline_date
-            )) ||
-            "";
+        // 1) payload 内から締切日っぽい値を探す
+        let rawDeadline =
+        payload.deadline ||
+        payload.limit ||
+        payload.deadlineYmd ||
+        payload.deadline_date ||
+        (payload.event && (
+            payload.event.deadline ||
+            payload.event.deadlineYmd ||
+            payload.event.deadline_date
+        )) ||
+        "";
 
-            // 2) それでも無ければ、さっき loadMeta で作った一覧から拾う
-            if (!rawDeadline && Array.isArray(state.reportMeta) && id) {
-            const metaHit = state.reportMeta.find(e => String(e.id) === String(id));
-            if (metaHit && metaHit.deadlineYmd) {
-                rawDeadline = metaHit.deadlineYmd;
+        // 2) digitsが足りないときだけ meta から補完
+        let digits = String(rawDeadline || "").replace(/[^0-9]/g, "");
+        if (digits.length < 8 && Array.isArray(state.reportMeta) && id) {
+        const metaHit = state.reportMeta.find(e => String(e.id) === String(id));
+        if (metaHit && metaHit.deadlineYmd) {
+            const metaDigits = String(metaHit.deadlineYmd || "").replace(/[^0-9]/g, "");
+            if (metaDigits.length >= 8) {
+            digits = metaDigits;
             }
-            }
+        }
+        }
 
-            // 3) 締切日文字列を数値比較用 YYYYMMDD に正規化
-            let open;
-            const digits = String(rawDeadline || "").replace(/[^0-9]/g, "");
-            if (digits.length === 8) {
-            // ex. "2025-12-31" → "20251231"
-            const dlYmd = digits;
-            // 締切日 < 今日 → 締切扱い
-            const isClosedByDeadline = dlYmd < todayYmd;
-            open = !isClosedByDeadline;
-            } else {
-            // 4) 締切日が取れない場合だけ、従来通り accepting / status を見る
-            if (typeof payload.accepting !== "undefined") {
-                const v = String(payload.accepting).toLowerCase();
-                open = !(
-                v === "closed" ||
-                v === "close"  ||
-                v === "false"  ||
-                v === "n"
-                );
-            } else {
-                const flag =
-                payload.isOpen ??
-                payload.open ??
-                (payload.status &&
-                    String(payload.status).toLowerCase() === "open");
-                open = !!flag;
-            }
-            }
+        let open;
+        if (digits.length >= 8) {
+        // 3) 先頭8桁だけ YYYYMMDD として使う
+        const dlYmd = digits.slice(0, 8);
+        const isClosedByDeadline = dlYmd < todayYmd;
+        open = !isClosedByDeadline;
+        } else {
+        // 4) それでも締切日が取れないときだけ accepting / status を見る
+        if (typeof payload.accepting !== "undefined") {
+            const v = String(payload.accepting).toLowerCase();
+            open = !(
+            v === "closed" ||
+            v === "close"  ||
+            v === "false"  ||
+            v === "n"
+            );
+        } else {
+            const flag =
+            payload.isOpen ??
+            payload.open ??
+            (payload.status &&
+                String(payload.status).toLowerCase() === "open");
+            open = !!flag;
+        }
+        }
 
         // ★ここからヘッダーHTML
         const head = `
