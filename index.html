@@ -4804,20 +4804,25 @@
                     data-evt="${ev.eventId}"
                     data-seg="${evSegNorm || "both"}">
                     <div class="fHead">
-                        <!-- 折りたたみ時：日付・時間・場所＋バッジ（できるだけ細く） -->
                         <div class="fRow1" title="${dateDisp} ${timeDisp}">
                             <span class="t-date">
                                 ${dateDisp}${timeDisp ? ` <small>${timeDisp}</small>` : ``}
                             </span>
-                            ${place ? `<span class="t-place-inline">　@ ${h(place)}</span>` : ``}
+                            ${
+                                place
+                                    ? `<span class="t-place-inline" style="font-size:12px; opacity:0.8;">
+                                        ＠ ${h(place)}
+                                    </span>`
+                                    : ``
+                            }
                             ${segBadgeLabel ? `<span class="seg-badge ${segBadgeCls}">${segBadgeLabel}</span>` : ``}
-                            <span class="badge-closed">締切済み</span>
+                            <!-- ← ここにあった「締切済み」バッジは削除 -->
                         </div>
                         <!-- 出欠バッジ -->
                         <div class="fStatusRow">${pills}</div>
                     </div>
 
-                    <!-- 展開時の中身 -->
+                    <!-- 展開時の中身は今のままでOK -->
                     <div class="fBody">
                         <div class="fRow2" title="${h(titleAttr)}" style="margin-bottom:4px;">
                             <span class="t-title">${h(titleStr || "（無題）")}</span>
