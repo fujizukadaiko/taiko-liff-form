@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v5.6.3";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v5.6.4";  // stable ver→v4.7.1, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwjsIiFQHfDvyQzWOf-IzFiuTk3IfJDl2ic8O0OXDa4o2_UJGVIwpkqSRaQ92tUNPpJ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1256,6 +1256,30 @@
         background: #fef2f2;
         border-color: #fecaca;
         }
+
+        .submitting-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        display: none;          /* JS で切り替え */
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        }
+
+        .submitting-overlay .overlay-inner {
+        background: #fff;
+        padding: 16px 24px;
+        border-radius: 12px;
+        min-width: 220px;
+        text-align: center;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        font-size: 14px;
+        }
+
+        .submitting-overlay .overlay-text {
+        margin-top: 8px;
+        }
     /* ===== Custom Push ===== */ 
         #view-custom-push .card{
         max-width: 720px;
@@ -2292,6 +2316,12 @@
             </div>
 
             <div id="formLog" class="muted" style="margin-top:8px;"></div>
+            <div id="submitOverlay" class="overlay submitting-overlay" style="display:none;">
+                <div class="overlay-inner">
+                    <div class="spinner"></div>
+                    <div class="overlay-text">送信中です…</div>
+                </div>
+            </div>
         </section>
 
     <!-- ===== View: 氏名登録・編集 ===== -->
@@ -4806,114 +4836,170 @@
 
     /* ===== 出欠送信（ドラフト一括送信） ===== */
     async function onSubmit(){
-    if (state.submitting) return;
-    state.submitting = true;
-    const btn = $("#btnSubmit");
-    const backBtn = $("#btnBackFromForm");
-    btn.disabled = true; btn.textContent = "送信中…"; logForm("");
-    if (backBtn) backBtn.disabled = true;
+        if (state.submitting) return;
+        state.submitting = true;
 
-    const navGuard = (e) => {
-        if (state.submitting) {
-        e.preventDefault();
-        e.returnValue = "";
-        }
-    };
-    window.addEventListener("beforeunload", navGuard);
+        const btn = $("#btnSubmit");
+        const backBtn = $("#btnBackFromForm");
 
-    try{
-        // ★ 念のためここでも古いドラフトは掃除
-        pruneDraftAgainstCurrentEvents();
-        
-        const payloads = draftBuildPayloads();
-        if (!payloads.length){ alert("送信する内容がありません（出欠の選択が未入力です）"); return; }
+        btn.disabled = true;
+        btn.textContent = "送信中…";
+        logForm("");
+        if (backBtn) backBtn.disabled = true;
 
-        // イベントIDでグループ化（＋コメント触ったかどうかを記録）
-        const grouped = {};
-        const eventCommentMap = {};          // eventId -> コメント文字列
-        const touchedEventSet = new Set();   // コメントを触った eventId
+        // ★ ここでオーバーレイ ON
+        toggleSubmitOverlay(true);
 
-        for (const p of payloads) {
-        if (!grouped[p.eventId]) grouped[p.eventId] = [];
-        grouped[p.eventId].push({ performerName: p.performerName, attend: p.attend });
-
-        if (Object.prototype.hasOwnProperty.call(p, '_eventComment')) {
-            // ★ コメントを「触った」イベントだけ拾う
-            eventCommentMap[p.eventId] = (p._eventComment || "");
-            touchedEventSet.add(p.eventId);
-        }
-        }
-        
-        // ★ 追加：集計用
-        let closedCleaned = [];   // 受付終了で掃除した eventId
-        let successCount  = 0;    // 正常送信できたイベント数
-        
-        // イベント単位で送信（merge=1 を付ける）
-        for (const [eventId, list] of Object.entries(grouped)) {
-        const eCom    = String(eventCommentMap[eventId] || "");
-        const touched = touchedEventSet.has(eventId);           // コメント欄を触ったイベントだけ送る
-        
-        const bulk = list.map((it, idx) => {
-            const row = { performerName: it.performerName, attend: it.attend };
-            if (touched && idx === 0) row.comment = eCom;         // 先頭レコードだけ comment キーを付与
-            return row;
-        });
-        
-        const url = `${API_ENDPOINT}?submitBulk=1`
-                    + `&eventId=${esc(eventId)}`
-                    + `&lineId=${esc(state.lineId)}`
-                    + `&merge=1`
-                    + `&bulk=${esc(JSON.stringify(bulk))}`;
-        
-        const r = await fetch(url);
-        const j = await r.json();
-        if (j.status !== "ok") {
-            // ★ ここで「受付終了」を検知して、そのイベントのドラフトだけ掃除して続行
-            const msg = String(j.message || j.error || "");
-            if (/受付.*終了|締切.*過ぎ|公開.*終了|closed/i.test(msg)) {
-            if (draft.byEvent && draft.byEvent[eventId]) {
-                delete draft.byEvent[eventId];
-                closedCleaned.push(String(eventId));
+        const navGuard = (e) => {
+            if (state.submitting) {
+            e.preventDefault();
+            e.returnValue = "";
             }
-            // 次のイベントへ（throwしない）
-            continue;
+        };
+        window.addEventListener("beforeunload", navGuard);
+
+        try{
+            // ★ 念のためここでも古いドラフトは掃除
+            pruneDraftAgainstCurrentEvents();
+            
+            let payloads = draftBuildPayloads();
+
+            // ★ 追加：コメントだけ変更されているケースを拾う
+            if (!payloads.length) {
+            const extra = [];
+            const draftByEvent = (draft && draft.byEvent) || {};
+
+            for (const [eventId, block] of Object.entries(draftByEvent)) {
+                const comment = String(block.comment || "").trim();
+                if (!comment) continue;  // コメントが空なら関係ない
+
+                // ① そのイベントの既存回答を探す
+                const ansList = (state.answers && state.answers[eventId]) || [];
+                let performerName = "";
+                let attend = "";
+
+                if (ansList.length) {
+                // 既に回答がある人を1人代表にする
+                const a0 = ansList[0];
+                performerName = a0.performerName || a0.name || "";
+                attend       = a0.attend || "未定";
+                } else {
+                // まだ誰も回答していない場合 → 自分の名簿から1人拾う
+                const m0 = (state.members || [])[0];
+                if (m0) {
+                    performerName = m0.performerName || m0.name || "";
+                    attend        = "未定";
+                }
+                }
+
+                if (!performerName) continue; // どう頑張っても名前が拾えなかったら諦める
+
+                extra.push({
+                eventId,
+                performerName,
+                attend,
+                _eventComment: comment,
+                });
             }
-            // それ以外の失敗は従来通りエラー扱い
-            throw new Error(`送信失敗（${eventId}）: ${j.message || "unknown"}`);
-        }
-        successCount++;
-        }
-        
-        if (closedCleaned.length){
-            draftSave();           // ← 削除の永続化
-            updateSubmitButton();  // ← 送信ボタンの活性/非活性を反映
-            logForm(`締切済みの未保存データ（${closedCleaned.length}件）を自動削除しました。`);
-        }
-        
-        // ★ 全件「受付終了」で送れなかった場合
-        if (successCount === 0){
-        alert("すべて受付終了のため送信できる内容がありませんでした。");
-        buildFormView(); // 表示を最新化
-        return;
-        }
 
-        alert("送信しました");
-        draftClear(); // ★ 送信成功で下書きを破棄
-        show("#view-home");
-        logHome("更新中…");
-        await refreshData();
-        logHome("");
+            if (!extra.length) {
+                alert("送信する内容がありません（出欠の選択やコメントの変更がありません）");
+                return;
+            }
 
-    }catch(err){
-        logForm(err.message || String(err));
-    } finally {
-        window.removeEventListener("beforeunload", navGuard);
-        state.submitting = false;
-        btn.disabled = false;
-        btn.textContent = "まとめて送信";
-        backBtn && (backBtn.disabled = false);
-        updateSubmitButton();
-    }
+            // これで comment だけでも payload が作られる
+            payloads = extra;
+            }
+
+            // イベントIDでグループ化（＋コメント触ったかどうかを記録）
+            const grouped = {};
+            const eventCommentMap = {};          // eventId -> コメント文字列
+            const touchedEventSet = new Set();   // コメントを触った eventId
+
+            for (const p of payloads) {
+            if (!grouped[p.eventId]) grouped[p.eventId] = [];
+            grouped[p.eventId].push({ performerName: p.performerName, attend: p.attend });
+
+            if (Object.prototype.hasOwnProperty.call(p, '_eventComment')) {
+                // ★ コメントを「触った」イベントだけ拾う
+                eventCommentMap[p.eventId] = (p._eventComment || "");
+                touchedEventSet.add(p.eventId);
+            }
+            }
+            
+            // ★ 追加：集計用
+            let closedCleaned = [];   // 受付終了で掃除した eventId
+            let successCount  = 0;    // 正常送信できたイベント数
+            
+            // イベント単位で送信（merge=1 を付ける）
+            for (const [eventId, list] of Object.entries(grouped)) {
+            const eCom    = String(eventCommentMap[eventId] || "");
+            const touched = touchedEventSet.has(eventId);           // コメント欄を触ったイベントだけ送る
+            
+            const bulk = list.map((it, idx) => {
+                const row = { performerName: it.performerName, attend: it.attend };
+                if (touched && idx === 0) row.comment = eCom;         // 先頭レコードだけ comment キーを付与
+                return row;
+            });
+            
+            const url = `${API_ENDPOINT}?submitBulk=1`
+                        + `&eventId=${esc(eventId)}`
+                        + `&lineId=${esc(state.lineId)}`
+                        + `&merge=1`
+                        + `&bulk=${esc(JSON.stringify(bulk))}`;
+            
+            const r = await fetch(url);
+            const j = await r.json();
+            if (j.status !== "ok") {
+                // ★ ここで「受付終了」を検知して、そのイベントのドラフトだけ掃除して続行
+                const msg = String(j.message || j.error || "");
+                if (/受付.*終了|締切.*過ぎ|公開.*終了|closed/i.test(msg)) {
+                if (draft.byEvent && draft.byEvent[eventId]) {
+                    delete draft.byEvent[eventId];
+                    closedCleaned.push(String(eventId));
+                }
+                // 次のイベントへ（throwしない）
+                continue;
+                }
+                // それ以外の失敗は従来通りエラー扱い
+                throw new Error(`送信失敗（${eventId}）: ${j.message || "unknown"}`);
+            }
+            successCount++;
+            }
+            
+            if (closedCleaned.length){
+                draftSave();           // ← 削除の永続化
+                updateSubmitButton();  // ← 送信ボタンの活性/非活性を反映
+                logForm(`締切済みの未保存データ（${closedCleaned.length}件）を自動削除しました。`);
+            }
+            
+            // ★ 全件「受付終了」で送れなかった場合
+            if (successCount === 0){
+            alert("すべて受付終了のため送信できる内容がありませんでした。");
+            buildFormView(); // 表示を最新化
+            return;
+            }
+
+            alert("送信しました");
+            draftClear(); // ★ 送信成功で下書きを破棄
+            show("#view-home");
+            logHome("更新中…");
+            await refreshData();
+            logHome("");
+
+        } catch(err) {
+            logForm(err.message || String(err));
+        } finally {
+            window.removeEventListener("beforeunload", navGuard);
+            state.submitting = false;
+            btn.disabled = false;
+            btn.textContent = "まとめて送信";
+            backBtn && (backBtn.disabled = false);
+            updateSubmitButton();
+
+            // ★ 送信処理が終わったら必ず OFF
+            toggleSubmitOverlay(false);
+        }
     }
 
 /* ===== 初回登録 ===== */
@@ -7036,7 +7122,11 @@
     if (el) el.textContent = s;
     }
 
-
+    function toggleSubmitOverlay(on) {
+    const el = document.getElementById("submitOverlay");
+    if (!el) return;
+    el.style.display = on ? "flex" : "none";
+    }
 
 /* ===== カスタム一斉通知：画面初期化 & イベント結線 ===== */
     (function(){
