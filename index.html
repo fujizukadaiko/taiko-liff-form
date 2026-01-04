@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.0.0";  // stable ver→v6.0.0, PROD v1.2.1 反映済み
+            const FRONT_VERSION = "Front v6.0.1";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3162,13 +3162,14 @@
     
         /* 状態 */
         const S = {
-        events: [],          // [{id, ymd, hm, place, deadline, isNew, segment}]
-        ansMap: {},          // { eventId: [{name, answer}] }
-        names : [],          // 登録演奏者
-        onlyNA: true,
-        nameSegMap: {}       // { [name]: 'adult'|'child' }
+            events: [],          // [{id, ymd, hm, place, deadline, isNew, segment}]
+            ansMap: {},          // { eventId: [{name, answer}] }
+            names : [],          // 登録演奏者
+            onlyNA: true,
+            nameSegMap: {},      // { [name]: 'adult'|'child' }
+            isViewer: false,     // ★ 閲覧者フラグ
         };
-    
+                
         /* 参照 */
         const E = {
         box : () => document.getElementById('eventsBox'),
@@ -3319,7 +3320,18 @@
         }
     
         function render(){
-            const box = E.box(); if (!box) return;
+            const box = E.box(); 
+            if (!box) return;
+
+            // ★ カードごと非表示にする
+            const card = box.closest(".card");
+            if (S.isViewer) {
+                if (card) card.style.display = "none";
+                return;                       // 以降の描画は行わない
+            } else {
+                // 管理者 / 通常メンバーでは表示しておく
+                if (card) card.style.display = "";
+            }
 
             // ★ ここで「締切を過ぎた公演」は除外する
             const activeEvents = (S.events || []).filter(ev => !isPastDeadline(ev));
@@ -3381,19 +3393,43 @@
     
         /* 公開API */
         const API = {
-        __v: 7,
-        mount({events = [], myAnswersMap = {}, performers = [], nameSegMap = {}} = {}){
-            S.events = Array.isArray(events) ? events : [];
-            S.ansMap = myAnswersMap || {};
-            S.names  = Array.isArray(performers) ? performers : [];
-            S.nameSegMap = nameSegMap || {};
-            const n = E.ckN(); if (n) S.onlyNA = !!n.checked;
-            render();
-        },
-        setEvents(e){ S.events = e || []; render(); },
-        setAnswers(a){ S.ansMap = a || {}; render(); },
-        setPerformers(arr){ S.names = Array.isArray(arr) ? arr : []; render(); },
-        render
+            __v: 7,
+            mount({
+                events = [],
+                myAnswersMap = {},
+                performers = [],
+                nameSegMap = {},
+                isViewer,          // ★ 追加
+            } = {}){
+                S.events    = Array.isArray(events) ? events : [];
+                S.ansMap    = myAnswersMap || {};
+                S.names     = Array.isArray(performers) ? performers : [];
+                S.nameSegMap = nameSegMap || {};
+
+                // ★ 閲覧者フラグの決定
+                if (typeof isViewer === "boolean") {
+                S.isViewer = isViewer;
+                } else {
+                // メンバーデータから判定（列名は実データに合わせて要調整）
+                const members =
+                    (window.state && Array.isArray(window.state.members))
+                    ? window.state.members
+                    : [];
+
+                S.isViewer = members.some(m => {
+                    const v = String(m.viewer || m.閲覧者 || "").trim().toUpperCase();
+                    return v === "Y";       // ← 「閲覧者」列に Y が入っている人
+                });
+                }
+
+                const n = E.ckN();
+                if (n) S.onlyNA = !!n.checked;
+                render();
+            },
+            setEvents(e){ S.events = e || []; render(); },
+            setAnswers(a){ S.ansMap = a || {}; render(); },
+            setPerformers(arr){ S.names = Array.isArray(arr) ? arr : []; render(); },
+            render
         };
         window.HomeEventsUI = API;
         window.renderEventsDense = API.mount;
