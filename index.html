@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.0.6";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v6.0.7";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3508,6 +3508,10 @@
         window.addEventListener('home:data', (e)=>{
             const d = e.detail || {};
 
+            console.log("[home] home:data keys =", Object.keys(d || {}));
+            console.log("[home] home:data sample schedules[0] =", d.schedules && d.schedules[0]);
+            console.log("[home] home:data sample allEvents[0] =", d.allEvents && d.allEvents[0]);
+
             // members が detail に乗ってくる場合はこちらから、
             // 無ければ state.members から
             const members =
@@ -3616,23 +3620,34 @@
             const today = new Date();
             today.setHours(0,0,0,0);
 
-           // ★ 発表だけでなく、全予定から取る
+            // ★ どこを使っているかログ
+            console.log("[home] viewerUpcoming: lengths", {
+                S_allEvents: Array.isArray(S.allEvents) ? S.allEvents.length : null,
+                globalSchedules: Array.isArray(window.__ALL_SCHEDULES__) ? window.__ALL_SCHEDULES__.length : null,
+                S_events: Array.isArray(S.events) ? S.events.length : null,
+            });
+
+            // ★ 発表だけでなく、全予定から取る
             const base =
-            (Array.isArray(S.allEvents) && S.allEvents.length)
-                ? S.allEvents
-                : (Array.isArray(window.__ALL_SCHEDULES__) && window.__ALL_SCHEDULES__.length)
-                ? window.__ALL_SCHEDULES__
-                : (S.events || []);
+                (Array.isArray(S.allEvents) && S.allEvents.length)
+                    ? S.allEvents
+                    : (Array.isArray(window.__ALL_SCHEDULES__) && window.__ALL_SCHEDULES__.length)
+                        ? window.__ALL_SCHEDULES__
+                        : (S.events || []);
+
+            console.log("[home] viewerUpcoming: base[0] sample =", base[0]);
 
             const upcoming = base
                 .map(ev => {
-                const dt = parseYmd(ev.ymd || ev.date);
-                return { ev, dt };
+                    const dt = parseYmd(ev.ymd || ev.date);
+                    return { ev, dt };
                 })
                 .filter(x => x.dt && x.dt >= today)
                 .sort((a,b) => a.dt - b.dt)
                 .slice(0,5)
                 .map(x => x.ev);
+
+            console.log("[home] viewerUpcoming: upcoming length =", upcoming.length);
 
             if (!upcoming.length){
                 box.innerHTML = '<div class="listEmpty">直近の予定はありません</div>';
@@ -3644,7 +3659,7 @@
                 ${upcoming.map(ev => viewerRowHtml(ev)).join("")}
                 </div>
             `;
-            }
+        }
 
             function getKindInfo(ev){
             // ★ 種別フィールドを推測して拾う（実データに合わせて調整OK）
@@ -6070,6 +6085,9 @@
 
             // ★ 生データを保持（以後はローカルでフィルタ）
             state.schedulesRaw = r.schedules.slice();
+            // ★ Home の閲覧者カード用に、全予定をグローバルへも公開
+            window.__ALL_SCHEDULES__ = state.schedulesRaw;
+            console.log("[sched] window.__ALL_SCHEDULES__ length =", window.__ALL_SCHEDULES__.length);
         }
 
         // 取得済みデータを UI 値でフィルタして描画
