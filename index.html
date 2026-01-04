@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.0.4";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v6.0.5";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -2333,6 +2333,18 @@
                     </div>
                 </div>
 
+            <!-- ★ 閲覧者用：今後の予定（直近5件） -->
+            <div class="card" id="cardViewerUpcoming" style="display:none;">
+            <div class="row-space">
+                <div class="sectionTitle">今後の予定（直近5件）</div>
+            </div>
+            <div id="viewerEventsBox">
+                <div class="muted">
+                読み込み中… <span class="spinner"></span>
+                </div>
+            </div>
+            </div>
+
             <div id="homeLog" class="muted" style="margin-top:8px;"></div>
         </section>
 
@@ -3156,7 +3168,6 @@
 
 
 <!-- ===== 回答受付中の公演リスト設定 v7 ===== -->
-    <script>
     (function(){
         if (window.HomeEventsUI && window.HomeEventsUI.__v === 7) return;
     
@@ -3175,6 +3186,9 @@
         const E = {
         box : () => document.getElementById('eventsBox'),
         ckN : () => document.getElementById('homeOnlyNA'),
+        viewerBox  : () => document.getElementById('viewerEventsBox'),
+        cardActive : () => document.getElementById('cardEventsActive'),
+        cardViewer : () => document.getElementById('cardViewerUpcoming'),
         };
     
         /* Util */
@@ -3326,16 +3340,22 @@
 
             console.log("[home] render: S.isViewer =", S.isViewer);
 
-            // ★ カードごと非表示にする
-            const card = box.closest(".card");
+            const cardActive = E.cardActive();
+            const cardViewer = E.cardViewer();
+
             if (S.isViewer) {
-                if (card) card.style.display = "none";
-                return;                       // 以降の描画は行わない
+                // 閲覧者：回答受付中カードは非表示、代わりに今後の予定カードを描画
+                if (cardActive) cardActive.style.display = "none";
+                if (cardViewer) cardViewer.style.display = "";
+                renderViewerUpcoming();
+                return;  // ここで終わり
             } else {
-                // 管理者 / 通常メンバーでは表示しておく
-                if (card) card.style.display = "";
+                // 演者・管理者：閲覧者用カードは隠し、従来のリストを描画
+                if (cardActive) cardActive.style.display = "";
+                if (cardViewer) cardViewer.style.display = "none";
             }
 
+            // ==== ここから下は今まで通りの「回答受付中の公演」描画 ====
             // ★ ここで「締切を過ぎた公演」は除外する
             const activeEvents = (S.events || []).filter(ev => !isPastDeadline(ev));
 
@@ -3575,9 +3595,97 @@
                 console.error('renderHomeFromRaw failed:', err);
             }
             };
-    })();
-    </script>
 
+        function viewerRowHtml(ev){
+            const rawYmd = ev.ymd || ev.date || "";
+            const rawHm  = ev.hm || ev.time || ev.performAt || ev["時間"] || "";
+            const place  = ev.place || ev.venue || "";
+
+            const ymdDisp = fmtYmd(rawYmd);
+            const hmDisp  = fmtTime(rawHm);
+            const atMark  = place ? " @" : "";
+
+            const titleText = hmDisp
+                ? `${ymdDisp} ${hmDisp}${atMark} ${place}`
+                : `${ymdDisp}${atMark} ${place}`;
+
+            const dateLineHtml = hmDisp
+                ? `${ymdDisp} <small>${hmDisp}</small>${atMark}`
+                : `${ymdDisp}${atMark}`;
+
+            // 締切
+            const rawDl = ev.deadline || ev.limit || ev.deadlineYmd || "";
+            const dlDisp = fmtYmdNoWeekday(rawDl);
+            const dlCls  = `deadline ${deadlineClass(rawDl)}`;
+
+            // 区分バッジ
+            const segNorm  = normSeg(ev.segment || "");
+            const segLbl   = dispSeg(segNorm);
+            const segCls   = segNorm === "adult" ? "seg-adult"
+                            : segNorm === "child" ? "seg-child"
+                            : "seg-both";
+            const segBadge = segLbl
+                ? `<span class="seg-badge ${segCls}">${segLbl}</span>`
+                : "";
+
+            return `
+                <div class="eventRow" data-evt="${ev.id}" data-seg="${segNorm || "both"}">
+                <div class="eventMeta">
+                    <!-- 1行目：区分だけ -->
+                    <div class="eventHead">
+                    <div class="eventHead-left">${segBadge}</div>
+                    <div class="eventHead-right"></div>
+                    </div>
+
+                    <!-- 2行目：日付 時刻 @ 場所 -->
+                    <div class="eventTitle" title="${titleText}">
+                    <span class="title-date">${dateLineHtml}</span>
+                    <span class="title-place">${place}</span>
+                    </div>
+
+                    <!-- 3行目：締切（あれば） -->
+                    <div class="eventSub">
+                    締切：<span class="${dlCls}">${dlDisp || "—"}</span>
+                    </div>
+                </div>
+                </div>
+            `;
+            }
+
+        function renderViewerUpcoming(){
+            const card = E.cardViewer();
+            const box  = E.viewerBox();
+            if (!card || !box) return;
+
+            // カードは表示にしておく
+            card.style.display = "";
+
+            // 今日以降の予定から直近5件
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            const upcoming = (S.events || [])
+                .map(ev => {
+                const dt = parseYmd(ev.ymd || ev.date);
+                return { ev, dt };
+                })
+                .filter(x => x.dt && x.dt >= today)
+                .sort((a,b) => a.dt - b.dt)
+                .slice(0,5)
+                .map(x => x.ev);
+
+            if (!upcoming.length){
+                box.innerHTML = '<div class="listEmpty">直近の予定はありません</div>';
+                return;
+            }
+
+            box.innerHTML = `
+                <div class="evList">
+                ${upcoming.map(ev => viewerRowHtml(ev)).join("")}
+                </div>
+            `;
+            }
+    })();
 <script>
 /* ===== アプリ共通ステート（全画面で共有する状態） ===== */
     let state = {
