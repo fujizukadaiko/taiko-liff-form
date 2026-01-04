@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.0.5";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v6.0.6";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3181,6 +3181,7 @@
             nameSegMap: {},      // { [name]: 'adult'|'child' }
             isViewer: false,     // ★ 閲覧者フラグ
             membersRaw: [],      // ★ 追加：生のメンバーデータを保持
+            allEvents: [],       // ★ 追加：今後の予定（発表+練習など全部）
         };
                 
         /* 参照 */
@@ -3420,6 +3421,7 @@
             __v: 7,
             mount({
                 events = [],
+                allEvents = [],      // ★ 追加
                 myAnswersMap = {},
                 performers = [],
                 nameSegMap = {},
@@ -3433,6 +3435,9 @@
                 });
 
                 S.events     = Array.isArray(events) ? events : [];
+                S.allEvents  = Array.isArray(allEvents) && allEvents.length
+                     ? allEvents
+                     : S.events;  // ★ allEvents が無ければ events を流用
                 S.ansMap     = myAnswersMap || {};
                 S.names      = Array.isArray(performers) ? performers : [];
                 S.nameSegMap = nameSegMap || {};
@@ -3522,6 +3527,10 @@
 
             API.mount({
                 events      : d.events || [],
+                allEvents   : d.allEvents                   // ★ ここを実データに合わせて
+                  || d.schedules                // 例えばこんな候補…
+                  || d.upcomingEvents
+                  || [],
                 myAnswersMap: d.myAnswersMap || {},
                 performers  : d.performers || [],
                 nameSegMap  : d.nameSegMap || {},
@@ -3597,75 +3606,25 @@
             }
             };
 
-        function viewerRowHtml(ev){
-            const rawYmd = ev.ymd || ev.date || "";
-            const rawHm  = ev.hm || ev.time || ev.performAt || ev["時間"] || "";
-            const place  = ev.place || ev.venue || "";
-
-            const ymdDisp = fmtYmd(rawYmd);
-            const hmDisp  = fmtTime(rawHm);
-            const atMark  = place ? " @" : "";
-
-            const titleText = hmDisp
-                ? `${ymdDisp} ${hmDisp}${atMark} ${place}`
-                : `${ymdDisp}${atMark} ${place}`;
-
-            const dateLineHtml = hmDisp
-                ? `${ymdDisp} <small>${hmDisp}</small>${atMark}`
-                : `${ymdDisp}${atMark}`;
-
-            // 締切
-            const rawDl = ev.deadline || ev.limit || ev.deadlineYmd || "";
-            const dlDisp = fmtYmdNoWeekday(rawDl);
-            const dlCls  = `deadline ${deadlineClass(rawDl)}`;
-
-            // 区分バッジ
-            const segNorm  = normSeg(ev.segment || "");
-            const segLbl   = dispSeg(segNorm);
-            const segCls   = segNorm === "adult" ? "seg-adult"
-                            : segNorm === "child" ? "seg-child"
-                            : "seg-both";
-            const segBadge = segLbl
-                ? `<span class="seg-badge ${segCls}">${segLbl}</span>`
-                : "";
-
-            return `
-                <div class="eventRow" data-evt="${ev.id}" data-seg="${segNorm || "both"}">
-                <div class="eventMeta">
-                    <!-- 1行目：区分だけ -->
-                    <div class="eventHead">
-                    <div class="eventHead-left">${segBadge}</div>
-                    <div class="eventHead-right"></div>
-                    </div>
-
-                    <!-- 2行目：日付 時刻 @ 場所 -->
-                    <div class="eventTitle" title="${titleText}">
-                    <span class="title-date">${dateLineHtml}</span>
-                    <span class="title-place">${place}</span>
-                    </div>
-
-                    <!-- 3行目：締切（あれば） -->
-                    <div class="eventSub">
-                    締切：<span class="${dlCls}">${dlDisp || "—"}</span>
-                    </div>
-                </div>
-                </div>
-            `;
-            }
-
         function renderViewerUpcoming(){
             const card = E.cardViewer();
             const box  = E.viewerBox();
             if (!card || !box) return;
 
-            // カードは表示にしておく
             card.style.display = "";
 
-            // 今日以降の予定から直近5件
             const today = new Date();
             today.setHours(0,0,0,0);
 
-            const upcoming = (S.events || [])
+           // ★ 発表だけでなく、全予定から取る
+            const base =
+            (Array.isArray(S.allEvents) && S.allEvents.length)
+                ? S.allEvents
+                : (Array.isArray(window.__ALL_SCHEDULES__) && window.__ALL_SCHEDULES__.length)
+                ? window.__ALL_SCHEDULES__
+                : (S.events || []);
+
+            const upcoming = base
                 .map(ev => {
                 const dt = parseYmd(ev.ymd || ev.date);
                 return { ev, dt };
@@ -3683,6 +3642,85 @@
             box.innerHTML = `
                 <div class="evList">
                 ${upcoming.map(ev => viewerRowHtml(ev)).join("")}
+                </div>
+            `;
+            }
+
+            function getKindInfo(ev){
+            // ★ 種別フィールドを推測して拾う（実データに合わせて調整OK）
+            const raw =
+                ev.kind ||
+                ev.type ||
+                ev.category ||
+                ev.eventType ||
+                ev.種別 ||
+                ev.種目 ||
+                "";
+            const s = String(raw).trim();
+            if (!s) return { label: "", cls: "" };
+
+            const lower = s.toLowerCase();
+
+            if (lower.includes("練") || lower.includes("practice")) {
+                return { label: "練習", cls: "kind-practice" };
+            }
+            if (lower.includes("発") || lower.includes("本番") || lower.includes("stage")) {
+                return { label: "発表", cls: "kind-performance" };
+            }
+            return { label: s, cls: "kind-other" };
+            }
+
+            function viewerRowHtml(ev){
+            const rawYmd = ev.ymd || ev.date || "";
+            const rawHm  = ev.hm || ev.time || ev.performAt || ev["時間"] || "";
+            const place  = ev.place || ev.venue || ev.location || "";
+
+            const ymdDisp = fmtYmd(rawYmd);
+            const hmDisp  = fmtTime(rawHm);
+            const atMark  = place ? " @" : "";
+
+            const titleText = hmDisp
+                ? `${ymdDisp} ${hmDisp}${atMark} ${place}`
+                : `${ymdDisp}${atMark} ${place}`;
+
+            const dateLineHtml = hmDisp
+                ? `${ymdDisp} <small>${hmDisp}</small>${atMark}`
+                : `${ymdDisp}${atMark}`;
+
+            // 区分バッジ
+            const segNorm  = normSeg(ev.segment || "");
+            const segLbl   = dispSeg(segNorm);
+            const segCls   = segNorm === "adult" ? "seg-adult"
+                            : segNorm === "child" ? "seg-child"
+                            : "seg-both";
+            const segBadge = segLbl
+                ? `<span class="seg-badge ${segCls}">${segLbl}</span>`
+                : "";
+
+            // 種別バッジ（発表 / 練習）
+            const kindInfo  = getKindInfo(ev);
+            const kindBadge = kindInfo.label
+                ? `<span class="kind-badge ${kindInfo.cls}">${kindInfo.label}</span>`
+                : "";
+
+            return `
+                <div class="eventRow" data-evt="${ev.id}" data-seg="${segNorm || "both"}">
+                <div class="eventMeta">
+                    <!-- 1行目：区分 + 種別 -->
+                    <div class="eventHead">
+                    <div class="eventHead-left">
+                        ${segBadge}
+                        ${kindBadge}
+                    </div>
+                    <div class="eventHead-right"></div>
+                    </div>
+
+                    <!-- 2行目：日付 時刻 @ 場所 -->
+                    <div class="eventTitle" title="${titleText}">
+                    <span class="title-date">${dateLineHtml}</span>
+                    <span class="title-place">${place}</span>
+                    </div>
+                </div>
                 </div>
             `;
             }
