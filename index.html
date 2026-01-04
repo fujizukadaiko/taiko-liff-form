@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.0.3";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v6.0.4";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3395,7 +3395,7 @@
         });
     
         /* 公開API */
-        const API = {
+            const API = {
             __v: 7,
             mount({
                 events = [],
@@ -3403,7 +3403,7 @@
                 performers = [],
                 nameSegMap = {},
                 isViewer,
-                members,            // ★ 追加
+                members,            // ★ 追加済み
             } = {}){
                 console.log("[home] API.mount called:", {
                 isViewerArg: isViewer,
@@ -3416,26 +3416,40 @@
                 S.names      = Array.isArray(performers) ? performers : [];
                 S.nameSegMap = nameSegMap || {};
                 if (Array.isArray(members)) {
-                S.membersRaw = members;      // ★ ここで保存
+                S.membersRaw = members;
                 }
 
                 // ★ 閲覧者フラグの決定
                 if (typeof isViewer === "boolean") {
+                // ① 引数で明示的に渡された場合
                 S.isViewer = isViewer;
                 } else {
+                // ② members / state.members から判定を試みる
                 const srcMembers =
                     Array.isArray(members) ? members :
                     (window.state && Array.isArray(window.state.members) ? window.state.members :
-                    S.membersRaw);   // ここまで全部ダメでも、最後に保持済みを使う
+                    S.membersRaw);
 
-                if (Array.isArray(srcMembers)) {
+                if (Array.isArray(srcMembers) && srcMembers.length) {
                     console.log("[home] mount members sample:", srcMembers[0]);
                     S.isViewer = srcMembers.some(m => {
                     const v = String(m.viewer || m.閲覧者 || "").trim().toUpperCase();
                     return v === "Y";
                     });
                 } else {
+                    // ③ members 情報が一切無いときのフォールバック
+                    //    → 演奏者リストが 0 人 かつ 管理者ではないなら「閲覧者扱い」
+                    const isAdmin = !!(window.state && window.state.isAdmin);
+                    if (!isAdmin && Array.isArray(S.names) && S.names.length === 0) {
+                    S.isViewer = true;
+                    } else {
                     S.isViewer = false;
+                    }
+                    console.log("[home] mount fallback by performers:", {
+                    isAdmin,
+                    performersLen: Array.isArray(S.names) ? S.names.length : -1,
+                    decidedViewer: S.isViewer,
+                    });
                 }
                 }
 
