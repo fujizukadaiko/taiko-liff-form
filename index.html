@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.0.7";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v6.0.8";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6079,15 +6079,22 @@
             }
 
             if (!r || r.status !== "ok" || !Array.isArray(r.schedules)) {
-            box.innerHTML = `<span class="err">取得に失敗しました</span>`;
-            return;
+                box.innerHTML = `<span class="err">取得に失敗しました</span>`;
+                return;
             }
 
             // ★ 生データを保持（以後はローカルでフィルタ）
             state.schedulesRaw = r.schedules.slice();
+
             // ★ Home の閲覧者カード用に、全予定をグローバルへも公開
             window.__ALL_SCHEDULES__ = state.schedulesRaw;
             console.log("[sched] window.__ALL_SCHEDULES__ length =", window.__ALL_SCHEDULES__.length);
+
+            // ★ HomeEventsUI に「データ入ったよ」と知らせて再描画
+            if (window.HomeEventsUI && typeof window.HomeEventsUI.render === "function") {
+                console.log("[sched] call HomeEventsUI.render() after schedules load");
+                window.HomeEventsUI.render();
+            }
         }
 
         // 取得済みデータを UI 値でフィルタして描画
@@ -6157,6 +6164,12 @@
             panel.hidden = expanded;                  // true→隠す / false→表示
             caret.textContent = expanded ? '∨' : '∧'; // 矢印を文字で切り替え
         });
+        // ★ ここを追加：閲覧者カード用にスケジュールを事前取得
+            if (document.getElementById('viewerEventsBox')) {
+                window.renderSchedules(true).catch(err => {
+                    console.error("[sched] initial renderSchedules error", err);
+                });
+            }
     });
     })();
 
