@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.0.2";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
+            const FRONT_VERSION = "Front v6.0.3";  // stable ver→v6.0.0, PROD v1.1.0 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3168,6 +3168,7 @@
             onlyNA: true,
             nameSegMap: {},      // { [name]: 'adult'|'child' }
             isViewer: false,     // ★ 閲覧者フラグ
+            membersRaw: [],      // ★ 追加：生のメンバーデータを保持
         };
                 
         /* 参照 */
@@ -3401,36 +3402,41 @@
                 myAnswersMap = {},
                 performers = [],
                 nameSegMap = {},
-                isViewer,          // ★ 追加
+                isViewer,
+                members,            // ★ 追加
             } = {}){
-                // ★ ここ追加
-                    console.log("[home] API.mount called:", {
-                    isViewerArg: isViewer,
-                    membersLen: (window.state && Array.isArray(window.state.members))
-                        ? window.state.members.length
-                        : 0
-                    });
-                S.events    = Array.isArray(events) ? events : [];
-                S.ansMap    = myAnswersMap || {};
-                S.names     = Array.isArray(performers) ? performers : [];
+                console.log("[home] API.mount called:", {
+                isViewerArg: isViewer,
+                membersLen: Array.isArray(window.state?.members) ? window.state.members.length : 0,
+                membersArgLen: Array.isArray(members) ? members.length : 0,
+                });
+
+                S.events     = Array.isArray(events) ? events : [];
+                S.ansMap     = myAnswersMap || {};
+                S.names      = Array.isArray(performers) ? performers : [];
                 S.nameSegMap = nameSegMap || {};
+                if (Array.isArray(members)) {
+                S.membersRaw = members;      // ★ ここで保存
+                }
 
                 // ★ 閲覧者フラグの決定
                 if (typeof isViewer === "boolean") {
                 S.isViewer = isViewer;
                 } else {
-                // メンバーデータから判定（列名は実データに合わせて要調整）
-                const members =
-                    (window.state && Array.isArray(window.state.members))
-                    ? window.state.members
-                    : [];
-                    // ★ 実際にどんなカラムが来ているか確認
-                        console.log("[home] mount members sample:", members[0]);
+                const srcMembers =
+                    Array.isArray(members) ? members :
+                    (window.state && Array.isArray(window.state.members) ? window.state.members :
+                    S.membersRaw);   // ここまで全部ダメでも、最後に保持済みを使う
 
-                S.isViewer = members.some(m => {
+                if (Array.isArray(srcMembers)) {
+                    console.log("[home] mount members sample:", srcMembers[0]);
+                    S.isViewer = srcMembers.some(m => {
                     const v = String(m.viewer || m.閲覧者 || "").trim().toUpperCase();
-                    return v === "Y";       // ← 「閲覧者」列に Y が入っている人
-                });
+                    return v === "Y";
+                    });
+                } else {
+                    S.isViewer = false;
+                }
                 }
 
                 console.log("[home] mount: S.isViewer decided =", S.isViewer);
@@ -3442,8 +3448,8 @@
             setEvents(e){ S.events = e || []; render(); },
             setAnswers(a){ S.ansMap = a || {}; render(); },
             setPerformers(arr){ S.names = Array.isArray(arr) ? arr : []; render(); },
-            render
-        };
+            render,
+            };
         window.HomeEventsUI = API;
         window.renderEventsDense = API.mount;
     
@@ -3462,13 +3468,15 @@
         window.addEventListener('home:data', (e)=>{
             const d = e.detail || {};
 
-            // members が detail に乗ってくる場合はこちらから、無ければ state.members から
+            // members が detail に乗ってくる場合はこちらから、
+            // 無ければ state.members から
             const members =
                 d.members ||
                 (window.state && Array.isArray(window.state.members) ? window.state.members : []);
 
             let isViewer = false;
             if (Array.isArray(members)) {
+                console.log("[home] home:data members sample:", members[0]);
                 isViewer = members.some(m => {
                 const v = String(m.viewer || m.閲覧者 || "").trim().toUpperCase();
                 return v === "Y";
@@ -3482,10 +3490,11 @@
                 myAnswersMap: d.myAnswersMap || {},
                 performers  : d.performers || [],
                 nameSegMap  : d.nameSegMap || {},
-                isViewer,    // ★ 渡す
+                members,          // ★ 追加
+                isViewer,         // ★ 追加
             });
             });
-            
+
         // if (!tryMountFromGlobals()){
         // let waited = 0;
         // const iv = setInterval(()=>{
@@ -3529,10 +3538,9 @@
                 if (n && s) nameSegMap[n] = s;
                 });
 
-                // ★ ここで閲覧者フラグを判定
                 const isViewer = Array.isArray(members) && members.some(m => {
                 const v = String(m.viewer || m.閲覧者 || "").trim().toUpperCase();
-                return v === "Y";   // ← 列名や値は実データに合わせて必要なら調整
+                return v === "Y";
                 });
 
                 console.log("[home] renderHomeFromRaw isViewer =", isViewer);
@@ -3541,13 +3549,13 @@
                 window.__HOME_ANSWERS__  = map;
                 window.__HOME_MEMBERS__  = performers;
 
-                // ★ isViewer を渡す
                 window.renderEventsDense({
                 events,
                 myAnswersMap: map,
                 performers,
                 nameSegMap,
-                isViewer,
+                members,    // ★ 追加
+                isViewer,   // ★ 追加
                 });
             } catch (err){
                 console.error('renderHomeFromRaw failed:', err);
