@@ -3681,13 +3681,14 @@
             const lower = s.toLowerCase();
 
             if (lower.includes("練") || lower.includes("practice")) {
-                return { label: "練習", cls: "kind-practice" };
+                // ★ 今後の予定と同じクラス名を返す
+                return { label: "練習", cls: "badge--practice" };
             }
             if (lower.includes("発") || lower.includes("本番") || lower.includes("stage")) {
-                return { label: "発表", cls: "kind-performance" };
+                return { label: "発表", cls: "badge--announce" };
             }
-            return { label: s, cls: "kind-other" };
-            }
+            return { label: s, cls: "badge--other" };
+        }
 
             function viewerRowHtml(ev){
                 const rawYmd = ev.ymd || ev.date || "";
@@ -3719,7 +3720,7 @@
                 // 種別バッジ（発表 / 練習）
                 const kindInfo  = getKindInfo(ev);
                 const kindBadge = kindInfo.label
-                    ? `<span class="kind-badge ${kindInfo.cls}">${kindInfo.label}</span>`
+                    ? `<span class="scKind ${kindInfo.cls}">${kindInfo.label}</span>`
                     : "";
 
                 return `
