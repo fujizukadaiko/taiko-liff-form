@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.1.2";  // stable ver→v6.1.0, PROD v1.2.2 反映済み
+            const FRONT_VERSION = "Front v6.1.3";  // stable ver→v6.1.0, PROD v1.2.2 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -3694,10 +3694,9 @@
                 const rawYmd = ev.ymd || ev.date || "";
                 const rawHm  = ev.hm || ev.time || ev.performAt || ev["時間"] || "";
 
-                // 場所（フォールバック用）
                 const place  = ev.place || ev.venue || ev.location || "";
 
-                // ★ イベント名（なければ場所を使う）
+                // ★ イベント名（なければ場所をタイトルに使う）
                 const titleRaw =
                     ev.title ||
                     ev.eventTitle ||
@@ -3709,12 +3708,10 @@
                 const ymdDisp = fmtYmd(rawYmd);
                 const hmDisp  = fmtTime(rawHm);
 
-                // ツールチップ用：日付 + 時刻 + イベント名
                 const titleText = hmDisp
                     ? `${ymdDisp} ${hmDisp} ${title}`
                     : `${ymdDisp} ${title}`;
 
-                // 画面表示用：左側は日付＋時刻だけ
                 const dateLineHtml = hmDisp
                     ? `${ymdDisp} <small>${hmDisp}</small>`
                     : `${ymdDisp}`;
@@ -3738,13 +3735,14 @@
                 return `
                     <div class="eventRow" data-evt="${ev.id}" data-seg="${segNorm || "both"}">
                         <div class="eventMeta">
-                            <!-- 1行目：区分 + 種別 -->
+                            <!-- 1行目：左=区分 / 右=種別 -->
                             <div class="eventHead">
                                 <div class="eventHead-left">
                                     ${segBadge}
+                                </div>
+                                <div class="eventHead-right">
                                     ${kindBadge}
                                 </div>
-                                <div class="eventHead-right"></div>
                             </div>
 
                             <!-- 2行目：日付 時刻 + イベント名 -->
