@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.1.4";  // stable ver→v6.1.0, PROD v1.2.2 反映済み
+            const FRONT_VERSION = "Front v6.1.5";  // stable ver→v6.1.0, PROD v1.2.2 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -6313,21 +6313,37 @@
         const dlEl   = $("#ad_deadline");
         if (!typeEl || !ymdEl || !dlEl) return;
 
-        // 練習は締切不要
         const type = String(typeEl.value || "").trim();
-        if (type === "練習") return;
+        if (!type || type === "練習") return;
 
-        // 新規モードのみ（要件どおり）
         if (typeof adminMode === "undefined" || adminMode !== "create") return;
 
+        // 公演日が未入力なら何もしない
+        const ymd = String(ymdEl.value || "").trim();
+        if (!ymd) return;
+
+        // 期待する自動締切（公演日-7日）
+        const expected = calcMinusDaysDateInput(ymd, 7);
+        if (!expected) return;
+
+        const touched = (dlEl.dataset.touched === "1");
+
         // ユーザーが触ってたら上書きしない
-        if (dlEl.dataset.touched === "1") return;
+        if (touched) return;
 
-        // 既に値が入ってたら上書きしない
-        if (String(dlEl.value || "").trim()) return;
+        const cur = String(dlEl.value || "").trim();
 
-        const v = calcMinusDaysDateInput(ymdEl.value, 7);
-        if (v) dlEl.value = v;
+        // 自動入力済み判定（過去に自動で入れたやつ）
+        const wasAuto = (dlEl.dataset.autofilled === "1");
+        const from    = String(dlEl.dataset.autofillFrom || "");
+
+        // ① 未入力なら入れる
+        // ② 既に値がある場合でも「自動入力だった」かつ「公演日が変わった/期待値と違う」なら追従して更新
+        if (!cur || (wasAuto && (from !== ymd || cur !== expected))) {
+            dlEl.value = expected;
+            dlEl.dataset.autofilled  = "1";
+            dlEl.dataset.autofillFrom = ymd;
+        }
     }
 
     /* ▼ 種別/モードに応じて「配信フラグ」プルダウンの候補を組み立てる */
@@ -6378,7 +6394,11 @@
         $("#ad_attendTarget").value = "N";
         $("#ad_deadline").value = "";
             const dl = $("#ad_deadline");
-            if (dl) dl.dataset.touched = "0";
+            if (dl){
+            dl.dataset.touched = "0";
+            dl.dataset.autofilled = "0";
+            dl.dataset.autofillFrom = "";
+            }
         $("#ad_publish").value = "Yes";
         $("#ad_status").value = "active";
         $("#ad_status").disabled = true;  // ★ 追加：新規は編集不可に
@@ -6398,7 +6418,11 @@
         const dl  = document.getElementById("ad_deadline");
 
         if (dl && !dl.__touchBound){
-            dl.addEventListener("input", () => { dl.dataset.touched = "1"; });
+            dl.addEventListener("input", () => {
+                dl.dataset.touched = "1";
+                dl.dataset.autofilled = "0";
+                dl.dataset.autofillFrom = "";
+            });
             dl.__touchBound = true;
         }
         if (ymd && !ymd.__boundAutoDL){
