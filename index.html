@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.1.3";  // stable ver→v6.1.0, PROD v1.2.2 反映済み
+            const FRONT_VERSION = "Front v6.1.4";  // stable ver→v6.1.0, PROD v1.2.2 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1050,6 +1050,14 @@
         #view-admin .hint{
             font-size: 10px !important;
             line-height: 1.55;
+        }
+
+        /* 管理フォーム：ラベル下の注釈 */
+        #view-admin .admNote{
+        display:block;
+        font-size:10px;     /* hint と同じ */
+        line-height:1.35;
+        margin-top:2px;
         }
 
     /* ===== Register（氏名編集） ===== */
@@ -2697,10 +2705,13 @@
                 </div>
 
                 <div>
-                    <label for="ad_publish">公開</label>
+                    <label for="ad_publish">
+                        公開
+                        <span class="admNote muted">※Yes=ユーザーに公開 / No=非公開（下書き）</span>
+                    </label>
                     <select id="ad_publish" class="selectBtn">
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
                     </select>
                 </div>
 
@@ -2713,7 +2724,9 @@
                 </div>
 
                 <div>
-                    <label for="ad_flag">配信フラグ（必須：発表のみ）</label>
+                    <label for="ad_flag">配信フラグ（必須：発表のみ）
+                        <span class="admNote muted">※Y=初回配信対象 / S=配信済 / D=締切停止 / N=配信なし</span>
+                    </label>
                     <select id="ad_flag" class="selectBtn">
                     <!-- 動的に差し替え -->
                     </select>
@@ -6225,6 +6238,7 @@
             $("#ad_meetPlace").value = "";  meetPlace.disabled = true;
             attend.value = "N";             attend.disabled    = true;
             $("#ad_deadline").value  = "";  deadline.disabled  = true;
+            if (deadline) deadline.dataset.touched = "0"; 
             updateFlagOptions({ type:t, forceN:true, disable:true });
 
             // ★ デフォルト自動入力（未入力のときだけ）
@@ -6250,6 +6264,9 @@
             attend.value = "Y";
             }
 
+            // ★ 新規のみ：締切が空＆未タッチなら「公演日-7日」を自動セット
+            adminAutoDeadlineIfNeeded();
+
             // 練習以外に戻したとき：自動入力だった分だけクリア
             if (hm?.dataset.autofilled === "1"){ hm.value = ""; }
             if (place?.dataset.autofilled === "1"){ place.value = ""; }
@@ -6264,12 +6281,53 @@
             deadline.disabled  = false;
             updateFlagOptions({ type:t, forceN:true, disable:true });
 
+            // ★ 新規のみ：締切が空＆未タッチなら「公演日-7日」を自動セット
+            adminAutoDeadlineIfNeeded();
+
             // 同上：自動入力だった分だけクリア
             if (hm?.dataset.autofilled === "1"){ hm.value = ""; }
             if (place?.dataset.autofilled === "1"){ place.value = ""; }
             if (hm) hm.dataset.autofilled = "0";
             if (place) place.dataset.autofilled = "0";
         }
+    }
+
+    /* 締切日を「公演日の7日前」で自動入力 */
+    function calcMinusDaysDateInput(ymdIn, minusDays){
+        // ymdIn: "YYYY-MM-DD"（input[type=date] の値）
+        if (!ymdIn) return "";
+        const m = String(ymdIn).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return "";
+        const dt = new Date(+m[1], +m[2]-1, +m[3]);
+        dt.setHours(0,0,0,0);
+        dt.setDate(dt.getDate() - (minusDays || 0));
+
+        const z = n => String(n).padStart(2, "0");
+        return `${dt.getFullYear()}-${z(dt.getMonth()+1)}-${z(dt.getDate())}`;
+    }
+
+    // 新規登録モードのときだけ「締切=公演日-7日」を自動セット
+    function adminAutoDeadlineIfNeeded(){
+        const typeEl = $("#ad_type");
+        const ymdEl  = $("#ad_ymd");
+        const dlEl   = $("#ad_deadline");
+        if (!typeEl || !ymdEl || !dlEl) return;
+
+        // 練習は締切不要
+        const type = String(typeEl.value || "").trim();
+        if (type === "練習") return;
+
+        // 新規モードのみ（要件どおり）
+        if (typeof adminMode === "undefined" || adminMode !== "create") return;
+
+        // ユーザーが触ってたら上書きしない
+        if (dlEl.dataset.touched === "1") return;
+
+        // 既に値が入ってたら上書きしない
+        if (String(dlEl.value || "").trim()) return;
+
+        const v = calcMinusDaysDateInput(ymdEl.value, 7);
+        if (v) dlEl.value = v;
     }
 
     /* ▼ 種別/モードに応じて「配信フラグ」プルダウンの候補を組み立てる */
@@ -6319,6 +6377,8 @@
         $("#ad_meetPlace").value = "藤塚小学校";
         $("#ad_attendTarget").value = "N";
         $("#ad_deadline").value = "";
+            const dl = $("#ad_deadline");
+            if (dl) dl.dataset.touched = "0";
         $("#ad_publish").value = "Yes";
         $("#ad_status").value = "active";
         $("#ad_status").disabled = true;  // ★ 追加：新規は編集不可に
@@ -6331,6 +6391,32 @@
         adminTypeChangeAdapt();
         logAdmin("");
     }
+
+    function bindAdminAutoDeadlineOnce(){
+        const ymd = document.getElementById("ad_ymd");
+        const typ = document.getElementById("ad_type");
+        const dl  = document.getElementById("ad_deadline");
+
+        if (dl && !dl.__touchBound){
+            dl.addEventListener("input", () => { dl.dataset.touched = "1"; });
+            dl.__touchBound = true;
+        }
+        if (ymd && !ymd.__boundAutoDL){
+            ymd.addEventListener("change", adminAutoDeadlineIfNeeded);
+            ymd.__boundAutoDL = true;
+        }
+        if (typ && !typ.__boundAutoDL){
+            typ.addEventListener("change", () => {
+            adminTypeChangeAdapt();
+            adminAutoDeadlineIfNeeded();
+            });
+            typ.__boundAutoDL = true;
+        }
+    }
+
+        // ★ どっちでも拾えるように
+        bindAdminAutoDeadlineOnce();
+        document.addEventListener("DOMContentLoaded", bindAdminAutoDeadlineOnce);
 
     function toDateInputFromAnyYmd(s){
     const str = String(s || "").trim();
