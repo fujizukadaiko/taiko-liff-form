@@ -1060,6 +1060,35 @@
         margin-top:2px;
         }
 
+        /* 管理フォーム：入力UIを統一（textareaもinputと同じ見た目に） */
+        #view-admin .adminGrid input,
+        #view-admin .adminGrid select,
+        #view-admin .adminGrid textarea{
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 12%);
+        border-radius: 10px;
+        background: #fff;
+        color: var(--c-text);
+        padding: 10px 12px;
+        font-size: 14px;
+        outline: none;
+        }
+
+        /* フォーカス時（他の入力と合わせる） */
+        #view-admin .adminGrid input:focus,
+        #view-admin .adminGrid select:focus,
+        #view-admin .adminGrid textarea:focus{
+        border-color: color-mix(in srgb, var(--c-primary-2), #000 22%);
+        box-shadow: 0 0 0 3px rgba(127,106,165,0.12);
+        }
+
+        /* textareaだけ微調整（高さとリサイズ） */
+        #view-admin .adminGrid textarea{
+        min-height: 72px;
+        resize: vertical;
+    }
+
     /* ===== Register（氏名編集） ===== */
         .regAddRow { 
         margin-top: 12px;               /* 上と詰まらないように余白を追加 */
