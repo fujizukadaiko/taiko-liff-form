@@ -5982,8 +5982,8 @@
         const rawDateText = ymdDow(parseYmdStrictLocal(it.ymd || it.date)) || (it.date || "");
         const kindText    = String(it.kind || "").trim();
         const kindCls     = KIND_CLASS[kindText] || "";
-        const noteText = String(it.note || it.memo || "").trim();
-        const noteSafe = h(noteText);
+        const noteText  = String(it.note || it.memo || "").trim();
+        const noteSafe  = h(noteText);
         const titleText   = String(it.title || "").trim();
         const placeText   = String(it.place || "").trim();
         const meetPlace   = String(it.meetPlace || "").trim();
@@ -5991,7 +5991,6 @@
         // エスケープ済み文字列
         const dateSafe     = h(rawDateText);
         const kindSafe     = h(kindText);
-        const memoSafe     = h(memoText);
         const titleSafe    = h(titleText);
         const placeSafe    = h(placeText);
         const segLabelSafe = h(segLabel || "");
@@ -6023,7 +6022,7 @@
 
         // 折りたたみ内の中身（タイトルは出さない：演奏開始 / 集合 / @場所）
         const panelInner = `
-        ${[hm, meetTxtRaw, placeTxt, memoText].filter(Boolean).length ? `
+        ${[hm, meetTxtRaw, placeTxt, noteText].filter(Boolean).length ? `
             <div class="scMeta">
             ${placeTxt   ? `<div class="scLine">${placeTxt}</div>` : ``}
             ${hm         ? `<div class="scLine">${timeForPanel}</div>` : ``}
