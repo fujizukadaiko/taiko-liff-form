@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.1.6";  // stable ver→v6.1.5, PROD v1.2.2 反映済み
+            const FRONT_VERSION = "Front v6.1.7";  // stable ver→v6.1.5, PROD v1.2.2 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -935,7 +935,7 @@
             white-space:nowrap;
         }
 
-    /* ===== Admin（管理画面） ===== */
+    /* ===== Admin（管理画面） ===== */adminListFetch
         /* 管理アコーディオン：ラベル｜プルダウンの2列グリッド */
         .adminControls{
             display:grid;
@@ -5982,7 +5982,8 @@
         const rawDateText = ymdDow(parseYmdStrictLocal(it.ymd || it.date)) || (it.date || "");
         const kindText    = String(it.kind || "").trim();
         const kindCls     = KIND_CLASS[kindText] || "";
-        const memoText    = String(it.memo || "").trim();
+        const noteText = String(it.note || it.memo || "").trim();
+        const noteSafe = h(noteText);
         const titleText   = String(it.title || "").trim();
         const placeText   = String(it.place || "").trim();
         const meetPlace   = String(it.meetPlace || "").trim();
@@ -6027,7 +6028,7 @@
             ${placeTxt   ? `<div class="scLine">${placeTxt}</div>` : ``}
             ${hm         ? `<div class="scLine">${timeForPanel}</div>` : ``}
             ${meetTxtRaw ? `<div class="scLine">${meetTxtSafe}</div>` : ``}
-            ${memoText   ? `<div class="scLine scMemo">${memoSafe}</div>` : ``}
+            ${noteText ? `<div class="scLine scMemo">備考：${noteSafe}</div>` : ``}
             </div>
         ` : ``}
         `;
@@ -6522,6 +6523,7 @@
         $("#ad_status").value  = it.status  || "active";
         $("#ad_status").disabled = false; // ★ 追加：編集時はプルダウンを有効化
         $("#ad_segment").value = it.segment || "子ども";
+        $("#ad_note").value = it.note || "";
 
         adminTypeChangeAdapt();
         $("#ad_flag").value = it.flag || "N";
@@ -6562,6 +6564,7 @@
                 const attT  = $("#ad_attendTarget").value.trim().toUpperCase();
                 const dlIn  = $("#ad_deadline").value.trim();
                 const pub   = $("#ad_publish").value.trim();
+                const note = $("#ad_note").value.trim();
                 const st    = (adminMode === "create")
                                 ? "active"
                                 : $("#ad_status").value.trim();
@@ -6620,7 +6623,8 @@
                     + `&attendTarget=${esc(attSend)}`
                     + (dl?        `&deadline=${esc(dl)}`               : "")
                     + `&publish=${esc(pub)}&status=${esc(st)}`
-                    + `&segment=${esc(seg)}`;
+                    + `&segment=${esc(seg)}`
+                    + (note ? `&note=${esc(note)}` : "");
 
                 $("#btnAdminSubmit").disabled = true;
                 $("#btnAdminSubmit").textContent = isEdit ? "保存中…" : "登録中…";
@@ -6796,6 +6800,9 @@
             ev.targetGroup    ||
             ev.target_group   ||
             "",
+            note:
+            ev.note ||
+            "",
         }))
         .filter(it => it.id); // id 無しは念のため除外
 
@@ -6806,16 +6813,16 @@
         adminItemsMap = {};
         raw.forEach(it => {
         adminItemsMap[String(it.id)] = it;
-        });
+    });
 
-        // 既存のローカル描画（期間・区分フィルタ & status=active フィルタ）が走る
-        adminListRenderLocal();
-    } catch (err) {
-        const topEl = document.getElementById("adminListBoxTop");
-        if (topEl) {
-        topEl.innerHTML = `<span class="err">エラー：${h(err.message || String(err))}</span>`;
+    // 既存のローカル描画（期間・区分フィルタ & status=active フィルタ）が走る
+    adminListRenderLocal();
+        } catch (err) {
+            const topEl = document.getElementById("adminListBoxTop");
+            if (topEl) {
+            topEl.innerHTML = `<span class="err">エラー：${h(err.message || String(err))}</span>`;
+            }
         }
-    }
     }
 
     /* ▼ 取得済みの adminItemsRaw を期間/区分でローカルフィルタして一覧に描画 */
