@@ -1095,13 +1095,6 @@
         }
 
         /* ===== Tag Admin（タグ管理） ===== */
-        #view-tag-admin .tagAdminKeyRow{
-            display:grid;
-            grid-template-columns: minmax(0, 1fr) auto auto;
-            gap:8px;
-            align-items:center;
-            margin-top:6px;
-        }
         #view-tag-admin .tagAdminCreateGrid{
             display:grid;
             grid-template-columns: 1fr 180px;
@@ -1174,12 +1167,6 @@
             margin-top:8px;
         }
         @media (max-width: 700px){
-            #view-tag-admin .tagAdminKeyRow{
-                grid-template-columns: 1fr 1fr;
-            }
-            #view-tag-admin .tagAdminKeyRow input{
-                grid-column: 1 / -1;
-            }
             #view-tag-admin .tagAdminCreateGrid{
                 grid-template-columns: 1fr;
             }
@@ -2416,9 +2403,6 @@
                     <button id="btnAdminMenuSchedules" class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin">
                         予定登録/編集
                     </button>
-                    <button id="btnAdminMenuTags" class="btn btn-outline btn-sm btn-compact" data-view-target="view-tag-admin">
-                        タグ管理
-                    </button>
                     <button id="btnAdminMenuReport" class="btn btn-outline btn-sm btn-compact" data-view-target="view-admin-report">
                         出欠結果一覧
                     </button>
@@ -2430,6 +2414,9 @@
                     </button>
                     <button id="btnFeedback" class="btn btn-outline btn-sm btn-compact" data-view-target="view-feedback">
                         ご意見BOX
+                    </button>
+                    <button id="btnAdminMenuTags" class="btn btn-outline btn-sm btn-compact" data-view-target="view-tag-admin">
+                        タグ管理
                     </button>
                 </div>
                 <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
@@ -2929,28 +2916,6 @@
                 >
                     トップに戻る
                 </button>
-            </div>
-
-            <div class="card">
-                <div class="sectionTitle">管理APIキー（暫定）</div>
-                <div class="tagAdminKeyRow">
-                    <input
-                        id="tagAdminApiKey"
-                        type="password"
-                        placeholder="管理APIキーを入力"
-                        autocomplete="off"
-                    />
-                    <button id="btnTagAdminSaveKey" class="btn btn-ghost btn-sm" type="button">
-                        キー保存
-                    </button>
-                    <button id="btnTagAdminClearKey" class="btn btn-ghost btn-sm" type="button">
-                        キー削除
-                    </button>
-                </div>
-                <div id="tagAdminKeyStatus" class="small muted" style="margin-top:6px;">未設定</div>
-                <div class="small muted" style="margin-top:6px;">
-                    ※ 暫定運用：APIキーは sessionStorage にのみ保存し、ブラウザ終了で破棄されます。
-                </div>
             </div>
 
             <div class="card">
@@ -4009,7 +3974,6 @@
     let adminMode = "create";    // "create" | "edit"（予定登録フォーム）
     let adminEditingId = "";     // 編集対象ID
     let adminItemsMap = {};      // 管理一覧の行データを保持するマップ（編集ボタンから参照）
-    const TAG_ADMIN_KEY_STORAGE = "tm/tag_admin_api_key/v1";
     let tagAdminState = {
     rows: [],
     orderedIds: [],
@@ -4710,8 +4674,6 @@
 
     // タグ管理画面
     $("#btnTagAdminBack").onclick = ()=> show("#view-home");
-    $("#btnTagAdminSaveKey").onclick = saveTagAdminApiKeyFromInput;
-    $("#btnTagAdminClearKey").onclick = clearTagAdminApiKey;
     $("#btnTagAdminReload").onclick = ()=> loadTagAdminList();
     $("#btnTagAdminCreate").onclick = ()=> createTagAdminTag();
     $("#btnTagAdminSaveOrder").onclick = ()=> saveTagAdminOrder();
@@ -7204,29 +7166,11 @@
     }
 
 /* ===== タグ管理（管理者） ===== */
-    function getTagAdminApiKey(){
-    return sessionStorage.getItem(TAG_ADMIN_KEY_STORAGE) || "";
-    }
-    function setTagAdminApiKey(v){
-    const key = String(v || "").trim();
-    if (!key) {
-        sessionStorage.removeItem(TAG_ADMIN_KEY_STORAGE);
-    } else {
-        sessionStorage.setItem(TAG_ADMIN_KEY_STORAGE, key);
-    }
-    }
     function setTagAdminLog(msg, isError = false){
     const el = document.getElementById("tagAdminLog");
     if (!el) return;
     el.textContent = msg || "";
     el.style.color = (msg && isError) ? "#b3261e" : "";
-    }
-    function renderTagAdminKeyStatus(){
-    const key = getTagAdminApiKey();
-    const input = document.getElementById("tagAdminApiKey");
-    const status = document.getElementById("tagAdminKeyStatus");
-    if (input) input.value = key;
-    if (status) status.textContent = key ? "APIキー保存済み（sessionStorage）" : "APIキー未設定";
     }
     function parseTagAdminSortInput(raw){
     const s = String(raw ?? "").trim();
@@ -7252,15 +7196,12 @@
     };
     }
     async function tagAdminRequest(path, { method = "GET", body } = {}){
-    const key = getTagAdminApiKey().trim();
-    if (!key) throw new Error("管理APIキーを入力して保存してください");
     if (!D1_BASE) throw new Error("D1_API_BASE_URL が未設定です");
 
     const url = D1_BASE.replace(/\/+$/, "") + path;
-    const headers = { "x-api-key": key };
-    const init = { method, headers };
+    const init = { method };
     if (body !== undefined) {
-        headers["content-type"] = "application/json";
+        init.headers = { "content-type": "application/json" };
         init.body = JSON.stringify(body);
     }
 
@@ -7338,15 +7279,6 @@
     const box = document.getElementById("tagAdminListBox");
     if (!box) return;
 
-    if (!getTagAdminApiKey().trim()) {
-        tagAdminState.rows = [];
-        tagAdminState.orderedIds = [];
-        tagAdminState.dirtyOrder = false;
-        box.innerHTML = `<div class="listEmpty">管理APIキーを保存するとタグ一覧を取得できます</div>`;
-        if (!keepLog) setTagAdminLog("");
-        return;
-    }
-
     box.innerHTML = `読み込み中… <span class="spinner"></span>`;
     try {
         const js = await tagAdminRequest("/admin/tags/list");
@@ -7365,30 +7297,7 @@
     }
     }
     function enterTagAdminView(){
-    renderTagAdminKeyStatus();
     loadTagAdminList();
-    }
-    function saveTagAdminApiKeyFromInput(){
-    const input = document.getElementById("tagAdminApiKey");
-    const key = String(input?.value || "").trim();
-    if (!key) {
-        setTagAdminLog("管理APIキーを入力してください", true);
-        return;
-    }
-    setTagAdminApiKey(key);
-    renderTagAdminKeyStatus();
-    setTagAdminLog("管理APIキーを保存しました");
-    loadTagAdminList({ keepLog: true });
-    }
-    function clearTagAdminApiKey(){
-    setTagAdminApiKey("");
-    renderTagAdminKeyStatus();
-    tagAdminState.rows = [];
-    tagAdminState.orderedIds = [];
-    tagAdminState.dirtyOrder = false;
-    const box = document.getElementById("tagAdminListBox");
-    if (box) box.innerHTML = `<div class="listEmpty">管理APIキーを保存するとタグ一覧を取得できます</div>`;
-    setTagAdminLog("管理APIキーを削除しました");
     }
     function moveTagAdminRow(id, delta){
     const ids = Array.isArray(tagAdminState.orderedIds) ? tagAdminState.orderedIds.slice() : [];
