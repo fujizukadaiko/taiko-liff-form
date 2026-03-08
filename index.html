@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.2.5";  // stable ver→v6.2.1, PROD v1.2.6 反映済み
+            const FRONT_VERSION = "Front v6.2.6";  // stable ver→v6.2.6, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyvDWJaEB-3jSmZvAsXGkAQbPdqKQglkwgamc5ETHI_klJgN8w4WeNrrvMjs_6ZDkGycg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -2679,18 +2679,17 @@
             </div>
 
             <div class="card">
-                <div class="sectionTitle" style="margin:0 0 6px;">ICS購読</div>
-                <div class="small muted" style="margin-bottom:8px;">カレンダーに予定を自動で表示する（購読）</div>
+                <div class="sectionTitle" style="margin:0 0 6px;">Iカレンダーに予定を自動で表示する（購読）</div>
                 <div class="small muted" style="margin-bottom:8px;">
                     このURLを登録すると、太鼓の予定があなたの Googleカレンダー / iPhone(Apple)カレンダー / Outlook に表示されます。
                     予定が追加・変更されたときも、カレンダー側が自動で更新します（反映まで少し時間がかかることがあります）。
                 </div>
                 <div class="small muted" style="margin-bottom:6px;">手順</div>
                 <ol class="small muted" style="margin:0 0 8px 18px; padding:0;">
-                    <li>下の「購読URLをコピー」を押す</li>
-                    <li>お使いのカレンダーアプリで「URLで購読（照会カレンダー）」に貼り付けて登録する</li>
+                    <li>①下の「購読URLをコピー」を押す</li>
+                    <li>②お使いのカレンダーアプリで「URLで購読（照会カレンダー）」に貼り付けて登録する</li>
                 </ol>
-                <label for="icsFeedUrl">購読URL（以降変更不要）</label>
+                <label for="icsFeedUrl">購読URL</label>
                 <input
                     id="icsFeedUrl"
                     type="text"
