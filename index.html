@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.3.0";  // stable ver→v6.3.0, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.3.1";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwNSN5CUrTmxEWnqnu0o4mEhqYnQFL210ndmirSFwaqhxyOufIzx8vPy-K38lc5b5aIRg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4205,9 +4205,14 @@
     const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     return m ? `${m[1]}/${m[2]}/${m[3]}` : "";
     }
-    function toDateInputFromYmdSlash(v){ // "yyyy/MM/dd" -> "yyyy-mm-dd"
-    const m = String(v||"").match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
-    return m ? `${m[1]}-${m[2]}-${m[3]}` : "";
+    function toDateInputFromYmdSlash(v){ // "yyyy/MM/dd" / "yyyyMMdd" / "yyyy-mm-dd" -> "yyyy-mm-dd"
+    const str = String(v || "").trim();
+    if (!str) return "";
+    const m8 = str.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (m8) return `${m8[1]}-${m8[2]}-${m8[3]}`;
+    const m = str.replace(/\//g, "-").match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (!m) return "";
+    return `${m[1]}-${String(m[2]).padStart(2, "0")}-${String(m[3]).padStart(2, "0")}`;
     }
 
     // イベントセレクト用の表示ラベル生成
@@ -6805,7 +6810,7 @@
         $("#ad_meetAt").value = it.meetAt || "";
         $("#ad_meetPlace").value = it.meetPlace || "";
         $("#ad_attendTarget").value = (it.attendTarget||"N");
-        $("#ad_deadline").value = toDateInputFromYmdSlash(it.deadline || "");
+        $("#ad_deadline").value = toDateInputFromAnyYmd(it.deadline || "");
         $("#ad_publish").value = it.publish || "Yes";
         $("#ad_status").value  = it.status  || "active";
         $("#ad_status").disabled = false; // ★ 追加：編集時はプルダウンを有効化
