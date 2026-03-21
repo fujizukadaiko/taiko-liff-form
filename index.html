@@ -8,9 +8,9 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.2.8";  // stable ver→v6.2.6, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.2.9";  // stable ver→v6.2.9, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
-            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbyyvsJAQTlb2COR12s8Ypy1ndjabE68Cg8tqo06hl8dJyW9rzyrzvZwo142FDM1zKYuwQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
+            const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbwNSN5CUrTmxEWnqnu0o4mEhqYnQFL210ndmirSFwaqhxyOufIzx8vPy-K38lc5b5aIRg/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
             /*
              * ICS配信デプロイ手順:
@@ -7993,13 +7993,14 @@
             : "na";
     }
 
-    // ▼ 名前の正規化（全角空白→半角、余分な空白・先頭ラベル除去）
+    // ▼ 名前の正規化（全角空白→半角、余分な空白・区分ラベル除去）
     function canonName(s){
         return String(s || "")
         .replace(/\u3000/g, " ")       // 全角空白→半角
         .replace(/^\s+|\s+$/g, "")     // 前後空白
         .replace(/\s+/g, " ")          // 連続空白
-        .replace(/^【[^】]+】\s*/, ""); // 接頭の【大人の部】等を除去
+        .replace(/^【[^】]+】\s*/, "")  // 接頭の【大人の部】等を除去
+        .replace(/\s*【[^】]+】$/, ""); // 接尾の【大人の部】等を除去
     }
 
     // ▼ members から「正規化名前 → 区分」索引を作成
@@ -8615,12 +8616,12 @@
         return norm;
     }
     
-    // ▼ 名前 + 区分から表示名を組み立て（大人の部の接頭辞を付ける）
+    // ▼ 名前 + 区分から表示名を組み立て（大人の部の接尾辞を付ける）
     function nameWithSegPrefix(p){
         const nm = String(p?.name || "");
-        if (nm.startsWith("【大人の部】")) return nm; // 既に付いていればそのまま
+        if (nm.endsWith("【大人の部】")) return nm; // 既に付いていればそのまま
         const s  = String(p?.seg || "");
-        return s.includes("大人") ? `【大人の部】${nm}` : nm;
+        return s.includes("大人") ? `${nm}【大人の部】` : nm;
     }
 
     // 既存ハンドラとつながるように公開
