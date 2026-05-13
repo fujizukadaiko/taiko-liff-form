@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.3.2";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.3.3";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycby82CIj6IQ69Ynx-jMWYokqeMBnjD2MFer2jqu4ZFzUtVkuCI2wE4emCLrMtzY8mrX8_A/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1106,90 +1106,6 @@
         /* プレースホルダの見え方も揃える（必要なら） */
         #view-admin #ad_note::placeholder{
         color: #9aa;
-        }
-
-        /* ===== Tag Admin（タグ管理） ===== */
-        #view-tag-admin .tagAdminCreateGrid{
-            display:grid;
-            grid-template-columns: 1fr 180px;
-            gap:10px 12px;
-            align-items:end;
-            margin-top:6px;
-        }
-        #view-tag-admin .tagAdminCheck{
-            grid-column: 1 / -1;
-            display:inline-flex;
-            align-items:center;
-            gap:8px;
-            font-size:13px;
-            color:var(--c-text);
-        }
-        #view-tag-admin .tagAdminRows{
-            display:flex;
-            flex-direction:column;
-            gap:10px;
-            margin-top:8px;
-        }
-        #view-tag-admin .tagAdminRow{
-            border:1px solid var(--c-border);
-            border-radius:10px;
-            background:#fff;
-            padding:10px;
-        }
-        #view-tag-admin .tagAdminRow.is-disabled{
-            background:#f6f6f6;
-            opacity:0.85;
-        }
-        #view-tag-admin .tagAdminRowHead{
-            display:flex;
-            align-items:center;
-            justify-content:space-between;
-            gap:8px;
-            margin-bottom:8px;
-        }
-        #view-tag-admin .tagAdminId{
-            font-size:12px;
-            color:var(--c-muted);
-        }
-        #view-tag-admin .tagAdminStatus{
-            font-size:12px;
-            color:var(--c-muted);
-        }
-        #view-tag-admin .tagAdminRowBody{
-            display:grid;
-            grid-template-columns: minmax(0, 1fr) auto auto auto;
-            gap:8px;
-            align-items:center;
-        }
-        #view-tag-admin .tagAdminRowBody input[type="text"]{
-            min-width:0;
-        }
-        #view-tag-admin .tagAdminRowBody input[type="number"]{
-            width:96px;
-        }
-        #view-tag-admin .tagAdminToggle{
-            display:inline-flex;
-            align-items:center;
-            gap:6px;
-            white-space:nowrap;
-            font-size:13px;
-        }
-        #view-tag-admin .tagAdminActionRow{
-            display:flex;
-            justify-content:flex-end;
-            gap:6px;
-            margin-top:8px;
-        }
-        @media (max-width: 700px){
-            #view-tag-admin .tagAdminCreateGrid{
-                grid-template-columns: 1fr;
-            }
-            #view-tag-admin .tagAdminRowBody{
-                grid-template-columns: 1fr 1fr;
-            }
-            #view-tag-admin .tagAdminRowBody .tagAdminNameWrap{
-                grid-column: 1 / -1;
-            }
         }
 
     /* ===== Register（氏名編集） ===== */
@@ -2587,9 +2503,6 @@
                     <button id="btnFeedback" class="btn btn-outline btn-sm btn-compact" data-view-target="view-feedback">
                         ご意見BOX
                     </button>
-                    <button id="btnAdminMenuTags" class="btn btn-outline btn-sm btn-compact" data-view-target="view-tag-admin">
-                        タグ管理
-                    </button>
                 </div>
                 <div class="small muted" style="margin-top:6px;">※ 管理者のみ表示されます</div>
             </div>
@@ -3103,56 +3016,6 @@
             <div id="savingOverlayMsg" class="saving-message">保存中…</div>
         </div>
         </div>
-        </section>
-
-    <!-- ===== View: タグ管理（管理者） ===== -->
-        <section id="view-tag-admin" data-view>
-            <div class="row-space">
-                <div class="sectionTitle">タグ管理（管理者）</div>
-                <button
-                    id="btnTagAdminBack"
-                    class="btn btn-ghost btn-sm"
-                    data-view-target="view-home"
-                    type="button"
-                >
-                    トップに戻る
-                </button>
-            </div>
-
-            <div class="card">
-                <div class="row-space">
-                    <div class="sectionTitle">新規タグ作成</div>
-                    <button id="btnTagAdminCreate" class="btn btn-primary btn-sm" type="button">
-                        作成
-                    </button>
-                </div>
-                <div class="tagAdminCreateGrid">
-                    <div>
-                        <label for="tagCreateName">タグ名 *</label>
-                        <input id="tagCreateName" type="text" placeholder="例：発表" />
-                    </div>
-                    <div>
-                        <label for="tagCreateSortOrder">sort_order（任意）</label>
-                        <input id="tagCreateSortOrder" type="number" step="1" placeholder="例：10" />
-                    </div>
-                    <label class="tagAdminCheck">
-                        <input id="tagCreateOfficial" type="checkbox" />
-                        <span>公式タグとして作成（is_official=1）</span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="row-space">
-                    <div class="sectionTitle">タグ一覧</div>
-                    <div class="row" style="gap:8px;">
-                        <button id="btnTagAdminReload" class="btn btn-ghost btn-sm" type="button">再取得</button>
-                        <button id="btnTagAdminSaveOrder" class="btn btn-outline btn-sm" type="button">並び順を保存</button>
-                    </div>
-                </div>
-                <div id="tagAdminListBox" class="muted">読み込み待機中</div>
-                <div id="tagAdminLog" class="small muted" style="margin-top:8px;"></div>
-            </div>
         </section>
 
     <!-- ===== View: 出欠結果一覧（管理者） ===== -->
@@ -4216,11 +4079,6 @@
     let adminMode = "create";    // "create" | "edit"（予定登録フォーム）
     let adminEditingId = "";     // 編集対象ID
     let adminItemsMap = {};      // 管理一覧の行データを保持するマップ（編集ボタンから参照）
-    let tagAdminState = {
-    rows: [],
-    orderedIds: [],
-    dirtyOrder: false,
-    };
 
 /* ===== ドラフト（一時保存） ===== */
     /* 保存スコープは lineId 単位。localStorage に永続化します */
@@ -4913,11 +4771,6 @@
         enterAdminCreateMode();
         adminListFetch();
     };
-    $("#btnAdminMenuTags").onclick = ()=>{
-        if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
-        show("#view-tag-admin");
-        enterTagAdminView();
-    };
     $("#btnAdminMenuReport").onclick = ()=>{
         if (!state.isAdmin){ alert("管理者のみアクセス可能です"); return; }
         show("#view-admin-report");
@@ -4969,14 +4822,6 @@
     $("#btnAdminReset").onclick = ()=> enterAdminCreateMode();
     $("#ad_type").addEventListener("change", adminTypeChangeAdapt);
 
-    // タグ管理画面
-    $("#btnTagAdminBack").onclick = ()=> show("#view-home");
-    $("#btnTagAdminReload").onclick = ()=> loadTagAdminList();
-    $("#btnTagAdminCreate").onclick = ()=> createTagAdminTag();
-    $("#btnTagAdminSaveOrder").onclick = ()=> saveTagAdminOrder();
-    document.getElementById("tagAdminListBox")?.addEventListener("click", onTagAdminListClick);
-    document.getElementById("tagAdminListBox")?.addEventListener("change", onTagAdminListChange);
-    
     // 管理アコーディオン（ヘッダーに直接：click/Enter/Space、キャプチャで確実に拾う）
     function setupAdminAccordion(){
         const acc  = document.getElementById('adminListAcc');
@@ -7509,300 +7354,6 @@
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-/* ===== タグ管理（管理者） ===== */
-    function setTagAdminLog(msg, isError = false){
-    const el = document.getElementById("tagAdminLog");
-    if (!el) return;
-    el.textContent = msg || "";
-    el.style.color = (msg && isError) ? "#b3261e" : "";
-    }
-    function parseTagAdminSortInput(raw){
-    const s = String(raw ?? "").trim();
-    if (!s) return { ok: true, value: null };
-    const n = Number(s);
-    if (!Number.isInteger(n)) return { ok: false, error: "sort_order は整数で入力してください" };
-    return { ok: true, value: n };
-    }
-    function toTagAdminBool(v){
-    return v === 1 || v === "1" || v === true;
-    }
-    function normalizeTagAdminRow(row){
-    const id = Number(row?.id || 0);
-    return {
-        id,
-        name: String(row?.name || "").trim(),
-        is_official: toTagAdminBool(row?.is_official ?? row?.isOfficial ?? 0),
-        disabled: toTagAdminBool(row?.disabled ?? row?.is_disabled ?? 0),
-        sort_order:
-        row?.sort_order === null || row?.sort_order === undefined || row?.sort_order === ""
-            ? null
-            : Number(row.sort_order),
-    };
-    }
-    async function tagAdminRequest(path, { method = "GET", body } = {}){
-    if (!D1_BASE) throw new Error("D1_API_BASE_URL が未設定です");
-
-    const url = D1_BASE.replace(/\/+$/, "") + path;
-    const init = { method };
-    if (body !== undefined) {
-        init.headers = { "content-type": "application/json" };
-        init.body = JSON.stringify(body);
-    }
-
-    const res = await fetch(url, init);
-    const js = await res.json().catch(() => ({}));
-    if (!res.ok || js?.ok === false) {
-        const msg = js?.error || js?.message || `HTTP ${res.status}`;
-        const err = new Error(msg);
-        err.status = res.status;
-        throw err;
-    }
-    return js;
-    }
-    function getTagAdminRowsInOrder(){
-    const map = new Map((tagAdminState.rows || []).map((r) => [r.id, r]));
-    const ids = Array.isArray(tagAdminState.orderedIds) ? tagAdminState.orderedIds : [];
-    const ordered = ids.map((id) => map.get(id)).filter(Boolean);
-    const seen = new Set(ordered.map((r) => r.id));
-    const rest = (tagAdminState.rows || []).filter((r) => !seen.has(r.id));
-    return ordered.concat(rest);
-    }
-    function renderTagAdminList(){
-    const box = document.getElementById("tagAdminListBox");
-    if (!box) return;
-
-    const rows = getTagAdminRowsInOrder();
-    if (!rows.length) {
-        box.innerHTML = `<div class="listEmpty">タグがありません</div>`;
-        return;
-    }
-
-    const html = rows.map((row, idx) => {
-        const id = Number(row.id);
-        const safeName = h(row.name || "");
-        const sortText = row.sort_order === null || row.sort_order === undefined ? "" : String(row.sort_order);
-        const isOfficial = row.is_official ? "checked" : "";
-        const isDisabled = row.disabled ? "checked" : "";
-        const disabledClass = row.disabled ? " is-disabled" : "";
-        return `
-        <div class="tagAdminRow${disabledClass}" data-tag-id="${id}">
-            <div class="tagAdminRowHead">
-                <div class="tagAdminId">ID: ${id}</div>
-                <div class="tagAdminStatus">表示順: ${idx + 1}</div>
-            </div>
-            <div class="tagAdminRowBody">
-                <div class="tagAdminNameWrap">
-                    <label class="small muted" for="tagName_${id}">タグ名</label>
-                    <input id="tagName_${id}" type="text" data-field="name" value="${safeName}" />
-                </div>
-                <label class="tagAdminToggle">
-                    <input type="checkbox" data-field="is_official" ${isOfficial} />
-                    <span>公式</span>
-                </label>
-                <label class="tagAdminToggle">
-                    <input type="checkbox" data-field="disabled" ${isDisabled} />
-                    <span>無効</span>
-                </label>
-                <div>
-                    <label class="small muted" for="tagSort_${id}">sort_order</label>
-                    <input id="tagSort_${id}" type="number" step="1" data-field="sort_order" value="${h(sortText)}" />
-                </div>
-            </div>
-            <div class="tagAdminActionRow">
-                <button class="btn btn-ghost btn-sm" type="button" data-action="up">↑</button>
-                <button class="btn btn-ghost btn-sm" type="button" data-action="down">↓</button>
-                <button class="btn btn-outline btn-sm" type="button" data-action="save">保存</button>
-            </div>
-        </div>
-        `;
-    }).join("");
-
-    box.innerHTML = `<div class="tagAdminRows">${html}</div>`;
-    }
-    async function loadTagAdminList({ keepLog = false } = {}){
-    const box = document.getElementById("tagAdminListBox");
-    if (!box) return;
-
-    box.innerHTML = `読み込み中… <span class="spinner"></span>`;
-    try {
-        const js = await tagAdminRequest("/admin/tags/list");
-        const list = Array.isArray(js?.tags) ? js.tags : [];
-        tagAdminState.rows = list.map(normalizeTagAdminRow).filter((r) => Number.isInteger(r.id) && r.id > 0);
-        tagAdminState.orderedIds = tagAdminState.rows.map((r) => r.id);
-        tagAdminState.dirtyOrder = false;
-        renderTagAdminList();
-        if (!keepLog) setTagAdminLog("");
-    } catch (e) {
-        tagAdminState.rows = [];
-        tagAdminState.orderedIds = [];
-        tagAdminState.dirtyOrder = false;
-        box.innerHTML = `<span class="err">タグ一覧の取得に失敗しました: ${h(e.message || String(e))}</span>`;
-        if (!keepLog) setTagAdminLog(e.message || String(e), true);
-    }
-    }
-    function enterTagAdminView(){
-    loadTagAdminList();
-    }
-    function moveTagAdminRow(id, delta){
-    const ids = Array.isArray(tagAdminState.orderedIds) ? tagAdminState.orderedIds.slice() : [];
-    const idx = ids.indexOf(id);
-    if (idx < 0) return;
-    const next = idx + delta;
-    if (next < 0 || next >= ids.length) return;
-    const tmp = ids[idx];
-    ids[idx] = ids[next];
-    ids[next] = tmp;
-    tagAdminState.orderedIds = ids;
-    tagAdminState.dirtyOrder = true;
-    renderTagAdminList();
-    setTagAdminLog("並び順を変更しました。「並び順を保存」を押してください。");
-    }
-    function onTagAdminListChange(ev){
-    const t = ev.target;
-    if (!(t instanceof HTMLElement)) return;
-    const row = t.closest(".tagAdminRow");
-    if (!row) return;
-    if (t.getAttribute("data-field") === "disabled" && t instanceof HTMLInputElement) {
-        row.classList.toggle("is-disabled", !!t.checked);
-    }
-    }
-    function readTagAdminRowPayload(rowEl){
-    const id = Number(rowEl?.dataset?.tagId || 0);
-    if (!Number.isInteger(id) || id <= 0) {
-        throw new Error("タグIDが不正です");
-    }
-    const nameInput = rowEl.querySelector('[data-field="name"]');
-    const officialInput = rowEl.querySelector('[data-field="is_official"]');
-    const disabledInput = rowEl.querySelector('[data-field="disabled"]');
-    const sortInput = rowEl.querySelector('[data-field="sort_order"]');
-
-    const name = String(nameInput?.value || "").trim();
-    if (!name) {
-        throw new Error("タグ名を入力してください");
-    }
-
-    const sortParsed = parseTagAdminSortInput(sortInput?.value || "");
-    if (!sortParsed.ok) {
-        throw new Error(sortParsed.error);
-    }
-
-    return {
-        id,
-        name,
-        is_official: officialInput?.checked ? 1 : 0,
-        disabled: disabledInput?.checked ? 1 : 0,
-        sort_order: sortParsed.value,
-    };
-    }
-    async function saveTagAdminRow(rowEl, btn){
-    let payload;
-    try {
-        payload = readTagAdminRowPayload(rowEl);
-    } catch (e) {
-        setTagAdminLog(e.message || String(e), true);
-        return;
-    }
-
-    const originalText = btn?.textContent || "保存";
-    if (btn) { btn.disabled = true; btn.textContent = "保存中…"; }
-    try {
-        await tagAdminRequest("/admin/tags/update", { method: "POST", body: payload });
-        setTagAdminLog(`タグ「${payload.name}」を更新しました`);
-        await loadTagAdminList({ keepLog: true });
-    } catch (e) {
-        setTagAdminLog(e.message || String(e), true);
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = originalText; }
-    }
-    }
-    async function createTagAdminTag(){
-    const nameInput = document.getElementById("tagCreateName");
-    const sortInput = document.getElementById("tagCreateSortOrder");
-    const officialInput = document.getElementById("tagCreateOfficial");
-    const createBtn = document.getElementById("btnTagAdminCreate");
-
-    const name = String(nameInput?.value || "").trim();
-    if (!name) {
-        setTagAdminLog("タグ名を入力してください", true);
-        return;
-    }
-    const sortParsed = parseTagAdminSortInput(sortInput?.value || "");
-    if (!sortParsed.ok) {
-        setTagAdminLog(sortParsed.error, true);
-        return;
-    }
-
-    const originalText = createBtn?.textContent || "作成";
-    if (createBtn) { createBtn.disabled = true; createBtn.textContent = "作成中…"; }
-    try {
-        await tagAdminRequest("/admin/tags/create", {
-        method: "POST",
-        body: {
-            name,
-            is_official: officialInput?.checked ? 1 : 0,
-            sort_order: sortParsed.value,
-        },
-        });
-        if (nameInput) nameInput.value = "";
-        if (sortInput) sortInput.value = "";
-        if (officialInput) officialInput.checked = false;
-        setTagAdminLog(`タグ「${name}」を作成しました`);
-        await loadTagAdminList({ keepLog: true });
-    } catch (e) {
-        setTagAdminLog(e.message || String(e), true);
-    } finally {
-        if (createBtn) { createBtn.disabled = false; createBtn.textContent = originalText; }
-    }
-    }
-    async function saveTagAdminOrder(){
-    if (!tagAdminState.dirtyOrder) {
-        setTagAdminLog("並び順の変更はありません");
-        return;
-    }
-    if (!Array.isArray(tagAdminState.orderedIds) || !tagAdminState.orderedIds.length) {
-        setTagAdminLog("並び順データがありません", true);
-        return;
-    }
-
-    const btn = document.getElementById("btnTagAdminSaveOrder");
-    const originalText = btn?.textContent || "並び順を保存";
-    if (btn) { btn.disabled = true; btn.textContent = "保存中…"; }
-    try {
-        await tagAdminRequest("/admin/tags/reorder", {
-        method: "POST",
-        body: { orderedIds: tagAdminState.orderedIds.slice() },
-        });
-        setTagAdminLog("並び順を保存しました");
-        await loadTagAdminList({ keepLog: true });
-    } catch (e) {
-        setTagAdminLog(e.message || String(e), true);
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = originalText; }
-    }
-    }
-    function onTagAdminListClick(ev){
-    const target = ev.target;
-    if (!(target instanceof Element)) return;
-    const btn = target.closest("button[data-action]");
-    if (!btn) return;
-    const rowEl = btn.closest(".tagAdminRow");
-    if (!rowEl) return;
-    const id = Number(rowEl.dataset.tagId || 0);
-    if (!Number.isInteger(id) || id <= 0) return;
-    const action = btn.dataset.action;
-    if (action === "up") {
-        moveTagAdminRow(id, -1);
-        return;
-    }
-    if (action === "down") {
-        moveTagAdminRow(id, 1);
-        return;
-    }
-    if (action === "save") {
-        saveTagAdminRow(rowEl, btn);
-    }
-    }
-
 /* ===== 管理レポート（軽量メタ → 詳細取得） ===== */
   // 追加の状態
   state.reportMeta = [];          // 軽量一覧（rows無し）
@@ -8432,6 +7983,51 @@
         return arr;
     }
 
+    // ▼ 出欠結果一覧と同じ基準で、payload から表示用 rows を作る
+    function buildReportRowsForPayload(payload, eventId, opt = {}){
+        const includeUnanswered = opt.includeUnanswered !== false;
+        const list = pickRows(payload);
+
+        // ★ 家族フィルタは一切しない（= 全員ベースで扱う）
+        const rows = list.map(mapRow);
+
+        const answeredCanon = new Set(
+        rows.map(r => canonName(r.name)).filter(Boolean)
+        );
+
+        const segIndex   = buildSegIndex(payload);
+        const candidates = buildCandidates(payload, segIndex);
+        const eventSegNorm = getEventSegmentNorm(payload, eventId);
+
+        rows.forEach(r => {
+        if (!r.seg) {
+            const nmKey = canonName(r.name);
+            const segFromIdx = segIndex[nmKey];
+            if (segFromIdx) r.seg = segFromIdx;
+        }
+        const baseName = canonName(r.name);
+        if (baseName) {
+            r.name = nameWithSegPrefix({ name: baseName, seg: r.seg });
+        }
+        });
+
+        let rowsFiltered = rows;
+        if (eventSegNorm && eventSegNorm !== "両方") {
+            rowsFiltered = rows.filter(r => {
+                const segNorm = normalizeSegmentLabel(r.seg);
+                if (!segNorm) return false;
+                if (segNorm === "両方") return true;
+                return segNorm === eventSegNorm;
+            });
+        }
+
+        const naRows = includeUnanswered
+            ? buildNaRows(candidates, answeredCanon, segIndex, eventSegNorm)
+            : [];
+
+        return sortRowsByPriority(rowsFiltered.concat(naRows), payload);
+    }
+
     // ▼ 出欠結果の描画（#repEvent の value を eventId とみなして取得→描画）
     async function renderReport(){
         const sel = document.getElementById("repEvent");
@@ -8552,60 +8148,7 @@
         }
 
         // ★ 家族フィルタは一切しない（= 全員ベースで扱う）
-        const rows = list.map(mapRow);
-
-        // --- 比較用：名前の正規化（全員ぶん） ---
-        // → 未回答生成のときには「大人だけど間違って子ども公演に回答した人」も
-        //   きちんと「回答済み」として扱いたいので、ここは *フィルタ前* の rows を見る
-        const answeredCanon = new Set(
-        rows.map(r => canonName(r.name)).filter(Boolean)
-        );
-
-        // members から「名前→区分」索引（未回答表示で接頭辞付与に使う）
-        const segIndex   = buildSegIndex(payload);
-        const candidates = buildCandidates(payload, segIndex);
-
-        // ▼ イベント自体の対象区分を取得（D1/GAS + フロントのマスターからも検索）
-        const eventSegNorm = getEventSegmentNorm(payload, id);
-
-        // ▼ 回答済み rows にも seg を補完しておく（members 情報から）
-        rows.forEach(r => {
-        if (!r.seg) {
-            const nmKey = canonName(r.name);
-            const segFromIdx = segIndex[nmKey];
-            if (segFromIdx) r.seg = segFromIdx;
-        }
-        const baseName = canonName(r.name);
-        if (baseName) {
-            r.name = nameWithSegPrefix({ name: baseName, seg: r.seg });
-        }
-        });
-
-        // ▼ イベントの対象区分で「回答済み rows」をフィルタ
-        let rowsFiltered = rows;
-        if (eventSegNorm && eventSegNorm !== "両方") {
-            rowsFiltered = rows.filter(r => {
-                const segNorm = normalizeSegmentLabel(r.seg);
-
-                // 区分が取れない場合 → このイベントでは対象外にする
-                if (!segNorm) return false;
-
-                // 両方 → どちらのイベントにも出て良い
-                if (segNorm === "両方") return true;
-
-                // それ以外はイベント区分と一致するかどうか
-                return segNorm === eventSegNorm;
-            });
-        }
-
-        // ▼ 未回答も同じくイベント区分でフィルタ
-        const naRows = buildNaRows(candidates, answeredCanon, segIndex, eventSegNorm);
-
-        // rows を未回答で拡張（ここから先は元の処理と同じ）
-        const rowsAll = rowsFiltered.concat(naRows);
-
-        // ★ 並び替え（sortGroup → birthYear → 名前）
-        const rowsAllSorted = sortRowsByPriority(rowsAll, payload);
+        const rowsAllSorted = buildReportRowsForPayload(payload, id, { includeUnanswered: true });
 
         // フィルタ
         const f = document.getElementById("repAttend")?.value || "";
@@ -8884,6 +8427,7 @@
 
     // 既存ハンドラとつながるように公開
     window.renderReport = renderReport;
+    window.buildAdminReportRowsForEvent = buildReportRowsForPayload;
     })();
 
 /* ===== 配車補助（管理者） ===== */
@@ -8933,6 +8477,11 @@
         return [];
     }
 
+    function isCarpoolParticipatingAttend(raw){
+        const s = String(raw || "").trim().toLowerCase();
+        return s === "参加" || s === "yes" || s === "y" || s === "true" || s === "1";
+    }
+
     function carpoolMapRow(x){
         const rawName =
         x?.displayName ??
@@ -8962,6 +8511,17 @@
         attend: String(rawAttend || "").trim() || "未回答",
         comment: String(comment || "").trim(),
         segment: x?.segment || x?.seg || "",
+        };
+    }
+
+    function carpoolMapReportRow(x){
+        return {
+        lineId: x?.lineId || x?.line_id || "",
+        name: normalizeCarpoolName(x?.name || x?.displayName || x?.performerName || ""),
+        displayName: String(x?.name || x?.displayName || x?.performerName || "").trim(),
+        attend: String(x?.attend || "").trim() || "未回答",
+        comment: String(x?.comment || "").trim(),
+        segment: x?.seg || x?.segment || "",
         };
     }
 
@@ -9188,7 +8748,13 @@
             throw new Error(payload?.message || `HTTP ${res.status}`);
         }
 
-        const eventSeg =
+        let rows = [];
+        if (typeof window.buildAdminReportRowsForEvent === "function") {
+            rows = window.buildAdminReportRowsForEvent(payload, eventKey, { includeUnanswered: false })
+            .filter(r => isCarpoolParticipatingAttend(r.attend))
+            .map(carpoolMapReportRow);
+        } else {
+            const eventSeg =
             payload.segment ||
             payload.targetGroup ||
             payload.target_group ||
@@ -9196,11 +8762,12 @@
             payload.event?.target_group ||
             "";
 
-        const rows = carpoolPickRows(payload)
+            rows = carpoolPickRows(payload)
             .map(carpoolMapRow)
-            .filter(r => r.attend === "参加")
+            .filter(r => isCarpoolParticipatingAttend(r.attend))
             .filter(r => carpoolEventMatchesSegment(r.segment, eventSeg))
             .sort((a, b) => String(a.name).localeCompare(String(b.name), "ja"));
+        }
 
         carpoolState.rows = rows;
         renderCarpoolRows();
