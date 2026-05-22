@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.3.4";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.3.5";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycby82CIj6IQ69Ynx-jMWYokqeMBnjD2MFer2jqu4ZFzUtVkuCI2wE4emCLrMtzY8mrX8_A/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -4473,6 +4473,14 @@
     }
     return true;
     }
+    function filterEventsForUserSegments(events, userSegSet){
+    const list = Array.isArray(events) ? events : [];
+    if (!userSegSet || userSegSet.size === 0) return list.slice();
+    return list.filter(e => {
+        const evSeg = e.segment || e.targetSegment || e.attendSegment || e.segmentRaw || e.segmentCode || e.targetGroup || "";
+        return eventVisibleForUser(evSeg, userSegSet, INCLUDE_BOTH_FOR_ALL);
+    });
+    }
     function buildNameSegMap(){
     const map = {};
     (state.members||[]).forEach(m=>{
@@ -5079,12 +5087,7 @@
     /* --- 先にイベントだけで描画（回答は空でOK） --- */
     function bootHomeQuickRender(){
     const userSegSet = getMemberSegSet();
-
-    let filteredEvents = (state.events||[]).filter(e=>{
-    const evSeg = e.segment || e.targetSegment || e.attendSegment || e.segmentRaw || e.segmentCode || "";
-    return eventVisibleForUser(evSeg, userSegSet, INCLUDE_BOTH_FOR_ALL);
-    });
-    if (userSegSet.size === 0) filteredEvents = (state.events||[]).slice(); // 未登録＝全表示
+    const filteredEvents = filterEventsForUserSegments(state.events || [], userSegSet);
 
     // performers（家族名）は会員情報がまだ無くても空配列でOK
     const performers = Array.from(
@@ -5105,12 +5108,14 @@
     window.HomeEventsUI?.mount({ events, myAnswersMap: {}, performers, nameSegMap });
     // フォーム側でも使えるよう保持
     state._filteredEventsForViews = filteredEvents;
+    state._filteredEventsForViewsReady = true;
     }
 
     /* --- 回答が届いたら差し替え描画 --- */
     function mountHomeWithFilters(){
-    const filteredEvents = (state._filteredEventsForViews && state._filteredEventsForViews.length)
-    ? state._filteredEventsForViews : (state.events || []);
+    const filteredEvents = state._filteredEventsForViewsReady
+    ? (state._filteredEventsForViews || [])
+    : filterEventsForUserSegments(state.events || [], getMemberSegSet());
     const events = filteredEvents.map(x => ({
         id      : String(x.eventId ?? x.id ?? ''),
         ymd     : ymdDow(parseYmdStrict(x.date)) || String(x.date || x.ymd || ''),
