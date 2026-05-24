@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.3.5";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.3.6";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycby82CIj6IQ69Ynx-jMWYokqeMBnjD2MFer2jqu4ZFzUtVkuCI2wE4emCLrMtzY8mrX8_A/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -24,6 +24,24 @@
                 if (!ICS_FEED_BASE_URL) return "";
                 const sep = ICS_FEED_BASE_URL.includes("?") ? "&" : "?";
                 return `${ICS_FEED_BASE_URL}${sep}ics=1&range=next6m`;
+            })();
+            const ICS_FEED_URLS = (() => {
+                if (!ICS_FEED_BASE_URL) {
+                    return { all: "", adult: "", child: "" };
+                }
+                const base = ICS_FEED_BASE_URL.replace(/\/+$/, "");
+                if (base.includes("?")) {
+                    return {
+                        all: ICS_FEED_URL,
+                        adult: `${base}&ics=1&range=next6m&feed=adult-and-both`,
+                        child: `${base}&ics=1&range=next6m&feed=child-and-both`
+                    };
+                }
+                return {
+                    all: ICS_FEED_URL,
+                    adult: `${base}/ics/adult-and-both.ics?range=next6m`,
+                    child: `${base}/ics/child-and-both.ics?range=next6m`
+                };
             })();
            
             // D1 のベースURL
@@ -117,7 +135,7 @@
                 );
                 }
                 // 他スクリプトから参照しやすいよう window にまとめて公開
-                window.__APP_CONFIG__ = { FRONT_VERSION, LIFF_ID, API_ENDPOINT, D1_BASE, ENV_NS, ICS_FEED_URL };
+                window.__APP_CONFIG__ = { FRONT_VERSION, LIFF_ID, API_ENDPOINT, D1_BASE, ENV_NS, ICS_FEED_URL, ICS_FEED_URLS };
             })();
         </script>
 
@@ -2855,21 +2873,61 @@
                     <li>①下の「購読URLをコピー」を押す</li>
                     <li>②お使いのカレンダーアプリで「URLで購読（照会カレンダー）」に貼り付けて登録する</li>
                 </ol>
-                <label for="icsFeedUrl">購読URL</label>
-                <input
-                    id="icsFeedUrl"
-                    type="text"
-                    readonly
-                    placeholder="ICSフィードURL"
-                />
-                <div class="row" style="margin-top:8px;">
-                    <button
-                        type="button"
-                        class="btn btn-ghost btn-sm"
-                        onclick="copyIcsFeed()"
-                    >
-                        購読URLをコピー
-                    </button>
+                <div style="display:grid; gap:10px;">
+                    <div>
+                        <label for="icsFeedUrl">全部入り</label>
+                        <input
+                            id="icsFeedUrl"
+                            type="text"
+                            readonly
+                            placeholder="全部入りICSフィードURL"
+                        />
+                        <div class="row" style="margin-top:6px;">
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm"
+                                onclick="copyIcsFeed('all')"
+                            >
+                                全部入りURLをコピー
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="icsFeedUrlAdult">大人向け</label>
+                        <input
+                            id="icsFeedUrlAdult"
+                            type="text"
+                            readonly
+                            placeholder="大人向けICSフィードURL"
+                        />
+                        <div class="row" style="margin-top:6px;">
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm"
+                                onclick="copyIcsFeed('adult')"
+                            >
+                                大人向けURLをコピー
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="icsFeedUrlChild">子ども向け</label>
+                        <input
+                            id="icsFeedUrlChild"
+                            type="text"
+                            readonly
+                            placeholder="子ども向けICSフィードURL"
+                        />
+                        <div class="row" style="margin-top:6px;">
+                            <button
+                                type="button"
+                                class="btn btn-ghost btn-sm"
+                                onclick="copyIcsFeed('child')"
+                            >
+                                子ども向けURLをコピー
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -6621,16 +6679,30 @@
     };
 
     function setIcsFeedUrl_() {
-        const ipt = $("#icsFeedUrl");
-        if (!ipt) return;
-        const v = (window.__APP_CONFIG__ && window.__APP_CONFIG__.ICS_FEED_URL) || ICS_FEED_URL || "";
-        ipt.value = v;
+        const urls = (window.__APP_CONFIG__ && window.__APP_CONFIG__.ICS_FEED_URLS) || ICS_FEED_URLS || {};
+        const fallbackAll = (window.__APP_CONFIG__ && window.__APP_CONFIG__.ICS_FEED_URL) || ICS_FEED_URL || "";
+        const targets = {
+            all: "#icsFeedUrl",
+            adult: "#icsFeedUrlAdult",
+            child: "#icsFeedUrlChild"
+        };
+        Object.keys(targets).forEach(function(key) {
+            const ipt = $(targets[key]);
+            if (!ipt) return;
+            ipt.value = urls[key] || (key === "all" ? fallbackAll : "");
+        });
     }
     window.setIcsFeedUrl = setIcsFeedUrl_;
 
     // === ICS フィード URL コピー =======================================
-    window.copyIcsFeed = async function () {
-        const ipt = $("#icsFeedUrl");
+    window.copyIcsFeed = async function (kind) {
+        const targets = {
+            all: "#icsFeedUrl",
+            adult: "#icsFeedUrlAdult",
+            child: "#icsFeedUrlChild"
+        };
+        const key = targets[kind] ? kind : "all";
+        const ipt = $(targets[key]);
         if (!ipt) return;
         try {
         ipt.select();
