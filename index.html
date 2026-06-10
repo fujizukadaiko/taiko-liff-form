@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.3.6";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.3.7";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycby82CIj6IQ69Ynx-jMWYokqeMBnjD2MFer2jqu4ZFzUtVkuCI2wE4emCLrMtzY8mrX8_A/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -37,10 +37,11 @@
                         child: `${base}&ics=1&range=next6m&feed=child-and-both`
                     };
                 }
+                const sep = base.includes("?") ? "&" : "?";
                 return {
                     all: ICS_FEED_URL,
-                    adult: `${base}/ics/adult-and-both.ics?range=next6m`,
-                    child: `${base}/ics/child-and-both.ics?range=next6m`
+                    adult: `${base}${sep}ics=1&range=next6m&feed=adult-and-both`,
+                    child: `${base}${sep}ics=1&range=next6m&feed=child-and-both`
                 };
             })();
            
