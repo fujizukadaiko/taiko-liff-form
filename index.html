@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.3.9";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.4.0";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaeqchlDJmkQGMKEYm9pQEOmp-GWgt0jhxRsO3Uq_G9GxaaE3n9p-fYcO6eprlLO5QLQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -65,13 +65,13 @@
                     date: "2026-01-13",
                     title: "備考の表示追加",
                     tags: ["改善", "UI"],
-                    body: "今後の予定画面に備考がある場合はその内容を表示するようにしました。"
+                    body: "予定表画面に備考がある場合はその内容を表示するようにしました。"
                 },
                 {
                     date: "2026-01-04",
                     title: "システムの読み込みを高速化",
                     tags: ["改善", "内部"],
-                    body: "トップ画面の「今後の予定」「会員情報」などの読み込み処理を変更し、表示速度と安定性を改善しました。"
+                    body: "トップ画面の「予定表」「会員情報」などの読み込み処理を変更し、表示速度と安定性を改善しました。"
                 },
                 {
                     date: "2026-01-04",
@@ -93,7 +93,7 @@
                 },
                 {
                 date: "2025-11-15",
-                title: "今後の予定に演奏開始時間を表示",
+                    title: "予定表に演奏開始時間を表示",
                 tags: ["改善","UI"],
                 body: "イベント一覧に演奏開始時間を表示するようにしました。"
                 },
@@ -1309,12 +1309,11 @@
             width:auto !important;
             min-height:44px !important;
             padding:5px 12px !important;
-            border:0 !important;
-            border-bottom:1px dashed rgba(107,34,16,.45) !important;
-            border-radius:12px !important;
-            background:rgba(253,249,244,.56) !important;
-            color:var(--ui-primary-dark) !important;
-            box-shadow:none !important;
+                border:1px solid rgba(160,60,32,.14) !important;
+                border-radius:12px !important;
+                background:rgba(253,249,244,.88) !important;
+                color:var(--ui-primary-dark) !important;
+                box-shadow:0 4px 14px rgba(107,34,16,.08) !important;
             justify-self:center;
             text-decoration:none;
             font-size:13px !important;
@@ -1337,7 +1336,13 @@
         }
         .homeEditLink:hover{
             background:rgba(244,228,220,.72) !important;
-            border-bottom-color:rgba(107,34,16,.72) !important;
+            border-color:rgba(160,60,32,.22) !important;
+            box-shadow:0 6px 18px rgba(107,34,16,.12) !important;
+        }
+        .homeEditLink:focus-visible{
+            background:rgba(244,228,220,.72) !important;
+            border-color:rgba(160,60,32,.28) !important;
+            box-shadow:0 0 0 3px rgba(160,60,32,.14), 0 6px 18px rgba(107,34,16,.12) !important;
         }
         .homeCardTitle{
             display:flex;
@@ -1402,6 +1407,32 @@
         }
 
     /* ===== Register（氏名編集） ===== */
+        .notify-row{
+        display:flex;
+        align-items:flex-start;
+        gap:8px;
+        margin:10px 0 0;
+        cursor:pointer;
+        }
+        .notify-row input[type="checkbox"]{
+        flex:0 0 auto;
+        width:18px;
+        height:18px;
+        margin:2px 0 0;
+        accent-color:var(--ui-primary);
+        }
+        .notify-main-label{
+        min-width:0;
+        font-size:13.5px;
+        line-height:1.55;
+        color:var(--c-text);
+        }
+        .notify-note{
+        margin:4px 0 10px 26px;
+        font-size:12.5px;
+        line-height:1.65;
+        color:var(--ui-muted-fg);
+        }
         .regAddRow { 
         margin-top: 12px;               /* 上と詰まらないように余白を追加 */
         align-items:center;
@@ -1410,11 +1441,16 @@
         }
         .regAddRow .sectionTitle{
         min-width:0;
+        font-size:.98em;
         line-height:1.35;
+        word-break:keep-all;
         }
         #btnAddPerf{
         flex:0 0 auto;
-        min-width:150px;
+        min-width:144px;
+        padding-left:12px;
+        padding-right:12px;
+        font-size:13.5px;
         white-space:nowrap;
         word-break:keep-all;
         line-height:1.25;
@@ -1474,16 +1510,22 @@
         white-space:nowrap;
         word-break:keep-all;
         }
-        @media (max-width: 380px){
+        @media (max-width: 430px){
         .regAddRow{
             display:grid;
             grid-template-columns:1fr;
             align-items:start;
+            justify-content:stretch;
+        }
+        .regAddRow .sectionTitle{
+            font-size:.95em;
         }
         #btnAddPerf{
-            justify-self:start;
+            justify-self:end;
             min-width:0;
         }
+        }
+        @media (max-width: 380px){
         .perfRow{
             grid-template-columns:1fr;
         }
@@ -2991,7 +3033,6 @@
                     <span class="homeArrow" aria-hidden="true">›</span>
                     </button>
                 </div>
-                <div id="profileEditSlotViewer" class="homeProfileEditSlot is-viewer"></div>
 
             <!-- 互換性維持のためのダミー -->
                 <button id="btnReload" type="button" style="display:none;"></button>
@@ -3026,10 +3067,10 @@
                     </div>
                 </div>
 
-            <!-- ★ 閲覧者用：今後の予定（直近5件） -->
+            <!-- ★ 閲覧者用：予定表（直近5件） -->
             <div class="card" id="cardViewerUpcoming" style="display:none;">
             <div class="row-space">
-                <div class="sectionTitle">今後の予定（直近5件）</div>
+                <div class="sectionTitle">予定表（直近5件）</div>
             </div>
             <div id="viewerEventsBox">
                 <div class="muted">
@@ -3037,6 +3078,7 @@
                 </div>
             </div>
             </div>
+            <div id="profileEditSlotViewer" class="homeProfileEditSlot is-viewer"></div>
 
             <div id="homeLog" class="muted" style="margin-top:8px;"></div>
         </section>
@@ -3100,18 +3142,16 @@
                 placeholder="例：山田 太郎"
                 />
 
-                <label
-                class="row"
-                style="gap:6px; align-items:center; margin-top:6px;"
-                >
+                <label class="notify-row" for="regNotify">
                     <input type="checkbox" id="regNotify" />
-                    <span class="small">
+                    <span class="notify-main-label">
                         このアカウント宛てに通知（配信・リマインド）を送る
                     </span>
                 </label>
 
-                <div class="small muted" style="margin:2px 0 8px 24px;">
-                ※通知をオフにすると、配信・リマインドは届きません（予定の閲覧は可能です）
+                <div class="notify-note">
+                ※通知をオフにすると、配信・リマインドは届きません<br>
+                （予定の閲覧は可能です）
                 </div>
 
                 <div class="line"></div>
@@ -3155,10 +3195,10 @@
             </div>
         </section>
 
-    <!-- ===== View: 今後の予定一覧 ===== -->
+    <!-- ===== View: 予定表 ===== -->
         <section id="view-schedules" data-view>
             <div class="row-space">
-                <div class="sectionTitle">今後の予定</div>
+                <div class="sectionTitle">予定表</div>
                 <button
                 id="btnBackFromSchedules"
                 class="btn btn-ghost btn-sm"
