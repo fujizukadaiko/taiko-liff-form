@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.4.0";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.4.1";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaeqchlDJmkQGMKEYm9pQEOmp-GWgt0jhxRsO3Uq_G9GxaaE3n9p-fYcO6eprlLO5QLQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -157,7 +157,7 @@
             theme: {
             extend: {
                 colors: {
-                primary: '#7f6aa5',
+                primary: '#a03c20',
                 },
                 boxShadow: {
                 card: '0 2px 10px rgba(0,0,0,0.04)',
@@ -357,10 +357,10 @@
             -webkit-appearance: none;
             appearance: none;
             }
-            .selectBtn:focus{
+        .selectBtn:focus{
             outline: none;
-            box-shadow: 0 0 0 3px rgba(127,106,165,.18);
-            }
+            box-shadow: 0 0 0 3px rgba(160,60,32,.16);
+        }
 
             /* === disabledテキスト入力の見た目をselectと統一（iOS/Safari対応） === */
             .selectBtn:disabled,
@@ -774,14 +774,14 @@
                 background: #fff !important;
                 color: var(--c-primary-2) !important;
                 border: 1px solid color-mix(in srgb, var(--c-primary-2), #000 10%) !important;
-                box-shadow: 0 1px 4px rgba(127,106,165, 0.08); /* ごく薄い影 */
+                box-shadow: 0 1px 4px rgba(160,60,32, 0.08); /* ごく薄い影 */
                 transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
             }
             .btn.btn-ghost:hover{
                 background: color-mix(in srgb, var(--c-primary), #fff 90%) !important; /* わずかに紫が乗る */
                 border-color: var(--c-primary) !important;
                 color: var(--c-primary-2) !important;
-                box-shadow: 0 2px 8px rgba(127,106,165, 0.12);
+                box-shadow: 0 2px 8px rgba(160,60,32, 0.12);
             }
             .btn.btn-ghost:focus-visible{
                 outline: 2px solid color-mix(in srgb, var(--c-primary), #000 0%) !important;
@@ -1429,9 +1429,11 @@
         }
         .notify-note{
         margin:4px 0 10px 26px;
-        font-size:12.5px;
+        font-size:12px;
         line-height:1.65;
         color:var(--ui-muted-fg);
+        word-break:normal;
+        overflow-wrap:anywhere;
         }
         .regAddRow { 
         margin-top: 12px;               /* 上と詰まらないように余白を追加 */
@@ -2032,7 +2034,7 @@
         }
         #view-custom-push .cp-textarea{
             width:100%;
-            border:1.5px solid var(--c-primary-2);
+            border:1.5px solid rgba(160,60,32,.34);
             background:#fff;
             border-radius:10px;
             padding:10px 12px;
@@ -2053,19 +2055,20 @@
         }
 
         #view-custom-push .cp-pill{
-            border:1.5px dashed var(--c-primary-2);
-            background:#f7f5ff;
+            border:1.5px solid rgba(160,60,32,.16);
+            background:rgba(253,249,244,.92);
             border-radius:10px;
             padding:12px;
             margin:10px 0;
+            box-shadow:0 2px 10px rgba(107,34,16,.04);
         }
         #view-custom-push .cp-pill-title{
             font-weight:700;
             margin-bottom:4px;
-            color:var(--c-text);
+            color:var(--ui-primary-dark);
         }
         #view-custom-push .cp-pill-body{
-            color:var(--c-muted);
+            color:var(--ui-muted-fg);
         }
 
         #cp_extra{
@@ -2079,23 +2082,23 @@
         }
 
         #view-custom-push .statWrap.is-disabled{
-            background:#f5efff !important;
-            border:1.5px dashed #d8cef1 !important;
+            background:rgba(244,228,220,.72) !important;
+            border:1.5px dashed rgba(160,60,32,.24) !important;
             border-radius:12px !important;
             padding:10px !important;
             opacity:.95 !important;
         }
         #view-custom-push .statWrap.is-disabled label{
-            color:#7a6fa6 !important;
+            color:var(--ui-muted-fg) !important;
         }
         #view-custom-push .statWrap .lockTag{
             display:inline-flex !important;
             align-items:center;
             gap:6px;
             font-size:12px;
-            color:#7f6aa5;
-            background:#efe7ff;
-            border:1px solid #e6e0f0;
+            color:var(--ui-primary-dark);
+            background:rgba(253,249,244,.92);
+            border:1px solid rgba(160,60,32,.18);
             border-radius:999px;
             padding:2px 8px;
             margin-left:8px;
@@ -2106,6 +2109,37 @@
 
         #view-custom-push #cp_event{
             font-size:13px;
+        }
+        #view-custom-push .statWrap{
+            background:rgba(253,249,244,.92);
+            border:1px solid rgba(160,60,32,.16);
+            border-radius:12px;
+            padding:10px;
+        }
+        #view-custom-push .statWrap label{
+            display:inline-flex;
+            align-items:center;
+            gap:5px;
+            min-height:32px;
+            padding:5px 10px;
+            border:1px solid rgba(160,60,32,.14);
+            border-radius:999px;
+            background:rgba(255,255,255,.58);
+            color:var(--ui-primary-dark) !important;
+            font-size:13px;
+            cursor:pointer;
+        }
+        #view-custom-push .statWrap label:has(input:checked){
+            background:rgba(244,228,220,.88);
+            border-color:rgba(160,60,32,.45);
+            box-shadow:0 2px 8px rgba(107,34,16,.08);
+        }
+        #view-custom-push .statWrap input[type="checkbox"]{
+            accent-color:var(--ui-primary);
+        }
+        #view-custom-push .statWrap label:focus-within{
+            outline:2px solid rgba(160,60,32,.35);
+            outline-offset:2px;
         }
         .loadingHint{
             font-size:12px;
@@ -2194,7 +2228,8 @@
         margin: 4px 0 0;
         padding: 8px 10px;
         border-radius: 10px;
-        background: #f7f5ff;
+        background: #fdf9f4;
+        border:1px solid rgba(160,60,32,.14);
         font-family: inherit;
         font-size: 14px;
         line-height: 1.6;
@@ -2371,12 +2406,12 @@
         border: none;
         border-radius: 9999px;
         padding: 0;
-        background: linear-gradient(180deg, #7c6ae6 0%, #6f5dbd 100%);
+        background: var(--ui-primary-gradient);
         color: #fff;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 10px 24px rgba(0,0,0,.22);
+        box-shadow: 0 10px 26px rgba(107,34,16,.24);
         cursor: pointer;
         z-index: 1200;
         -webkit-tap-highlight-color: transparent;
@@ -2391,14 +2426,16 @@
         }
         @media (hover:hover){
         #feedbackFab.fab:hover{
-            box-shadow: 0 12px 28px rgba(0,0,0,.28);
+            background:linear-gradient(135deg, #b84524 0%, #7b2a14 100%);
+            box-shadow: 0 12px 30px rgba(107,34,16,.30);
             transform: translateY(-1px);
         }
         }
         #feedbackFab.fab:active{ transform: translateY(1px); }
         #feedbackFab.fab:focus-visible{
-        outline: 3px solid rgba(255,255,255,.9);
+        outline: 3px solid rgba(160,60,32,.24);
         outline-offset: 2px;
+        box-shadow:0 0 0 5px rgba(253,249,244,.9), 0 12px 30px rgba(107,34,16,.30);
         }
         @media (prefers-reduced-motion: reduce){
         #feedbackFab.fab{ transition: none; }
@@ -2489,9 +2526,9 @@
         border:1px solid #bbb;
         }
         #feedbackModal .btn-primary{
-        background:#6f5dbd;
+        background:var(--ui-primary-gradient);
         color:#fff;
-        border:1px solid #6f5dbd;
+        border:1px solid #8c3218;
         }
 
         /* ===== スナックバー ===== */
@@ -2761,7 +2798,7 @@
         height:14px;
         border-radius:50%;
         border:2px solid #ccc;
-        border-top-color:#6f5dbd;
+        border-top-color:var(--ui-primary);
         animation: fbsp 0.8s linear infinite;
         vertical-align:-2px;
         margin-left:6px;
@@ -3150,8 +3187,7 @@
                 </label>
 
                 <div class="notify-note">
-                ※通知をオフにすると、配信・リマインドは届きません<br>
-                （予定の閲覧は可能です）
+                ※通知をオフにすると、配信・リマインドは届きません（予定の閲覧は可能です）
                 </div>
 
                 <div class="line"></div>
