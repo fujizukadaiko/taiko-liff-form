@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.3.8";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.3.9";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaeqchlDJmkQGMKEYm9pQEOmp-GWgt0jhxRsO3Uq_G9GxaaE3n9p-fYcO6eprlLO5QLQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1192,14 +1192,14 @@
             display:grid;
             grid-template-columns:1fr;
             gap:12px;
-            margin:10px 0 22px;
+            margin:10px 0 20px;
         }
         .homeActions .btn{ width:100%; box-sizing:border-box; }
         .homePrimary{
             position:relative;
             overflow:hidden;
-            min-height:86px !important;
-            padding:20px 22px !important;
+            min-height:78px !important;
+            padding:18px 22px !important;
             border-radius:18px !important;
             justify-content:space-between !important;
             text-align:left;
@@ -1222,17 +1222,20 @@
         .homePrimaryText{
             position:relative;
             z-index:1;
-            display:grid;
-            gap:5px;
+            display:flex;
+            align-items:center;
+            min-width:0;
         }
         .homePrimaryTitle{
-            font-family:"Shippori Mincho","Noto Serif JP","Yu Mincho","Hiragino Mincho ProN","MS PMincho",serif;
+            font-family:"Noto Sans JP",system-ui,-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;
             font-size:21px;
             line-height:1.25;
-            font-weight:700;
-            letter-spacing:.03em;
+            font-weight:800;
+            letter-spacing:.02em;
+            word-break:keep-all;
         }
         .homePrimarySub{
+            display:none;
             font-size:13px;
             line-height:1.45;
             opacity:.84;
@@ -1246,8 +1249,8 @@
             opacity:.88;
         }
         .homeSecondary{
-            min-height:68px !important;
-            padding:14px 16px !important;
+            min-height:60px !important;
+            padding:12px 16px !important;
             border-radius:16px !important;
             justify-content:space-between !important;
             border-width:1.5px !important;
@@ -1271,8 +1274,8 @@
             color:var(--ui-primary);
         }
         .homeSecondaryText{
-            display:grid;
-            gap:2px;
+            display:flex;
+            align-items:center;
             text-align:left;
             min-width:0;
         }
@@ -1283,23 +1286,58 @@
             color:var(--ui-primary-dark);
         }
         .homeSecondarySub{
+            display:none;
             font-size:12px;
             line-height:1.35;
             color:var(--ui-muted-fg);
             font-weight:500;
         }
+        .homeProfileEditSlot{
+            display:flex;
+            justify-content:center;
+            margin:10px 0 16px;
+        }
+        .homeProfileEditSlot.is-viewer{
+            margin-top:-2px;
+            margin-bottom:18px;
+        }
         .homeEditLink{
-            min-height:32px !important;
-            padding:0 !important;
+            display:inline-flex !important;
+            align-items:center;
+            justify-content:center;
+            gap:.45em;
+            width:auto !important;
+            min-height:44px !important;
+            padding:5px 12px !important;
             border:0 !important;
-            background:transparent !important;
-            color:var(--ui-muted-fg) !important;
+            border-bottom:1px dashed rgba(107,34,16,.45) !important;
+            border-radius:12px !important;
+            background:rgba(253,249,244,.56) !important;
+            color:var(--ui-primary-dark) !important;
             box-shadow:none !important;
             justify-self:center;
-            text-decoration:underline;
-            text-decoration-style:dotted;
-            text-underline-offset:4px;
+            text-decoration:none;
             font-size:13px !important;
+            font-weight:700;
+            white-space:nowrap;
+            word-break:keep-all;
+        }
+        .homeEditLinkIcon{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:1.55em;
+            height:1.55em;
+            border-radius:999px;
+            background:rgba(160,60,32,.10);
+            color:var(--ui-primary);
+            font-size:.9em;
+            line-height:1;
+            flex:0 0 auto;
+        }
+        .homeEditLink:hover{
+            background:rgba(244,228,220,.72) !important;
+            border-bottom-color:rgba(107,34,16,.72) !important;
         }
         .homeCardTitle{
             display:flex;
@@ -1366,6 +1404,20 @@
     /* ===== Register（氏名編集） ===== */
         .regAddRow { 
         margin-top: 12px;               /* 上と詰まらないように余白を追加 */
+        align-items:center;
+        gap:12px;
+        flex-wrap:nowrap;
+        }
+        .regAddRow .sectionTitle{
+        min-width:0;
+        line-height:1.35;
+        }
+        #btnAddPerf{
+        flex:0 0 auto;
+        min-width:150px;
+        white-space:nowrap;
+        word-break:keep-all;
+        line-height:1.25;
         }
         #regNote {
         margin: 6px 0 8px;               /* タイトル直下の注意書きの行間 */
@@ -1373,15 +1425,13 @@
         color: var(--c-muted);
         }
 
-        /* ===== 演奏者行（ラベルは1行、下段で入力と削除を2列に並べる） ===== */
-        /* ===== 演奏者行：名前 7 / 右カラム 3（区分+削除） ===== */
         .perfRow{
         display: grid;
-        grid-template-columns: 7fr 3fr;     /* ← 7:3 */
+        grid-template-columns:minmax(0, 1fr) minmax(132px, 0.34fr);
         grid-auto-rows: auto;
-        column-gap: 12px;
-        row-gap: 8px;
-        margin: 10px 0;
+        column-gap:10px;
+        row-gap:10px;
+        margin:12px 0;
         align-items: center;
         }
         .perfRow .perfLabel{
@@ -1393,25 +1443,57 @@
         grid-column: 1 / 2;                /* 左：名前 */
         width: 100%;
         height: 44px;
+        min-width:0;
         }
         .perfRow .regPerfSeg{
         grid-column: 2 / 3;                /* 右（上段）：区分セレクト */
         width: 100%;
+        min-width:132px;
         height: 44px;
+        white-space:nowrap;
+        word-break:keep-all;
+        text-align:center;
+        padding-left:10px;
+        padding-right:10px;
         }
         .perfRow .btn-remove{
         grid-column: 2 / 3;                /* 右（下段）：削除ボタン */
         width: 100%;
+        min-width:132px;
         min-height: 40px;
         height: 44px;
         padding: 0 12px;
         border-radius: 12px;
         justify-self: stretch;
         align-self: end;
+        white-space:nowrap;
+        word-break:keep-all;
         }
-        /* 狭い端末でも維持（必要なら 1列化にもできます） */
-        @media (max-width: 420px){
-        .perfRow{ column-gap: 10px; }
+        #view-register .btn,
+        #view-register .selectBtn{
+        white-space:nowrap;
+        word-break:keep-all;
+        }
+        @media (max-width: 380px){
+        .regAddRow{
+            display:grid;
+            grid-template-columns:1fr;
+            align-items:start;
+        }
+        #btnAddPerf{
+            justify-self:start;
+            min-width:0;
+        }
+        .perfRow{
+            grid-template-columns:1fr;
+        }
+        .perfRow .regPerf,
+        .perfRow .regPerfSeg,
+        .perfRow .btn-remove{
+            grid-column:1 / -1;
+            width:100%;
+            min-width:0;
+        }
         }
     
     /* ===== Admin Report（出欠レポート） ===== */
@@ -2891,7 +2973,6 @@
                     <button id="btnPrimary" class="btn btn-primary btn-lg homePrimary" data-view-target="view-form" disabled>
                     <span class="homePrimaryText">
                         <span class="homePrimaryTitle">読み込み中…</span>
-                        <span class="homePrimarySub">出欠情報を確認しています</span>
                     </span>
                     <span class="homeArrow" aria-hidden="true">›</span>
                     </button>
@@ -2904,16 +2985,13 @@
                             </svg>
                         </span>
                         <span class="homeSecondaryText">
-                            <span class="homeSecondaryTitle">今後の予定</span>
-                            <span class="homeSecondarySub">練習・公演予定を見る</span>
+                            <span class="homeSecondaryTitle">予定表</span>
                         </span>
                     </span>
                     <span class="homeArrow" aria-hidden="true">›</span>
                     </button>
-                    <button id="btnEditNames" class="btn btn-outline btn-lg homeEditLink" data-view-target="view-register" style="display:none;">
-                    登録氏名を変更する
-                    </button>
                 </div>
+                <div id="profileEditSlotViewer" class="homeProfileEditSlot is-viewer"></div>
 
             <!-- 互換性維持のためのダミー -->
                 <button id="btnReload" type="button" style="display:none;"></button>
@@ -2932,6 +3010,12 @@
                             読み込み中… <span class="spinner"></span>
                         </div>
                     </div>
+                </div>
+                <div id="profileEditSlotNormal" class="homeProfileEditSlot">
+                    <button id="btnEditNames" class="btn btn-outline btn-lg homeEditLink" data-view-target="view-register" style="display:none;">
+                    <span class="homeEditLinkIcon" aria-hidden="true">✎</span>
+                    <span>登録氏名を変更する</span>
+                    </button>
                 </div>
 
             <!-- あなたの登録状況（トップでは非表示） -->
@@ -4657,22 +4741,44 @@
     function setHomePrimaryButton(label, disabled){
     const btn = $("#btnPrimary");
     if (!btn) return;
-    const text = String(label || "");
-    const sub = text.includes("読み込み")
-        ? "出欠情報を確認しています"
-        : text.includes("初回登録")
-            ? "出欠の前に入力者名と演奏者を登録する"
-            : text.includes("登録氏名")
-                ? "入力者・演奏者の登録内容を編集する"
-                : "参加・欠席・未定を登録・変更する";
+    const text = String(label || "").replace(/\s*\/\s*/g, "／");
     btn.disabled = !!disabled;
     btn.innerHTML = `
         <span class="homePrimaryText">
         <span class="homePrimaryTitle">${h(text)}</span>
-        <span class="homePrimarySub">${h(sub)}</span>
         </span>
         <span class="homeArrow" aria-hidden="true">›</span>
     `;
+    }
+
+    function updateHomeProfileEditPlacement({ hasMembers, viewer } = {}){
+    const edit = $("#btnEditNames");
+    const primary = $("#btnPrimary");
+    const normalSlot = $("#profileEditSlotNormal");
+    const viewerSlot = $("#profileEditSlotViewer");
+    const activeCard = $("#cardEventsActive");
+    if (!edit || !normalSlot || !viewerSlot) return;
+
+    const isViewOnly = (typeof viewer === "boolean") ? viewer : isViewer();
+    const hasRegisteredMembers = (typeof hasMembers === "boolean")
+        ? hasMembers
+        : state.members.length > 0;
+    const showEdit = hasRegisteredMembers || isViewOnly;
+
+    if (isViewOnly) {
+        viewerSlot.appendChild(edit);
+        viewerSlot.style.display = showEdit ? "" : "none";
+        normalSlot.style.display = "none";
+        if (primary) primary.style.display = "none";
+        if (activeCard) activeCard.style.display = "none";
+    } else {
+        normalSlot.appendChild(edit);
+        normalSlot.style.display = showEdit ? "" : "none";
+        viewerSlot.style.display = "none";
+        if (primary) primary.style.display = "";
+        if (activeCard) activeCard.style.display = "";
+    }
+    edit.style.display = showEdit ? "" : "none";
     }
     
     /* ===== 区分(セグメント) 正規化 & 判定ヘルパー ===== */
@@ -5526,6 +5632,8 @@
         $("#answersBox").innerHTML = `会員情報照会中… <span class="spinner"></span>`;
         setHomePrimaryButton("読み込み中…", true);
         $("#btnEditNames").style.display = "none";
+        $("#profileEditSlotNormal").style.display = "none";
+        $("#profileEditSlotViewer").style.display = "none";
 
         const lineId = state.lineId || "";
         if (!lineId) {
@@ -5810,10 +5918,8 @@
         const viewer  = isViewer();
         setHomePrimaryButton(viewer
             ? "登録氏名の編集"
-            : (hasPerf ? "出欠を入力 / 変更する" : "初回登録に進む"), false);
-
-        const showEditSubBtn = hasPerf && !viewer;
-        $("#btnEditNames").style.display = showEditSubBtn ? "" : "none";
+            : (hasPerf ? "出欠を入力／変更する" : "初回登録に進む"), false);
+        updateHomeProfileEditPlacement({ hasMembers: state.members.length > 0, viewer });
 
         console.log("[perf] refreshData done", (performance.now() - t0).toFixed(0), "ms");
     }
@@ -5821,8 +5927,9 @@
 /* ===== HOME画面に戻ってきたときのボタン表示とメッセージ調整 ===== */
     function renderHome(){
     const hasMembers = state.members.length > 0;
-    setHomePrimaryButton(hasMembers ? "出欠を入力 / 変更する" : "初回登録に進む", false);
-    $("#btnEditNames").style.display = (hasMembers && !isViewer()) ? "" : "none";
+    const viewer = isViewer();
+    setHomePrimaryButton(hasMembers ? "出欠を入力／変更する" : "初回登録に進む", false);
+    updateHomeProfileEditPlacement({ hasMembers, viewer });
 
     if (!hasMembers){
         $("#answersBox").innerHTML = `
