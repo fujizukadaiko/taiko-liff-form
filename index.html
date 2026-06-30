@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.4.2";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.4.3";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaeqchlDJmkQGMKEYm9pQEOmp-GWgt0jhxRsO3Uq_G9GxaaE3n9p-fYcO6eprlLO5QLQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -1859,6 +1859,13 @@
             line-height:1.45;
             overflow-wrap:anywhere;
             min-width:0;
+        }
+        #view-admin-carpool .carpoolParticipants{
+            color:var(--c-muted);
+            font-size:11px;
+            line-height:1.45;
+            margin-top:2px;
+            overflow-wrap:anywhere;
         }
         #view-admin-carpool .carpoolComment{
             display:-webkit-box;
@@ -9108,6 +9115,7 @@
         eventsLoaded: false,
         events: [],
         rows: [],
+        participantCount: 0,
     };
 
     function normalizeCarpoolName(s){
@@ -9196,6 +9204,142 @@
         };
     }
 
+    function carpoolLineIdOf(x){
+        return String(x?.lineId || x?.line_id || x?.userId || x?.user_id || x?.uid || "").trim();
+    }
+
+    function carpoolPickRepresentativeName(x){
+        return String(
+        x?.inputName ||
+        x?.input_name ||
+        x?.ownerName ||
+        x?.owner_name ||
+        x?.parentName ||
+        x?.parent_name ||
+        x?.guardianName ||
+        x?.guardian_name ||
+        x?.accountName ||
+        x?.account_name ||
+        x?.representativeName ||
+        x?.representative_name ||
+        ""
+        ).trim();
+    }
+
+    function buildCarpoolMemberIndexes(payload){
+        const members = Array.isArray(payload?.members) ? payload.members : [];
+        const membersByLine = new Map();
+        const memberByName = new Map();
+
+        members.forEach(m => {
+        const lid = carpoolLineIdOf(m);
+        const inputName = carpoolPickRepresentativeName(m);
+        const performerName = String(m?.performerName || m?.performer_name || m?.displayName || m?.name || "").trim();
+        const segment = m?.segment || m?.seg || "";
+
+        let mem = lid ? membersByLine.get(lid) : null;
+        if (lid && !mem) {
+            mem = {
+            lineId: lid,
+            inputName: "",
+            primaryPerformer: "",
+            segment: "",
+            };
+        }
+
+        if (mem) {
+            if (!mem.inputName && inputName) mem.inputName = inputName;
+            if (!mem.primaryPerformer && performerName) mem.primaryPerformer = performerName;
+            if (!mem.segment && segment) mem.segment = segment;
+            membersByLine.set(lid, mem);
+        }
+
+        [performerName, m?.displayName, m?.name].forEach(n => {
+            const key = normalizeCarpoolName(n);
+            if (key && !memberByName.has(key)) {
+            memberByName.set(key, {
+                lineId: lid,
+                inputName,
+                primaryPerformer: performerName,
+                segment,
+            });
+            }
+        });
+        });
+
+        return { membersByLine, memberByName };
+    }
+
+    function buildUniqueCarpoolCandidates(payload, eventKey){
+        const eventSeg =
+        payload?.segment ||
+        payload?.targetGroup ||
+        payload?.target_group ||
+        payload?.event?.targetGroup ||
+        payload?.event?.target_group ||
+        "";
+        const { membersByLine, memberByName } = buildCarpoolMemberIndexes(payload);
+
+        const participantRows = carpoolPickRows(payload)
+        .map((raw, idx) => {
+            const row = carpoolMapRow(raw);
+            const byName = memberByName.get(normalizeCarpoolName(row.name || row.displayName));
+            if (!row.lineId) row.lineId = carpoolLineIdOf(raw) || byName?.lineId || "";
+            if (!row.segment) row.segment = byName?.segment || membersByLine.get(row.lineId)?.segment || "";
+            row._sourceIndex = idx;
+            return row;
+        })
+        .filter(r => isCarpoolParticipatingAttend(r.attend))
+        .filter(r => carpoolEventMatchesSegment(r.segment, eventSeg));
+
+        const candidateMap = new Map();
+
+        participantRows.forEach(row => {
+        const lineId = String(row.lineId || "").trim();
+        const key = lineId ? `line:${lineId}` : `no-line-id:${row._sourceIndex}:${row.name || row.displayName || "unknown"}`;
+        const mem = lineId ? membersByLine.get(lineId) : null;
+        const representativeName = mem?.inputName || mem?.primaryPerformer || "";
+        const participantName = row.displayName || row.name || "(名前未設定)";
+
+        let cand = candidateMap.get(key);
+        if (!cand) {
+            cand = {
+            lineId,
+            name: normalizeCarpoolName(representativeName || participantName),
+            displayName: representativeName || participantName,
+            attend: "参加",
+            comment: "",
+            segment: row.segment,
+            participantNames: [],
+            _comments: [],
+            };
+            candidateMap.set(key, cand);
+        }
+
+        if (participantName && !cand.participantNames.includes(participantName)) {
+            cand.participantNames.push(participantName);
+        }
+        if (row.comment) {
+            const commentLine = `${participantName}: ${row.comment}`;
+            if (!cand._comments.includes(commentLine)) cand._comments.push(commentLine);
+        }
+        });
+
+        const candidates = Array.from(candidateMap.values()).map(cand => {
+        const participantNote = cand.participantNames.length > 1
+            ? `参加者: ${cand.participantNames.join("、")}`
+            : "";
+        cand.comment = cand._comments.length ? cand._comments.join("\n") : participantNote;
+        delete cand._comments;
+        return cand;
+        }).sort((a, b) => String(a.displayName || a.name).localeCompare(String(b.displayName || b.name), "ja"));
+
+        return {
+        participantCount: participantRows.length,
+        candidates,
+        };
+    }
+
     function analyzeCarpoolComment(comment){
         const s = String(comment || "").trim();
         if (!s) return null;
@@ -9236,7 +9380,9 @@
         const root = document.getElementById("carpoolSummary");
         if (!root) return;
 
-        const participantCount = carpoolState.rows.length;
+        const participantCount = Number.isFinite(carpoolState.participantCount)
+        ? carpoolState.participantCount
+        : carpoolState.rows.length;
         const extra = Math.max(0, Number(document.getElementById("carpoolExtraCount")?.value || 0) || 0);
         const target = participantCount + extra;
         let capacity = 0;
@@ -9302,6 +9448,9 @@
                 <div class="carpoolTopLine">
                     <div class="carpoolCellName">
                         <div class="carpoolName">${h(p.displayName || p.name || "(名前未設定)")}</div>
+                        ${Array.isArray(p.participantNames) && p.participantNames.length
+                            ? `<div class="carpoolParticipants">参加者: ${h(p.participantNames.join("、"))}</div>`
+                            : ""}
                         ${assistHtml}
                     </div>
                     <div class="carpoolCellAttend"><span class="badge-att yes">${h(p.attend || "参加")}</span></div>
@@ -9403,6 +9552,7 @@
         const eventKey = sel?.value || "";
 
         carpoolState.rows = [];
+        carpoolState.participantCount = 0;
         if (!eventKey) {
         if (box) box.textContent = "公演を選択してください";
         renderCarpoolSummary();
@@ -9428,28 +9578,9 @@
             throw new Error(payload?.message || `HTTP ${res.status}`);
         }
 
-        let rows = [];
-        if (typeof window.buildAdminReportRowsForEvent === "function") {
-            rows = window.buildAdminReportRowsForEvent(payload, eventKey, { includeUnanswered: false })
-            .filter(r => isCarpoolParticipatingAttend(r.attend))
-            .map(carpoolMapReportRow);
-        } else {
-            const eventSeg =
-            payload.segment ||
-            payload.targetGroup ||
-            payload.target_group ||
-            payload.event?.targetGroup ||
-            payload.event?.target_group ||
-            "";
-
-            rows = carpoolPickRows(payload)
-            .map(carpoolMapRow)
-            .filter(r => isCarpoolParticipatingAttend(r.attend))
-            .filter(r => carpoolEventMatchesSegment(r.segment, eventSeg))
-            .sort((a, b) => String(a.name).localeCompare(String(b.name), "ja"));
-        }
-
-        carpoolState.rows = rows;
+        const built = buildUniqueCarpoolCandidates(payload, eventKey);
+        carpoolState.rows = built.candidates;
+        carpoolState.participantCount = built.participantCount;
         renderCarpoolRows();
         } catch (e) {
         console.error("loadCarpoolDetail error:", e);
