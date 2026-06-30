@@ -8,7 +8,7 @@
     <!-- ===== 共通設定（環境・バージョン） ===== -->
         <script>
             // === 基本設定 ===
-            const FRONT_VERSION = "Front v6.4.3";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
+            const FRONT_VERSION = "Front v6.4.4";  // stable ver→v6.3.1, PROD v1.2.8 反映済み
             const LIFF_ID = "2008020568-2jVl00Rn";         // ←差し替え
             const API_ENDPOINT = "https://script.google.com/macros/s/AKfycbzaeqchlDJmkQGMKEYm9pQEOmp-GWgt0jhxRsO3Uq_G9GxaaE3n9p-fYcO6eprlLO5QLQ/exec";     // GAS v106.2 （PROD v1.0.2 反映済み）
             const D1_API_BASE_URL = "https://taiko-worker-plain.fujizukadaiko.workers.dev";
@@ -9320,16 +9320,12 @@
             cand.participantNames.push(participantName);
         }
         if (row.comment) {
-            const commentLine = `${participantName}: ${row.comment}`;
-            if (!cand._comments.includes(commentLine)) cand._comments.push(commentLine);
+            if (!cand._comments.includes(row.comment)) cand._comments.push(row.comment);
         }
         });
 
         const candidates = Array.from(candidateMap.values()).map(cand => {
-        const participantNote = cand.participantNames.length > 1
-            ? `参加者: ${cand.participantNames.join("、")}`
-            : "";
-        cand.comment = cand._comments.length ? cand._comments.join("\n") : participantNote;
+        cand.comment = cand._comments.length ? cand._comments.join("\n") : "";
         delete cand._comments;
         return cand;
         }).sort((a, b) => String(a.displayName || a.name).localeCompare(String(b.displayName || b.name), "ja"));
@@ -9458,7 +9454,7 @@
                         <input type="checkbox" class="carpoolCandidate"> 候補
                     </label>
                 </div>
-                <div class="carpoolCellComment"><div class="carpoolComment">${h(p.comment || "")}</div></div>
+                ${p.comment ? `<div class="carpoolCellComment"><div class="carpoolComment">${h(p.comment)}</div></div>` : ""}
             </div>
             <div class="carpoolDetails">
                 <div class="carpoolCellCapacity">
